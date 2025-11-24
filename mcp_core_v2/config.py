@@ -5,11 +5,16 @@ Uses pydantic-settings for environment variable management.
 
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
     
     # Supabase Configuration
     supabase_url: str = ""
@@ -24,10 +29,6 @@ class Settings(BaseSettings):
     debug: bool = False
     default_voltage: float = 220.0  # Thailand standard voltage
     default_frequency: float = 50.0  # Hz
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
 
 
 # Global settings instance

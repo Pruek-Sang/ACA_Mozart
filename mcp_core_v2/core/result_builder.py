@@ -257,7 +257,7 @@ class ResultBuilder:
         lighting_circuit = self.build_circuit(
             room.room_id,
             "lighting",
-            16,  # Standard lighting circuit
+            10,  # Standard lighting circuit (10A for 1.5mm² wire, max 14A)
             1.5,  # Standard lighting wire
             16,   # Standard conduit
             len(light_positions) * light_wattage,
