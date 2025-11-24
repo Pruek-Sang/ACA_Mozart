@@ -4,6 +4,7 @@ Data Access Layer for amadeus.catalog schema in Supabase.
 Provides fallback to baseline data when DB is unavailable.
 """
 
+import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime
@@ -22,6 +23,8 @@ from models.baseline import (
     BASELINE_OUTLET_RULES,
     BASELINE_LIGHTING_RULES,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CatalogDAL:
@@ -58,7 +61,7 @@ class CatalogDAL:
             if result.data:
                 return WireSpec(**result.data[0])
         except Exception as e:
-            print(f"DB error, falling back to baseline: {e}")
+            logger.warning("DB error, falling back to baseline: %s", e)
             return self._get_baseline_wire(size_sqmm)
         
         return None
@@ -82,7 +85,7 @@ class CatalogDAL:
             if result.data:
                 return WireSpec(**result.data[0])
         except Exception as e:
-            print(f"DB error, falling back to baseline: {e}")
+            logger.warning("DB error, falling back to baseline: %s", e)
             return self._get_baseline_wire_for_current(current_amps)
         
         return None
@@ -129,7 +132,7 @@ class CatalogDAL:
             if result.data:
                 return BreakerSpec(**result.data[0])
         except Exception as e:
-            print(f"DB error, falling back to baseline: {e}")
+            logger.warning("DB error, falling back to baseline: %s", e)
             return self._get_baseline_breaker(rated_current)
         
         return None
@@ -153,7 +156,7 @@ class CatalogDAL:
             if result.data:
                 return BreakerSpec(**result.data[0])
         except Exception as e:
-            print(f"DB error, falling back to baseline: {e}")
+            logger.warning("DB error, falling back to baseline: %s", e)
             return self._get_baseline_breaker_for_current(current_amps)
         
         return None
@@ -199,7 +202,7 @@ class CatalogDAL:
             if result.data:
                 return RoomTemplate(**result.data[0])
         except Exception as e:
-            print(f"DB error, falling back to baseline: {e}")
+            logger.warning("DB error, falling back to baseline: %s", e)
             return self._get_baseline_template(room_type, area_sqm)
         
         return None
@@ -250,7 +253,7 @@ class CatalogDAL:
             result = query.execute()
             return [ComplianceRule(**r) for r in result.data]
         except Exception as e:
-            print(f"DB error, falling back to baseline: {e}")
+            logger.warning("DB error, falling back to baseline: %s", e)
             return self._get_baseline_compliance_rules(rule_type)
     
     def _get_baseline_compliance_rules(self, rule_type: Optional[str] = None) -> List[ComplianceRule]:

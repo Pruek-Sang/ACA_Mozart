@@ -31,6 +31,12 @@ class LoadCalculator:
         "water_heater": 3000,
     }
     
+    # Demand factor thresholds (per EIT standard)
+    LIGHTING_DEMAND_THRESHOLD_WATTS = 2000  # First 2000W at 100%
+    LIGHTING_DEMAND_FACTOR_OVER = 0.35  # 35% for watts over threshold
+    OUTLET_DEMAND_THRESHOLD_WATTS = 10000  # First 10kW at 100%
+    OUTLET_DEMAND_FACTOR_OVER = 0.5  # 50% for watts over threshold
+    
     def __init__(self, voltage: float = 220.0):
         self.voltage = voltage
     
@@ -136,16 +142,20 @@ class LoadCalculator:
             Demand load in watts
         """
         if load_type == "lighting":
-            # First 2000W at 100%, rest at 35%
-            if connected_load <= 2000:
+            # First LIGHTING_DEMAND_THRESHOLD_WATTS at 100%, rest at LIGHTING_DEMAND_FACTOR_OVER
+            if connected_load <= self.LIGHTING_DEMAND_THRESHOLD_WATTS:
                 return connected_load
-            return 2000 + (connected_load - 2000) * 0.35
+            return self.LIGHTING_DEMAND_THRESHOLD_WATTS + (
+                connected_load - self.LIGHTING_DEMAND_THRESHOLD_WATTS
+            ) * self.LIGHTING_DEMAND_FACTOR_OVER
         
         elif load_type == "outlet":
-            # First 10kW at 100%, over at 50%
-            if connected_load <= 10000:
+            # First OUTLET_DEMAND_THRESHOLD_WATTS at 100%, over at OUTLET_DEMAND_FACTOR_OVER
+            if connected_load <= self.OUTLET_DEMAND_THRESHOLD_WATTS:
                 return connected_load
-            return 10000 + (connected_load - 10000) * 0.5
+            return self.OUTLET_DEMAND_THRESHOLD_WATTS + (
+                connected_load - self.OUTLET_DEMAND_THRESHOLD_WATTS
+            ) * self.OUTLET_DEMAND_FACTOR_OVER
         
         elif load_type == "ac":
             # 100% of largest + 75% of others

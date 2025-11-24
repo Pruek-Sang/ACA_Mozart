@@ -3,10 +3,13 @@ MCP Core v2 Supabase Client
 Handles connection to Supabase for the amadeus.catalog schema.
 """
 
+import logging
 from typing import Optional
 from supabase import create_client, Client
 
 from config import get_supabase_url, get_supabase_key
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseClientWrapper:
@@ -37,7 +40,7 @@ class SupabaseClientWrapper:
             cls._key = key
             return cls._instance
         except Exception as e:
-            print(f"Failed to create Supabase client: {e}")
+            logger.error("Failed to create Supabase client: %s", e)
             return None
     
     @classmethod

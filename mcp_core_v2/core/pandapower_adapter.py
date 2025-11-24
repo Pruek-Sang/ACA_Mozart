@@ -3,8 +3,11 @@ MCP Core v2 Pandapower Adapter
 Single-phase equivalent power flow analysis using pandapower.
 """
 
+import logging
 from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 try:
     import pandapower as pp
@@ -33,7 +36,7 @@ class PandapowerAdapter:
         self.net = None
         
         if not PANDAPOWER_AVAILABLE:
-            print("Warning: pandapower not available, using simplified calculations")
+            logger.warning("pandapower not available, using simplified calculations")
     
     def create_network(self, circuits: List[CircuitSpec]) -> Optional[Any]:
         """
