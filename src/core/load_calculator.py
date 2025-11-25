@@ -1,5 +1,7 @@
 """Load calculator for computing connected, demand loads and design currents."""
 
+import math
+
 from src.models.baseline import BaselineContext
 
 
@@ -36,7 +38,6 @@ class LoadCalculator:
                 if circuit.voltage_v > 0 and circuit.power_factor > 0:
                     if context.phase_system == "3-phase":
                         # For 3-phase: I = P / (sqrt(3) * V * PF)
-                        import math
                         circuit.design_current_a = circuit.demand_load_w / (
                             math.sqrt(3) * circuit.voltage_v * circuit.power_factor
                         )

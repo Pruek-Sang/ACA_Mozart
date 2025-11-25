@@ -311,8 +311,8 @@ class TestWireSizer:
             ambient_temp=40.0,
         )
 
-        # Wire should have adequate ampacity
-        assert spec.ampacity_40c >= 10.0 * 1.25  # 1.25 safety factor
+        # Wire should have adequate ampacity (using safety factor from WireSizer)
+        assert spec.ampacity_40c >= 10.0 * WireSizer.AMPACITY_SAFETY_FACTOR
 
 
 class TestBreakerSelector:

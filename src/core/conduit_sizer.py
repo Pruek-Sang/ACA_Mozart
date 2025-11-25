@@ -11,6 +11,10 @@ from src.models.catalog_models import CableSpec, ConduitSpec
 class ConduitSizer:
     """Calculates conduit fill and selects appropriate conduit sizes."""
 
+    # Estimated outer diameter factor for THW cables (OD ≈ sqrt(size) * factor)
+    # Based on typical THW cable insulation thickness
+    THW_OD_ESTIMATE_FACTOR = 2.5
+
     def __init__(self, dal: Optional[CatalogDAL] = None):
         """Initialize conduit sizer.
         
@@ -66,8 +70,8 @@ class ConduitSizer:
                 return math.pi * (spec.outer_diameter_mm / 2) ** 2
 
         # Estimate based on wire size with typical insulation
-        # Outer diameter ≈ sqrt(size) * 2.5 for THW cables
-        estimated_od = math.sqrt(wire_size_sqmm) * 2.5
+        # Outer diameter ≈ sqrt(size) * THW_OD_ESTIMATE_FACTOR for THW cables
+        estimated_od = math.sqrt(wire_size_sqmm) * self.THW_OD_ESTIMATE_FACTOR
         return math.pi * (estimated_od / 2) ** 2
 
     def _get_max_fill_pct(self, num_wires: int) -> float:

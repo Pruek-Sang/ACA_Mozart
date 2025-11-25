@@ -1,5 +1,6 @@
 """Pandapower adapter for power flow analysis and voltage drop calculations."""
 
+import math
 from typing import Optional
 
 import pandapower as pp
@@ -80,13 +81,16 @@ class PandapowerAdapter:
                 )
 
                 # Create load at circuit bus
+                # Convert W to MW and calculate reactive power from power factor
+                p_mw = circuit.demand_load_w / 1e6
+                # Q = P * tan(arccos(PF)) = P * sqrt(1 - PF²) / PF
+                q_mvar = p_mw * math.sqrt(1 - circuit.power_factor**2) / circuit.power_factor
+                
                 pp.create_load(
                     net,
                     bus=circuit_bus,
-                    p_mw=circuit.demand_load_w / 1e6,
-                    q_mvar=(circuit.demand_load_w / 1e6)
-                    * (1 - circuit.power_factor**2) ** 0.5
-                    / circuit.power_factor,
+                    p_mw=p_mw,
+                    q_mvar=q_mvar,
                     name=f"Load_{circuit.circuit_id}",
                 )
 

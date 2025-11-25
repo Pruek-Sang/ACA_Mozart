@@ -1,5 +1,6 @@
 """Breaker selector for choosing appropriate circuit protection."""
 
+import math
 from typing import Optional
 
 from src.dal.catalog_dal import DEFAULT_BREAKER_SPECS, CatalogDAL
@@ -97,8 +98,6 @@ class BreakerSelector:
         Returns:
             Main breaker rating in amperes.
         """
-        import math
-
         # Calculate total current
         if voltage_v <= 0 or power_factor <= 0:
             return 100.0  # Default

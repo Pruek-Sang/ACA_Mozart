@@ -13,6 +13,9 @@ class WireSizer:
     # Maximum voltage drop limits (NEC/EIT standards)
     MAX_BRANCH_VD_PCT = 3.0  # 3% for branch circuits
     MAX_TOTAL_VD_PCT = 5.0  # 5% total
+    
+    # Safety factor for continuous loads (NEC 210.19(A)(1))
+    AMPACITY_SAFETY_FACTOR = 1.25
 
     def __init__(self, dal: Optional[CatalogDAL] = None):
         """Initialize wire sizer.
@@ -112,7 +115,7 @@ class WireSizer:
             Tuple of (wire_size_sqmm, CableSpec).
         """
         specs = self._get_cable_specs()
-        required_ampacity = design_current_a * 1.25  # Safety factor
+        required_ampacity = design_current_a * self.AMPACITY_SAFETY_FACTOR
 
         for spec in sorted(specs, key=lambda s: s.size_sqmm):
             ampacity = self._get_ampacity(spec, ambient_temp)
