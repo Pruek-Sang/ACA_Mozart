@@ -1,0 +1,470 @@
+﻿________________
+
+
+HOW TO FIX RAG (v2)
+Mozart RAG → MCP Spec Engine
+เอกสารนี้เป็นคู่มือออกแบบและซ่อมระบบ RAG ของ Mozart ให้สอดคล้องกับ
+* MCP DESIGN HANDOVER DOCUMENT
+
+* แนวคิด Canonical Funnel (index + service + verification)
+เป้าหมายคือทำให้ RAG ทำหน้าที่เป็น “Spec Engine” ที่เชื่อถือได้สำหรับสร้าง ProjectInputSpec ส่งให้ MCP Core
+
+________________
+
+
+0. เป้าหมายของ RAG Layer
+RAG/Mozart Copilot ต้องทำหน้าที่ดังนี้:
+   1. คุยกับผู้ใช้ (วิศวกร / เจ้าของบ้าน) ด้วยภาษาคน
+
+   2. เก็บ requirement ให้ครบ แล้วแปลงเป็นโครงสร้างข้อมูล:
+
+      * ProjectRequirements
+
+      * จากนั้นเป็น ProjectInputSpec (schema กลางของ MCP)
+
+         3. ใช้ knowledge base (มาตรฐาน, CATALOG_CONTRACT, ตัวอย่าง input) เพื่อช่วยตีกรอบข้อมูลให้ถูกบริบท
+
+         4. เรียก MCP Core ผ่าน HTTP API (/mcp/v2/run) พร้อมส่ง ProjectInputSpec แบบ JSON
+
+         5. ไม่คำนวณไฟฟ้า ไม่เลือกสาย/เบรกเกอร์ ไม่อ่าน/เขียน amadeus.catalog โดยตรง
+
+________________
+
+
+1. ภาพรวมสถาปัตยกรรม (Context)
+1.1 Actor หลัก
+            * Mozart Copilot + RAG Service
+
+               * REST API: /api/v1/ask, /api/v1/mcp_spec, /api/v1/retrieve_raw, /api/v1/ingest, /api/v1/delete, ฯลฯ
+
+               * ใช้ LLM + VectorDB + Knowledge Index
+
+                  * MCP Core
+
+                     * REST API: /mcp/v2/run
+
+                     * รับ ProjectInputSpec → สร้าง BaselineContext → คำนวณด้วย pandapower + MCP modules → คืน McpRunResult
+
+                        * Supabase (amadeus.catalog)
+
+                           * แหล่งข้อมูล catalog, RULE, TEMPLATE ทั้งหมดของระบบ
+
+                           * RAG ใช้ผ่าน “เอกสาร/knowledge” เท่านั้น
+
+                           * MCP อ่านผ่าน DAL เท่านั้น
+
+1.2 ขอบเขต RAG vs MCP
+                              * RAG:
+
+                                 * ทำ: ความเข้าใจ requirement, การ mapping ภาษาคน → schema, การเลือกเอกสารมาตรฐานที่เกี่ยวข้อง
+
+                                 * ไม่ทำ: คำนวณโหลด, sizing, compliance จริง
+
+                                    * MCP:
+
+                                       * ทำ: คำนวณ, sizing, compliance, layout
+
+                                       * ใช้: amadeus.catalog และ ProjectInputSpec เท่านั้น
+
+________________
+
+
+2. API Design สำหรับ RAG Service
+2.1 /api/v1/ask – General QA & Explanation
+Purpose
+ ตอบคำถามทั่วไปเกี่ยวกับมาตรฐาน, concept, การอธิบายผล MCP แบบภาษาคน
+Request (ตัวอย่าง)
+POST /api/v1/ask
+{
+  "query": "บ้าน 2 ชั้นต้องมี RCD กี่ตัว",
+  "context_hint": ["thai_standard", "eit_lv"],
+  "language": "th"
+}
+
+
+Response (ตัวอย่าง)
+{
+  "answer": "สำหรับบ้านพักอาศัย 2 ชั้นทั่วไป ควรมี RCD อย่างน้อย 1 ตัวต่อวงจรที่...",
+  "sources": [
+    {"doc_id": "DOC_EIT_STANDARD_LV", "page": 12},
+    {"doc_id": "DOC_MCP_CONTRACT", "section": "RCD_RULES"}
+  ],
+  "metadata": {
+    "llm_model": "gemini-pro",
+    "retrieved_docs": ["DOC_EIT_STANDARD_LV", "DOC_EIT_RESIDENTIAL_GUIDE"]
+  }
+}
+
+
+2.2 /api/v1/mcp_spec – สร้าง ProjectInputSpec ให้ MCP
+Purpose
+ รับ requirement แบบ human-readable → คืน McpSpecResponse ที่มี ProjectInputSpec พร้อมใช้งาน
+Request (ตัวอย่าง)
+POST /api/v1/mcp_spec
+{
+  "project_requirements": {
+    "project_name": "House A",
+    "building_type": "residential",
+    "location": "Bangkok",
+    "voltage_system": "TH_1PH_230V",
+    "rooms": [
+      {"name": "Bedroom 1", "type": "bedroom"},
+      {"name": "Kitchen", "type": "kitchen"}
+    ],
+    "loads": [
+      {"room_name": "Bedroom 1", "device": "AC_12000BTU", "quantity": 1},
+      {"room_name": "Kitchen", "device": "OUTLET_16A", "quantity": 6}
+    ],
+    "user_constraints": [
+      "split_kitchen_circuit",
+      "rcd_for_all_outlets"
+    ]
+  }
+}
+
+
+Response (ตัวอย่าง)
+{
+  "project_input": {
+    "project_info": {
+      "project_name": "House A",
+      "building_type": "RESIDENTIAL",
+      "spec_version": "2.0"
+    },
+    "electrical_system": {
+      "voltage_system": "TH_1PH_230V",
+      "earthing": "TT"
+    },
+    "rooms": [
+      {
+        "room_id": "R1",
+        "name": "Bedroom 1",
+        "room_type": "BEDROOM",
+        "template_code": "ROOMT-BEDROOM-STD"
+      },
+      {
+        "room_id": "R2",
+        "name": "Kitchen",
+        "room_type": "KITCHEN",
+        "template_code": "ROOMT-KITCHEN-STD"
+      }
+    ],
+    "loads": [
+      {
+        "load_id": "L1",
+        "room_id": "R1",
+        "device_code": "AC-12000BTU",
+        "qty": 1
+      },
+      {
+        "load_id": "L2",
+        "room_id": "R2",
+        "device_code": "SOCKET-16A",
+        "qty": 6
+      }
+    ],
+    "constraints": {
+      "rule_profile_id": "TH_RESIDENTIAL_LV",
+      "user_constraints": [
+        "split_kitchen_circuit",
+        "rcd_for_all_outlets"
+      ]
+    }
+  },
+  "standards_profile": {
+    "rule_profile_id": "TH_RESIDENTIAL_LV",
+    "notes": "Based on Thai EIT LV residential standard..."
+  },
+  "llm_metadata": {
+    "model": "gemini-pro",
+    "retrieved_docs": ["DOC_MCP_CONTRACT", "DOC_EIT_RESIDENTIAL_GUIDE"]
+  }
+}
+
+
+ข้อบังคับ
+                                          * JSON ที่คืนต้อง parse ได้ด้วย Pydantic model ของ McpSpecResponse / ProjectInputSpec
+
+                                          * ห้ามคืน field มั่วที่ MCP ไม่รู้จัก
+
+                                          * ถ้า validation fail → RAG ต้อง retry/self-correct หรือส่ง error ที่ชัดเจนให้ client
+
+2.3 /api/v1/retrieve_raw
+Purpose
+ Debug retrieval: ให้เห็นว่า query ใดได้เอกสารอะไรบ้าง
+2.4 /api/v1/ingest & /api/v1/delete
+Purpose
+ จัดการ index เอกสารเข้า VectorDB โดยอิง Knowledge Index (ดูหัวข้อ Canonical)
+________________
+
+
+3. Data Model หลักที่ต้อง Fix/Align
+3.1 ProjectRequirements
+ใช้ภายใน RAG เท่านั้น เป็น input ของ /mcp_spec ก่อนเรียก LLM
+ควรรวม:
+                                             * project_name / building_type / location
+
+                                             * voltage_system / earthing ถ้าระบุ
+
+                                             * rooms (ชื่อ + type ภาษาคน)
+
+                                             * loads (room + device + qty)
+
+                                             * user_constraints (เป็น string list ที่เข้าใจง่าย)
+
+3.2 ProjectInputSpec (สัญญากับ MCP)
+ต้อง align กับ MCP DESIGN HANDOVER: input = ProjectInputSpec
+Field หลัก:
+                                                * project_info
+
+                                                   * project_name
+
+                                                   * building_type (normalized)
+
+                                                   * spec_version (เช่น "2.0")
+
+                                                      * electrical_system
+
+                                                         * voltage_system (code เช่น TH_1PH_230V)
+
+                                                         * earthing (TT/TN-S ฯลฯ)
+
+                                                            * rooms: List[RoomSpec]
+
+                                                               * room_id
+
+                                                               * name
+
+                                                               * room_type (enum)
+
+                                                               * template_code (ROOM_TEMPLATE)
+
+                                                                  * loads: List[LoadSpec]
+
+                                                                     * load_id
+
+                                                                     * room_id
+
+                                                                     * device_code (map ไป catalog)
+
+                                                                     * qty
+
+                                                                     * notes (optional)
+
+                                                                        * constraints
+
+                                                                           * rule_profile_id
+
+                                                                           * user_constraints: List[str]
+
+จุด fix หลัก
+                                                                              * ไม่ใช้ field ปลายเปิด / dict มั่ว ๆ
+
+                                                                              * ทุก field ต้องมี type ชัดเจน → Pydantic model
+
+3.3 McpSpecResponse
+                                                                                 * project_input: ProjectInputSpec
+
+                                                                                 * standards_profile (rule_profile_id + note)
+
+                                                                                 * llm_metadata (model, docs)
+
+________________
+
+
+4. นำแนวคิด Canonical Funnel มาใช้กับ RAG
+เป้าหมาย: ทำให้ RAG ใช้ knowledge อย่างเป็นระเบียบ และตรวจสอบย้อนกลับได้
+4.1 Knowledge Index (knowledge_index.json)
+สร้างไฟล์ index กลาง เช่น:
+[
+  {
+    "id": "DOC_MCP_CONTRACT",
+    "path": "docs/MCP_CONTRACT.md",
+    "group": "mcp_spec",
+    "tags": ["schema", "contract", "must_read"],
+    "version": "2.0"
+  },
+  {
+    "id": "DOC_EIT_RESIDENTIAL_GUIDE",
+    "path": "docs/standards/eit_residential_lv.md",
+    "group": "thai_standard",
+    "tags": ["residential", "lv"],
+    "version": "2024-01"
+  },
+  {
+    "id": "DOC_CATALOG_CONTRACT",
+    "path": "docs/DB/CATALOG_CONTRACT.md",
+    "group": "catalog_schema",
+    "tags": ["amadeus.catalog", "schema"],
+    "version": "1.1"
+  }
+]
+
+
+กลุ่มแนะนำ:
+                                                                                    * mcp_spec – MCP DESIGN, MCP_CONTRACT, ตัวอย่าง ProjectInputSpec
+
+                                                                                    * thai_standard – มาตรฐาน วสท., MEA/PEA ฯลฯ
+
+                                                                                    * catalog_schema – CATALOG_CONTRACT, DB schema
+
+                                                                                    * example_project – ตัวอย่าง input/output ดี ๆ สำหรับ test
+
+4.2 Knowledge Service Layer
+เพิ่มโมดูลเช่น knowledge_service.py:
+                                                                                       * list_groups()
+
+                                                                                       * list_docs(group: str)
+
+                                                                                       * load_doc(doc_id: str) → text
+
+                                                                                       * get_docs_for_mcp_spec() → คืน doc ใน group mcp_spec + catalog_schema
+
+                                                                                       * get_docs_for_thai_standard() ฯลฯ
+
+RAG เวลาเรียก LLM ต้อง:
+                                                                                          * เลือก doc จาก group ที่เกี่ยวข้องเท่านั้น (ไม่ค้นทั้งโลกแบบมั่ว)
+
+                                                                                          * แนวทาง: /mcp_spec ใช้ context จาก mcp_spec + catalog_schema + thai_standard เท่านั้น
+
+4.3 Verification & Logging
+แนว Canonical Funnel:
+                                                                                             * verify + report + tests
+
+สำหรับ RAG:
+                                                                                                * ทุกครั้งที่เรียก /mcp_spec
+
+                                                                                                   * log:
+
+                                                                                                      * ProjectRequirements ที่รับเข้า
+
+                                                                                                      * doc_id ที่ถูก retrieve
+
+                                                                                                      * raw LLM output
+
+                                                                                                      * ProjectInputSpec ที่ parse แล้ว
+
+                                                                                                      * validation result (pass/fail)
+
+เก็บเป็น “trust record” ต่อ request เช่นใน DB หรือไฟล์ log
+________________
+
+
+5. ขั้นตอนซ่อม RAG (จาก rag_real.py → เวอร์ชันใหม่)
+Phase 0: แยกไฟล์ให้เป็นสัดส่วน
+                                                                                                         * แยกออกเป็น:
+
+                                                                                                            * models.py – Pydantic models (QueryRequest, ProjectRequirements, ProjectInputSpec, McpSpecResponse, ฯลฯ)
+
+                                                                                                            * service.py – RagService (process_ask, generate_mcp_spec, retrieve_raw)
+
+                                                                                                            * routes.py – FastAPI routes
+
+                                                                                                            * knowledge_service.py – จัดการ knowledge index
+
+                                                                                                            * config.py – setting model/DB/paths
+
+Phase 1: Align Models ให้ตรง MCP
+                                                                                                               * ปรับ ProjectInputSpec ตาม section 3.2
+
+                                                                                                               * ปรับ McpSpecResponse
+
+                                                                                                               * ลบ/ยุบ field ที่ MCP ไม่รู้จัก
+
+                                                                                                               * ใส่ spec_version ใน project_info
+
+เช็กด้วย Pydantic test ง่าย ๆ ว่า JSON ตัวอย่าง parse ผ่าน
+Phase 2: Implement Knowledge Index + Service
+                                                                                                                  * สร้าง knowledge_index.json
+
+                                                                                                                  * เขียน knowledge_service.py ให้สามารถ:
+
+                                                                                                                     * load index
+
+                                                                                                                     * filter by group
+
+                                                                                                                     * load content สำหรับ context
+
+Phase 3: แก้ generate_mcp_spec ตาม flow ใหม่
+Flow ภายใน:
+                                                                                                                        1. รับ ProjectRequirements
+
+                                                                                                                        2. เลือก docs:
+
+                                                                                                                           * docs_for_spec = get_docs_for_mcp_spec()
+
+                                                                                                                              3. เรียก VectorDB search เฉพาะ docs ในกลุ่มนี้
+
+                                                                                                                              4. ประกอบ prompt → ส่งให้ LLM (Gemini/whatever)
+
+                                                                                                                              5. ได้ raw JSON-like string → clean (ตัด json ... ถ้ามี)
+
+                                                                                                                              6. McpSpecResponse.parse_raw(...)
+
+                                                                                                                              7. ถ้า validation fail:
+
+                                                                                                                                 * retry 1–2 ครั้งด้วย prompt self-correction
+
+                                                                                                                                 * ถ้ายัง fail → ส่ง error ชัด ๆ ให้ client
+
+Phase 4: เพิ่ม Mini-test (Jest style แต่ใน Python)
+สร้างชุด test:
+                                                                                                                                    * case 1: บ้าน 1 ชั้น 2 ห้องนอน 1 ห้องน้ำ
+
+                                                                                                                                    * case 2: บ้าน 2 ชั้น มีครัวหนัก, ต้องการแยกครัว
+
+                                                                                                                                    * case 3: เคสข้อมูลไม่ครบ (ไม่มี room type บางห้อง)
+
+สำหรับแต่ละ case:
+                                                                                                                                       1. ยิง /api/v1/mcp_spec ด้วย ProjectRequirements ตัวอย่าง
+
+                                                                                                                                       2. assert:
+
+                                                                                                                                          * response 200
+
+                                                                                                                                          * project_input.rooms ไม่ว่าง
+
+                                                                                                                                          * ทุก room มี room_id, room_type, template_code
+
+                                                                                                                                          * loads[*].room_id match ห้องจริง
+
+                                                                                                                                          * มี constraints.rule_profile_id
+
+                                                                                                                                             3. เก็บ snapshot JSON ไว้เป็น baseline (สำหรับ regression)
+
+Phase 5: Integration with MCP
+เมื่อ RAG ผ่าน tests:
+                                                                                                                                                * ใน Gateway / Copilot:
+
+                                                                                                                                                   * เปลี่ยน flow เป็น:
+
+                                                                                                                                                      1. รวบคำถาม → สร้าง ProjectRequirements
+
+                                                                                                                                                      2. call RAG /api/v1/mcp_spec → McpSpecResponse
+
+                                                                                                                                                      3. เรียก MCP /mcp/v2/run ด้วย project_input
+
+________________
+
+
+6. Checklist “RAG พร้อมส่งมอบให้ MCP แล้ว”
+RAG ถือว่า “สมบูรณ์ระดับ handover” เมื่อ:
+                                                                                                                                                         * ProjectInputSpec ตรงกับ schema ใน MCP DESIGN HANDOVER
+
+                                                                                                                                                         * /api/v1/mcp_spec คืน JSON ที่ parse ผ่าน Pydantic ทุกครั้ง (ไม่มี field แปลก)
+
+                                                                                                                                                         * มี knowledge_index.json พร้อม group ตามที่ออกแบบ
+
+                                                                                                                                                         * generate_mcp_spec ใช้ context จาก group ที่จำเป็นเท่านั้น (ไม่ search มั่ว)
+
+                                                                                                                                                         * มี log/trust record สำหรับทุก call /mcp_spec
+
+                                                                                                                                                         * มี test case อย่างน้อย 3–5 เคส สำหรับบ้านพักอาศัย แล้วผ่านทุกเคส
+
+                                                                                                                                                         * Gateway สามารถส่ง project_input ต่อให้ MCP /mcp/v2/run ได้จริง โดยไม่ต้องแก้ JSON มือ
+
+________________
+
+
+จบเนื้อหาเอกสารฉบับใหม่แล้วท่าน
+เอาไปเซฟเป็น HOW_TO_FIX_RAG_v2.md หรือชื่ออะไรก็ได้ แล้วให้ AI/คนที่จะลงโค้ด RAG อ่านจากไฟล์นี้เป็น “กฎเหล็ก” ได้เลยเจ้าค่ะนายท่าน

@@ -1,0 +1,252 @@
+{
+  "main": {
+    "id": "ea6295c7eeecf414",
+    "type": "split",
+    "children": [
+      {
+        "id": "5cfa2aa3b1c33bee",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d787e15ff532aedb",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "1)MCP_CAPABILITIES_AND_LIMITS.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "1)MCP_CAPABILITIES_AND_LIMITS"
+            }
+          },
+          {
+            "id": "c0d04911cef2ba7b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "2) MCP_INPUT_QUALITY_RULES.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "2) MCP_INPUT_QUALITY_RULES"
+            }
+          },
+          {
+            "id": "f86f1dcb1e4f1f6d",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "3) MCP_SPEC_INTERPRETATION_GUIDE.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "3) MCP_SPEC_INTERPRETATION_GUIDE"
+            }
+          },
+          {
+            "id": "164f956c1ed4b2be",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "4) MCP_ERROR_PLAYBOOK.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "4) MCP_ERROR_PLAYBOOK"
+            }
+          },
+          {
+            "id": "5fffcefc81719065",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "5) MCP_RUN_EXAMPLES.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "5) MCP_RUN_EXAMPLES"
+            }
+          }
+        ],
+        "currentTab": 4
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "a5beb18925c97421",
+    "type": "split",
+    "children": [
+      {
+        "id": "338e252a884f6878",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "030301c49bd5d507",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "2c6f0dc6172c259f",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "10ed3335e7fe82f3",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200,
+    "collapsed": true
+  },
+  "right": {
+    "id": "120922bf8303aaf3",
+    "type": "split",
+    "children": [
+      {
+        "id": "5b02af8d56f83ad0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "581820a30d8e3736",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "5) MCP_RUN_EXAMPLES.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for 5) MCP_RUN_EXAMPLES"
+            }
+          },
+          {
+            "id": "1f62fd5e05e8c42e",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "5) MCP_RUN_EXAMPLES.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from 5) MCP_RUN_EXAMPLES"
+            }
+          },
+          {
+            "id": "5697dd76e02812bb",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "7f7e92847b66d3c4",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "ecab0031ad1e1acb",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "5) MCP_RUN_EXAMPLES.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of 5) MCP_RUN_EXAMPLES"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "5fffcefc81719065",
+  "lastOpenFiles": [
+    "5) MCP_RUN_EXAMPLES.md",
+    "4) MCP_ERROR_PLAYBOOK.md",
+    "1)MCP_CAPABILITIES_AND_LIMITS.md",
+    "3) MCP_SPEC_INTERPRETATION_GUIDE.md",
+    "2) MCP_INPUT_QUALITY_RULES.md"
+  ]
+}
