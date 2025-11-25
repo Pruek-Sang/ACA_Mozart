@@ -1,0 +1,84 @@
+# ═══════════════════════════════════════════════════════════════════
+# Docker Ignore - Exclude Unnecessary Files from Image
+# ═══════════════════════════════════════════════════════════════════
+# Philosophy: Only include what gives life to the container
+# ═══════════════════════════════════════════════════════════════════
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Docker/
+Dockerfile*
+docker-compose*.yml
+.dockerignore*
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Documentation
+*.md
+docs/
+*.txt
+!requirements_ACA.txt
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/
+
+# OS Files
+Thumbs.db
+.DS_Store
+
+# Logs (will be created in container)
+logs/
+*.log
+
+# Development Files
+.env
+.env.local
+.env.development
+
+# Vector DB (will be created in container)
+vector_db/
+
+# Legacy/Reference Files
+rag_real.py
+gate_way_new.py
+
+# Test Files
+tests/
+test_*.py
+*_test.py
+
+# Build Artifacts
+build/
+dist/
+*.egg-info/

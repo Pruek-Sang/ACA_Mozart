@@ -1,0 +1,318 @@
+﻿เริ่มตรงฝั่ง MCP ล้วน ๆ ได้เลย แบบไม่ต้องห่วง RAG ผูกตามทีหลัง ผมจะวาง “แผนออกแบบ” ให้เป็นลำดับงานที่คุณเอาไปสั่ง dev ได้ โดยยึดตาม MCP DESIGN HANDOVER + amadeus.catalog อย่างเดียว
+
+
+### ภาพรวม: MCP Core v2 ต้องมีอะไรบ้าง
+
+
+แบ่งเป็น 4 ชั้น:
+
+
+1. Contract ชั้นนอก: MCP API + รูป `ProjectInputSpec` และ `McpRunResult`
+2. Core pipeline: `ProjectInputSpec → TemplateResolver → BaselineContext → (pandapower + MCP modules) → McpRunResult`
+3. Catalog DAL: อ่าน `amadeus.catalog` ผ่าน view → map เป็น model ที่ MCP ใช้
+4. Runtime state: ตาราง `design_session` (หรือชื่อเทียบเท่า) ไว้เก็บ input + baseline + result
+
+
+เพราะคุณบอกว่า “ฝั่ง RAG เดี๋ยวจัดเอง” เราเริ่มตั้งแต่ข้อ 1–4 ฝั่ง MCP ได้เลย
+
+
+---
+
+
+## ขั้นที่ 1: ล็อก Contract ฝั่ง MCP – รับอะไร / ส่งอะไร
+
+
+### 1.1 Endpoint MCP ตาม handover
+
+
+ยึดตามเอกสาร:
+
+
+- MCP Core มี endpoint หลัก (สมมุติ):
+
+
+```http
+POST /mcp/v2/run
+Body: ProjectInputSpec (JSON)
+Response: McpRunResult (JSON)
+```
+
+
+RAG จะไปเรียกอันนี้ ไม่ใช่ปัญหาฝั่งคุณแล้ว
+
+
+### 1.2 ออกแบบ `ProjectInputSpec` เวอร์ชัน MCP (ไม่ใช่ของ RAG ปัจจุบัน)
+
+
+อิง section 3.1 ใน handover:
+
+
+โครงหลัก:
+
+
+```text
+ProjectInputSpec
+- project_info
+- electrical_system
+- rooms: [RoomSpec]
+- loads: [LoadSpec]
+- constraints: [string/struct]
+```
+
+
+สิ่งที่ MCP ต้อง “กำหนดเองให้ชัด” ตอน design:
+
+
+- `project_info`:
+  - name
+  - building_type (ต้อง map กับ ROOM_TEMPLATE / ZONE_BUNDLE ได้)
+- `electrical_system`:
+  - voltage, phase, earthing type ฯลฯ
+- `rooms` (RoomSpec):
+  - ชื่อ / type (ค่าที่จับคู่กับ ROOM_TEMPLATE, เช่น `living_room`, `bedroom`, `kitchen`)
+  - area (m²) ถ้ามี
+- `loads` (LoadSpec):
+  - ชื่อโหลด / type (`lighting`, `socket`, `ac`, `water_heater` ฯลฯ)
+  - power ถ้าระบุ
+  - room ที่สังกัด (หรือระดับ project)
+- `constraints`:
+  - อย่างน้อย:
+    - vd limit
+    - rule profile id
+    - brand constraints ฯลฯ (ให้กลายเป็นค่า structured พอสมควร ไม่ใช่แค่ string มั่ว ๆ)
+
+
+แผน:  
+คุณยังไม่ต้องไปจับ RAG ตอนนี้ แค่ design `ProjectInputSpec` ให้เหมาะกับ MCP NetworkBuilder / TemplateResolver ก่อน แล้วบอก RAG ทีหลังว่า “ต้องส่ง JSON ตามนี้นะ”
+
+
+### 1.3 ออกแบบ `McpRunResult`
+
+
+อิง section 3.3:
+
+
+โครง concept:
+
+
+- `project_summary`
+- `circuits` (ต่อวงจร)
+- `rooms` (per room summary)
+- `violations`
+- `layout_summary` (optional)
+- `artifacts` (AutoLISP text / path)
+
+
+สิ่งที่ MCP ต้องล็อก:
+
+
+- ต่อ 1 circuit:
+  - ชื่อวงจร, panel, room(s)
+  - P, I, VD, loading
+  - wire size, wire code (CAB-***), breaker rating, breaker code
+  - ok / not ok + issue code (จาก `VALIDATION_RULE`)
+- ต่อ 1 violation:
+  - id, message, rule_id (VR-*), severity
+
+
+สเต็ปนี้เน้น “นิยาม data shape” ให้ชัดก่อน ไม่แตะโค้ด
+
+
+---
+
+
+## ขั้นที่ 2: Design Core Pipeline ภายใน MCP
+
+
+ตาม handover section 4:
+
+
+### 2.1 วาด pipeline ให้อิง module ตามเอกสาร
+
+
+1. รับ `ProjectInputSpec`
+2. `TemplateResolver`:
+   - เติม template จาก `ROOM_TEMPLATE`, `CIRCUIT_TEMPLATE`, `APPLIANCE`
+   - ได้ `BaselineContext`
+3. (ถ้ามี) `LoadCalculator`:
+   - คิดโหลด P/I ต่อวงจรจาก BaselineContext + factor (demand/diversity)
+4. `PandapowerAdapter`:
+   - สร้าง pandapower net จาก BaselineContext+โหลด
+   - runpp → I/V/VD/loading
+5. `WireSizer`:
+   - ใช้ I (จาก 3 หรือ 4) + `CABLE_SPEC` + `DERATING_FACTOR`
+   - เลือกสาย → ผูก code CAB-*
+6. `BreakerSelector`:
+   - ใช้ I + rule → เลือก breaker จาก catalog
+7. `ConduitSizer` (ถ้าเอาใน phase แรก)
+8. `ComplianceChecker`:
+   - ใช้ `VALIDATION_RULE` + ผลจาก pandapower/sizing → ไม่ผ่านอะไรบ้าง
+9. `LayoutOptimizer` + AutoLISP (คุณอาจขยับไปเฟสถัดไปได้)
+10. `ResultBuilder` → `McpRunResult`
+11. Persist → `design_session` / `project_result`
+
+
+### 2.2 ล็อก interface ของแต่ละ module (ไม่ต้องโค้ด แค่ design)
+
+
+ตัวอย่าง:
+
+
+- `TemplateResolver(project_input, catalog_dal) -> BaselineContext`
+- `LoadCalculator(baseline_context, catalog_dal) -> baseline_context_with_loads`
+- `PandapowerAdapter(baseline_context_with_loads) -> power_flow_result`
+- `WireSizer(baseline_context_with_loads, power_flow_result, cable_specs, derating_rules) -> sized_circuits`
+- `ComplianceChecker(sized_circuits, validation_rules) -> violations`
+
+
+แผน design ตรงนี้คือ:  
+ระบุ input/output ของแต่ละ module ให้ชัดในระดับ “type/โครง JSON” เพื่อให้ dev เขียนทีละตัวได้
+
+
+---
+
+
+## ขั้นที่ 3: Design DAL สำหรับ `amadeus.catalog`
+
+
+เป้าหมาย: ให้ MCP อ่านทุกอย่างจาก DB ผ่านชั้นเดียว (DAL) ตาม CATALOG_CONTRACT
+
+
+### 3.1 กำหนด “model ภายใน MCP” ต่อ kind
+
+
+เช่น:
+
+
+- `Component`
+- `CableSpec`
+- `RoomTemplate`
+- `CircuitTemplate`
+- `ValidationRule`
+- `DeratingFactor`
+- `Panelboard`
+- `ProjectConfig` (สำหรับเลือก rule profile / zone bundle)
+
+
+แต่ละ model:
+
+
+- mapping ตรงจาก view:
+  - `amadeus.v_cable_specs`
+  - `amadeus.v_room_templates`
+  - `amadeus.v_circuit_templates`
+  - `amadeus.v_validation_rules`
+  - `amadeus.v_derating_factors` (ถ้ามี)
+  - ฯลฯ
+
+
+### 3.2 ออกแบบ DAL interface
+
+
+เช่น:
+
+
+- `get_project_config(project_code) -> ProjectConfig`
+- `get_room_template(room_type) -> RoomTemplate`
+- `list_circuit_templates_for(room_type, load_type) -> [CircuitTemplate]`
+- `list_cable_specs() -> [CableSpec]`
+- `get_validation_rules(profile_id) -> [ValidationRule]`
+
+
+สำคัญ:  
+**จังหวัดเดียวที่แตะ JSON `data` ของ amadeus.catalog คือ DAL นี้**  
+module อื่นใน MCP เห็นแต่ model ที่สะอาดแล้ว
+
+
+---
+
+
+## ขั้นที่ 4: Design ตารางฝั่ง MCP runtime (`design_session`)
+
+
+อิง handover section 2.2:
+
+
+ตัวอย่าง conceptual:
+
+
+- `design_session`:
+  - `session_id`
+  - `project_name`
+  - `project_input_json` (ProjectInputSpec)
+  - `baseline_context_json`
+  - `mcp_result_json` (McpRunResult)
+  - `status`
+  - `created_at`, `updated_at`
+
+
+คุณอาจเพิ่ม:
+
+
+- `error_log` (ข้อความสั้น ๆ ถ้าล้ม)
+- `rule_profile_id` / `project_config_name` ที่ใช้
+
+
+แผน:
+
+
+- MCP ทุกครั้งที่รัน `/mcp/v2/run`:
+  - สร้าง/อัปเดตรายการใน `design_session`
+  - ทำให้สามารถ replay / debug / audit ได้
+
+
+---
+
+
+## ขั้นที่ 5: ค่อยคิดลึกเรื่อง PandapowerAdapter Strategy
+
+
+เมื่อ 1–4 ชัดแล้ว ค่อยแตก PandapowerAdapter:
+
+
+- mapping BaselineContext → pandapower:
+  - main bus / sub bus / line per circuit
+- ตัดสินใจว่า:
+  - แรกสุดใช้ I จาก LoadCalculator แล้วใช้ pandapowerเฉพาะเช็ค VD/line loading
+  - หรือให้ pandapower เป็น source ของ I ทั้งหมดเลย
+
+
+แต่ขั้นนี้ไว้หลังจาก:
+
+
+- `ProjectInputSpec`
+- `BaselineContext`
+- `McpRunResult`
+- DAL → model จาก amadeus.catalog
+
+
+ถูกนิยามชัดแล้ว
+
+
+---
+
+
+## ตอบคำถามตรง ๆ: “ถ้าฝั่ง RAG เดี๋ยวกูจัดเอง ฝั่ง MCP มึงจะเริ่มยังไง”
+
+
+ลำดับที่ผมจะเริ่ม design (ไม่เขียนโค้ด):
+
+
+1. **ฟิกซ์สเปก `ProjectInputSpec` ฝั่ง MCP**  
+   - บ้านพัก 1–3 เฟส: ต้องการ field อะไรบ้างให้ TemplateResolver + LoadCalculator + NetworkBuilder ใช้ได้จริง
+2. **ฟิกซ์สเปก `McpRunResult`**  
+   - ต่อวงจรต้องมี field อะไรบ้าง (เพื่อ UI / Copilot / AutoCAD ใช้งาน)
+3. **ออกแบบ `BaselineContext` + TemplateResolver**  
+   - map ยังไงจาก ProjectInputSpec → BaselineContext โดยใช้ ROOM_TEMPLATE / CIRCUIT_TEMPLATE / APPLIANCE
+4. **ออกแบบ DAL + internal models จาก `amadeus.catalog`**  
+   - ชุด model /ฟังก์ชันอ่าน catalog ที่ MCP จะเรียก
+5. **วาด pipeline MCP Core (module graph) พร้อม I/O ของแต่ละ module**  
+   - LoadCalculator, WireSizer, BreakerSelector, ComplianceChecker, PandapowerAdapter
+6. **ออกแบบตาราง `design_session`/runtime state**  
+   - เก็บ input/baseline/result สำหรับ debug & audit
+
+
+จากนั้นค่อยไปสเต็ป “ลงรายละเอียด module แรก” (มักจะเป็น TemplateResolver + LoadCalculator) ก่อน pandapower
+
+
+ถ้าคุณอยากเริ่ม step 1 เลยในรอบถัดไป ผมจะช่วย “ออกแบบ ProjectInputSpec แบบละเอียดระดับ field ที่ MCP ต้องการ (สำหรับบ้านพัก 1 เฟส ก่อน)” ให้ก่อน จากนั้นเราค่อยไล่ต่อไปทีละขั้นตามแผนนี้.

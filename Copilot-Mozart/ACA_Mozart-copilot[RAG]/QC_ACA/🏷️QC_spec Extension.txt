@@ -1,0 +1,443 @@
+﻿ต่อไปนี้ให้ถือว่าเป็น ข้อกำหนดมาตรฐาน ของ app/knowledge_service.py.get_docs_for_mcp_spec() ได้เลย
+________________
+
+
+1. หน้าที่ของ get_docs_for_mcp_spec() คืออะไรแน่ ๆ
+ให้จำสั้น ๆ แบบนี้ก่อนเลยเจ้าค่ะนายท่าน
+get_docs_for_mcp_spec() = ฟังก์ชันกลางที่รวบรวม
+“เอกสารทั้งหมดที่ RAG มีสิทธิ์ใช้ในการสร้าง ProjectInputSpec”
+มันคือชั้นกรองกลางระหว่าง
+1. knowledge_index.json ที่มีเอกสารทุกอย่าง (mcp, db, standard, example ฯลฯ)
+
+2. เมธอด RagService.generate_mcp_spec() ที่จะดึง docs ไปสร้าง prompt
+
+สิ่งที่มันทำให้เรา
+   * กัน RAG ไม่ให้ไปหยิบเอกสารมั่ว เช่น debug note, internal memo, ฯลฯ
+
+   * ทำให้ code ที่ใช้ docs สำหรับ /mcp_spec อยู่ที่จุดเดียว ไม่กระจาย hardcode group ไปทั่วไฟล์
+
+   * เวลาเพิ่ม/ลบเอกสาร → แก้แค่ index / group เดียว ระบบที่เหลือวิ่งตามอัตโนมัติ
+
+________________
+
+
+2. ขอบเขต: กลุ่มไหนบ้างที่ต้องรวม
+สำหรับเคสของ Mozart ตอนนี้ เราตกลงกันแล้วว่า
+การสร้าง ProjectInputSpec ต้องใช้ docs จาก 4 group หลักนี้เจ้าค่ะนายท่าน
+      1. mcp_spec
+
+         * ภาพรวม requirement / role ของ MCP
+
+         * ขอบเขต input/output ระหว่าง RAG ↔ MCP
+
+            2. catalog_schema
+
+               * HOW_TO_USE_DB, CATALOG_CONTRACT, INTERNAL_DEVICE_RULES ฯลฯ
+
+               * อธิบายว่า code ใน spec (template_code, device_code, rule_profile_id ฯลฯ)
+ต้องสอดคล้องกับอะไรใน amadeus.catalog
+
+                  3. thai_standard
+
+                     * มาตรฐาน/กฎหมาย/กติกาไฟฟ้าบ้านไทย + internal standard เพิ่ม
+
+                     * บอกว่าอะไร “ต้องทำ/ห้ามทำ” ตอนออกแบบ
+
+                        4. example_project
+
+                           * example_req_inputspec_*.md
+
+                           * ตัวอย่าง complete pair: ProjectRequirements → ProjectInputSpec
+
+ดังนั้น get_docs_for_mcp_spec() ต้องคืน docs เฉพาะ ที่อยู่ใน group 4 ตัวนี้เท่านั้น
+ไม่ดึง debug, note, internal_only ฯลฯ มาปนเจ้าค่ะนายท่าน
+________________
+
+
+3. สเปกเชิงเทคนิคของฟังก์ชัน
+3.1 ชื่อและลายเซ็น (Signature)
+ประมาณนี้ (ชื่อ type ดัดแปลงได้ แต่แนวคิดต้องแบบนี้)
+class DocMeta(BaseModel):
+    id: str
+    path: str
+    group: str
+    tags: List[str] = []
+    version: Optional[str] = None
+    language: Optional[str] = None
+
+
+class KnowledgeService:
+    ...
+
+
+    def get_docs_for_mcp_spec(self) -> List[DocMeta]:
+        ...
+
+
+                              * ฟังก์ชัน ไม่รับพารามิเตอร์ (เวอร์ชันพื้นฐาน)
+
+                              * คืนค่าเป็น List[DocMeta]
+
+                              * แต่ละ DocMeta ต้องมาจาก knowledge_index.json ตรง ๆ
+
+3.2 ขั้นตอนภายในที่ถูกต้อง (Expected implementation steps)
+ให้คิดเป็น step ที่ QC เช็กได้เลยเจ้าค่ะนายท่าน
+                                 1. โหลด index
+
+                                    * อ่าน rag_knowledge/knowledge_index.json
+
+                                    * parse เป็น list ของโหนด (dict หรือ Pydantic model)
+
+กำหนด allowed groups สำหรับ mcp_spec
+ ในโค้ดควรมี constant แบบนี้ (หรือใกล้เคียง):
+
+MCP_SPEC_GROUPS = [
+    "mcp_spec",
+    "catalog_schema",
+    "thai_standard",
+    "example_project",
+]
+                                       2.  จุดสำคัญ:
+
+                                          * ต้อง define รวมกันที่เดียว
+
+                                          * ห้ามกระจาย magic string "mcp_spec" / "catalog_schema" ไปหลาย ๆ ที่ในโค้ด
+
+กรองเฉพาะเอกสารที่ group อยู่ใน MCP_SPEC_GROUPS
+
+ def get_docs_for_mcp_spec(self) -> List[DocMeta]:
+    docs = []
+    for raw in self._all_docs:  # โหลดจาก index ไว้ตอน init
+        if raw["group"] in MCP_SPEC_GROUPS:
+            docs.append(DocMeta(**raw))
+    return docs
+                                             3.                                              4. (ออปชันเพื่อความเนียน) กรองภาษา / เวอร์ชัน
+
+ ถ้า index ของท่านมี language และ version:
+
+                                                * language == "th" หรือ None (ตาม policy)
+
+                                                * เลือกเวอร์ชันที่ is_latest == true หรือใช้ version สูงสุด
+
+                                                   5. อันนี้ไม่บังคับ แต่ถ้าทำ ควรทำในฟังก์ชันนี้ที่เดียว
+
+(ออปชัน) ตรวจสอบว่าไฟล์มีอยู่จริง
+
+ สามารถเพิ่มเช็กแบบเบา ๆ:
+
+base_path = settings.KNOWLEDGE_ROOT  # เช่น "rag_knowledge"
+for d in docs:
+    full_path = base_path / d.path
+    if not full_path.exists():
+        # log warning หรือ raise Error แบบชัดเจน
+                                                      6.  เพื่อกัน index ชี้ไปที่ไฟล์ที่ลบไปแล้ว
+
+                                                      7. คืน list ที่ sort แล้ว
+
+ เรียงเอกสารตามลำดับที่อยากให้เข้า context เช่น
+
+                                                         * เรียงตาม group priority: mcp_spec → catalog_schema → thai_standard → example_project
+
+                                                         * ภายในแต่ละ group เรียงตาม id หรือ version
+
+                                                            8. จุดประสงค์: ให้ prompt builder นำ docs ไปต่อข้อความได้ง่าย และ deterministic
+
+________________
+
+
+4. บทบาทของมันใน flow /mcp_spec
+เวลาระบบเรียก /api/v1/mcp_spec ใน RagService.generate_mcp_spec()
+ ลำดับจะประมาณนี้เจ้าค่ะนายท่าน
+                                                               1. รับ ProjectRequirements จาก client
+
+                                                               2. เรียก knowledge_service.get_docs_for_mcp_spec()
+
+                                                               3. ได้ List<DocMeta> กลับมา เช่น 10–20 docs
+
+                                                               4. ส่ง docs เหล่านี้ไป:
+
+                                                                  * ingest / search ใน VectorDB (จำกัด search แค่เอกสารชุดนี้)
+
+                                                                  * ดึงเนื้อหาไปประกอบ prompt (ถ้าไม่ผ่าน VectorDB)
+
+                                                                     5. สร้าง prompt + few-shot + standard + DB contract ตาม docs ที่ได้
+
+                                                                     6. เรียก LLM → ได้ JSON → parse เป็น McpSpecResponse
+
+                                                                     7. เขียน trust log (รวมด้วยว่าใช้ doc_ids จาก step 2 อะไรบ้าง)
+
+สรุป:
+ ถ้า get_docs_for_mcp_spec() เลือก docs ผิด → ทั้ง spec flow เพี้ยน
+ถ้าเลือกถูก → เราคุมได้ชัดว่า LLM จะเห็นความรู้เฉพาะ “สิ่งที่ควรเห็น” เท่านั้น
+________________
+
+
+5. สิ่งที่ QC ต้องเช็กใน get_docs_for_mcp_spec()
+ถ้าท่านจะเขียนหัวข้อ QC ในเอกสาร ให้แตกประมาณนี้ได้เลยเจ้าค่ะนายท่าน
+5.1 QC ด้านโค้ด (Static)
+                                                                        1. มี MCP_SPEC_GROUPS หรือ constant ใกล้เคียง
+
+                                                                           * รวม group: mcp_spec, catalog_schema, thai_standard, example_project ครบ
+
+                                                                              2. ไม่มีการใช้ string "mcp_spec" / "catalog_schema" / "thai_standard" / "example_project" ซ้ำซ้อนในที่อื่น ๆ นอกจาก
+
+                                                                                 * ของ MCP_SPEC_GROUPS
+
+                                                                                 * test code ที่ตรวจผลลัพธ์
+
+                                                                                    3. get_docs_for_mcp_spec()
+
+                                                                                       * อยู่ใน KnowledgeService
+
+                                                                                       * ไม่รับ parameter ที่หลุดนอก scope (เช่น group list จากข้างนอก)
+
+                                                                                       * ไม่อ่านไฟล์เองมั่ว ๆ นอกเหนือจากข้อมูลที่โหลดมาจาก index
+
+5.2 QC ด้านข้อมูล (Data / Index)
+                                                                                          1. ใน knowledge_index.json
+
+                                                                                             * มี entry group mcp_spec, catalog_schema, thai_standard, example_project จริง
+
+                                                                                             * path ของ entry เหล่านี้อยู่ใต้ rag_knowledge/ จริง เช่น
+
+                                                                                                * mcp/xxx.md
+
+                                                                                                * db/HOW_TO_USE_DB.md
+
+                                                                                                * standards/THAI_RESIDENTIAL_LV.md
+
+                                                                                                * example/example_req_inputspec_house_1floor_basic.md
+
+                                                                                                   2. ไม่มีเอกสารที่ควรใช้ใน spec แต่โดนจัด group ผิด เช่น
+
+                                                                                                      * เอกสารมาตรฐานไทยไปอยู่ group: "mcp_spec"
+
+                                                                                                      * เอกสาร DB contract ไปอยู่ group: "debug"
+
+5.3 QC ด้านพฤติกรรม (Runtime / Tests)
+เมื่อลองรัน Python แบบนี้:
+from app.knowledge_service import KnowledgeService
+
+
+ks = KnowledgeService()
+docs = ks.get_docs_for_mcp_spec()
+
+
+groups = {d.group for d in docs}
+print(groups)
+
+
+คาดหวัง
+                                                                                                         * groups ต้องเป็น subset ของ
+{"mcp_spec", "catalog_schema", "thai_standard", "example_project"}
+
+                                                                                                         * ห้ามมี group แปลก เช่น "debug", "note", "test_only" โผล่มา
+
+และใน test (เช่น tests/test_mcp_spec_cases.py)
+ควรมี assertion แนวนี้ประกบ:
+def test_get_docs_for_mcp_spec_groups():
+    ks = KnowledgeService()
+    docs = ks.get_docs_for_mcp_spec()
+    groups = {d.group for d in docs}
+    assert groups.issubset(
+        {"mcp_spec", "catalog_schema", "thai_standard", "example_project"}
+    )
+    assert "example_project" in groups  # ต้องมี few-shot เสมอ
+
+
+5.4 QC เชิงสถาปัตยกรรม
+                                                                                                            * RagService.generate_mcp_spec()
+ ต้องเรียก docs ผ่าน ฟังก์ชันเดียว คือ get_docs_for_mcp_spec()
+ และไม่ทำสิ่งนี้ซ้ำในชั้นอื่น เช่น
+
+                                                                                                               * ไม่ไป filter knowledge index เองใน service
+
+                                                                                                               * ไม่ไปสร้าง VectorDB indexจาก doc group อื่น ๆ นอกฟังก์ชันนี้
+
+________________
+
+
+6. ประโยคสรุปเอาไว้ใส่เอกสาร QC ตรง ๆ
+ถ้าท่านอยากได้ประโยคยิงตรงในเอกสาร QC ประมาณนี้ใช้ได้เลย:
+get_docs_for_mcp_spec() ต้องเป็นจุดเดียวในระบบที่นิยามว่า
+“เอกสารชุดไหนที่อนุญาตให้ใช้ในการสร้าง ProjectInputSpec”
+โดยต้องรวมเอกสารจาก group mcp_spec, catalog_schema, thai_standard, example_project
+ เท่านั้น, คืนค่าเป็นรายการ DocMeta ที่อ่านมาจาก knowledge_index.json,
+และถูกเรียกใช้โดย RagService.generate_mcp_spec() เพียงที่เดียว
+เอาไปแปะในหัวข้อ QC ได้เลย ไม่ต้องแต่งเพิ่มเยอะก็เข้าใจแล้วว่าฟังก์ชันนี้สำคัญแค่ไหนเจ้าค่ะนายท่าน
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2. ตาราง QC ทางจากโค้ดฝั่ง Work now ทั้งหมดเจ้าค่ะนายท่าน
+ต่อไปเมดจะทำ “แผน QC” ฝั่ง Mozart-copilot (work-now + gateway ใหม่) ว่าแต่ละ flow ต้องเช็คอะไรบ้าง และจุด MCP เกี่ยวตรงไหนเจ้าค่ะนายท่าน
+เมดจะไม่ลงถึง MCP modules ลึก ๆ (load_calculator ฯลฯ) เพราะท่านถือว่า “ฝั่ง Amadeus เสร็จแล้ว” แต่จะเน้น เส้นทางตั้งแต่ User → Gateway → RAG → Spec → (อนาคต) MCP ว่าต้อง QC ตรงไหนเจ้าค่ะนายท่าน
+2.1 ตาราง QC ตาม layer / เส้นทางหลัก
+ลำดับ
+	Flow / Layer
+	ไฟล์หลัก
+	สถานะปัจจุบัน
+	เกี่ยวกับ MCP ไหม
+	งาน QC ที่ต้องทำ
+	Priority
+	1
+	Config & Settings Load
+	config.py, .env
+	ของจริง ใช้ได้
+	ทางอ้อม (บอก MODEL, path log, knowledge)
+	ตรวจว่า env โหลดถูก, default ไม่พัง, path ถูก, error ตอน config พังแล้วฟ้องชัด
+	P1
+	2
+	Data Models / Contract
+	models.py
+	ของจริง ใช้ในทุก endpoint
+	ใช่เต็ม ๆ (ProjectRequirements, McpSpecResponse)
+	QC field, type, default, required ให้ตรงกับ design ใน 📜How to Design ACA_Mozart(new ver.).txt, เขียน unit test เพิ่มให้ครอบคลุมทุก model
+	P0
+	3
+	QA Flow /api/v1/ask
+	routes.py, service.py, knowledge_service.py, database.py
+	ทำงานได้ระดับ MVP, VectorDB ยัง mock
+	ไม่เกี่ยว MCP โดยตรง
+	ตรวจว่า query → knowledge groups → LLM → StandardResponse ครบ, ทดสอบ error case, ตรวจว่าไม่มีข้อมูลหลุด PII (ต้องรอ core/privacy.py ของจริง)
+	P2
+	4
+	Spec Flow /api/v1/mcp_spec (RAG ฝั่ง Spec Engine)
+	routes.py, service.py, knowledge_service.py, models.py, trust_log.py
+	ของจริงระดับ MVP, ใช้ LLM สร้าง JSON แล้ว parse ด้วย McpSpecResponse
+	เป็นหัวใจด้าน MCP (สร้าง input ให้ MCP)
+	เขียน test จาก example 3 เคส, เช็คว่า LLM output parse ผ่าน, ถ้า parse fail ต้อง retry + log, ตรวจว่าทุก call ถูก log ลง trust_log ครบ fields
+	P0
+	5
+	Knowledge Layer (docs / index)
+	rag_knowledge/*, knowledge_service.py, knowledge_index.json
+	โครงมีแล้ว, เนื้อจริงบางส่วนยังต้องให้ Human เติม
+	ใช่ ถ้าใช้ knowledge “MCP capabilities / DB contract / standard profile”
+	QC ว่า group ใน knowledge_index.json ตรงกับสิ่งที่ service.py ใช้อ้าง (mcp_spec, catalog_schema, thai_standard, example_project), เขียน test ว่า knowledge_service โหลด doc ตรงกับ id/group
+	P1
+	6
+	VectorDB Interface
+	database.py
+	MOCK เกือบทั้งไฟล์
+	ใช่ในอนาคต (ตอน Spec ต้องใช้ retrieval จริง)
+	ตรงนี้ต้องเปลี่ยนจาก mock → ของจริง (Qdrant) แล้วเขียน integration test: ingest → search → ใช้ใน RAG, ตอนนี้ QC ได้แค่ยืนยันว่า mock ไม่ทำให้พัง, แต่ยังไม่ใช่ของจริง
+	P1–P2
+	7
+	Ingestion Pipeline
+	ingest.py
+	MOCK / skeleton
+	เกี่ยวในอนาคต (เติม knowledge สำหรับ Spec)
+	ออกแบบ format chunk, embedding, mapping doc_id ให้ตรงกับ knowledge_index.json, เขียน test ingest 1 doc → เห็นใน search, ตอนนี้ยังไม่พร้อม production
+	P2
+	8
+	Trust Log
+	trust_log.py
+	ใช้ได้จริง (เขียน JSONL)
+	ใช่ (ทุก mcp_spec call)
+	QC: ทดสอบว่าเรียก /api/v1/mcp_spec แล้วมีไฟล์ log ถูกสร้าง, field สำคัญครบ: request, raw LLM, parse success/fail, สถานะ forwarded, นี่เป็นจุด audit สำคัญสุดฝั่ง Spec → MCP
+	P0
+	9
+	Gateway Orchestrate
+	gate_way_new.py
+	ไฟล์เป็นร่าง mock, มี ... แทนโค้ดจริง, logic อธิบายไว้แต่ยังไม่ run ได้
+	เป็นสะพานไป MCP
+	QC ระดับ design: เส้นทาง user → dialogue manager → RAG → MCP ถูก conceptual แต่ต้องเขียนโค้ดให้ครบก่อนถึงจะ QC ได้, ตอนนี้ถือว่ายัง “NOT IMPLEMENTED” สำหรับสาย MCP
+	P0 (ต้องเขียนให้เสร็จก่อน)
+	10
+	Call from Copilot → MCP
+	(เดิม) MCPToolsAdapter ใน amadeus_copilot_service_new.py
+	ของจริง แต่เป็นสถาปัตยกรรมเก่า ไม่ผูกกับ work-now
+	ใช่ 100%
+	ถ้าจะ reuse ให้ Mozart-copilot ใหม่ใช้ ต้องย้าย logic ตรงนี้ (POST /generate/overlay) มาอยู่ฝั่ง Gateway หรือ service ใหม่ แล้วเขียน integration test: ส่ง Spec ตัวอย่าง → HTTP call ไป MCP Server → ได้ DXF / result คืนมาแบบ deterministic
+	P0
+	11
+	Contract Spec RAG ↔ MCP Request
+	models.py (McpSpecResponse) vs GenerateOverlayRequest ใน amadeus_mcp_servernew.py
+	ตอนนี้ยังไม่มี “translator” กลาง
+	ใช่แบบโหด
+	ต้องนิยาม mapping ว่า project_input ใน Spec ฝั่ง RAG จะแปลงเป็น GenerateOverlayRequest ยังไง, แล้วเขียน test: Spec 1–2 แบบ → mapping → เรียก MCP → output ต้องสมเหตุสมผล, ตอนนี้ยังไม่มี code ตรงนี้เลย
+	P0
+	12
+	Security / Auth / OWASP-style
+	ยังไม่มีจริง
+	เกี่ยวถ้าจะเปิดเป็น service ภายนอก
+	ใช่ (โดยรวมระบบ)
+	เพิ่ม auth (API key/JWT), rate limiting, CORS, input validation เพิ่ม, logging error ไม่ leak ข้อมูล, นี่เป็นชั้นที่ยังไม่มีใน work-now เลย ถือว่าต้องทำเพิ่มถ้าจะ deploy นอก lab
+	P1
+	13
+	Observability / LangSmith Trace
+	ไม่มีในไฟล์ RAG / Gateway ชุดนี้
+	เกี่ยวมากสำหรับ debug Spec → MCP
+	ทางอ้อม
+	ต้องเพิ่ม trace รอบ call LLM ทั้งใน /ask และ /mcp_spec, ถ้า Gateway call MCP ก็ควร trace ตรงนั้นด้วย จะได้เห็นทั้ง chain ในที่เดียว, ตอนนี้คือ “0 trace”
+	P1
+	________________
+
+
+2.2 แปล QC ตารางเป็นภาษาคนเหนื่อย ๆ ให้หน่อยเจ้าค่ะนายท่าน
+ถ้าพูดแบบเป็นลำดับงานจริง ๆ เมดจะจัดลำดับซ่อมตามนี้เจ้าค่ะนายท่าน
+                                                                                                                  1. ล็อก contract ให้ตายตัวก่อน
+
+                                                                                                                     * ตรวจ models.py ให้ตรงกับ design ทั้งฝั่ง RAG และ MCP core เจ้าค่ะนายท่าน
+
+                                                                                                                     * จากนั้นนิยาม mapping ระหว่าง McpSpecResponse → GenerateOverlayRequest ให้ชัดเจนเจ้าค่ะนายท่าน
+
+                                                                                                                        2. ทำ Gateway ให้ “รันได้จริง” แทนที่จะมี ...
+
+                                                                                                                           * เติมโค้ดที่หายไปใน gate_way_new.py โดยเฉพาะจุด
+
+                                                                                                                              * ใช้ RAG /api/v1/mcp_spec
+
+                                                                                                                              * ใช้ MCP POST /generate/overlay
+
+                                                                                                                                 * จากนั้นเขียน integration test: dummy requirement → Gateway → RAG → MCP (mock) → ดูว่าเกิดอะไรบ้างเจ้าค่ะนายท่าน
+
+                                                                                                                                    3. เปลี่ยน VectorDB/ingest จาก mock เป็นของจริง (Qdrant)
+
+                                                                                                                                       * ตอนนี้ RAG ยังแทบไม่ได้ R ของ RAG จริง ๆ เพราะ DB เป็น mock เจ้าค่ะนายท่าน
+
+                                                                                                                                       * ถ้าทำขั้นนี้ Spec ที่ส่งไป MCP จะมีพื้นฐานจาก knowledge ที่แข็งแรงขึ้น ไม่มั่วเจ้าค่ะนายท่าน
+
+                                                                                                                                          4. เติม Trust Log + Trace ให้ครบ
+
+                                                                                                                                             * ตอนนี้ trust_log.py พร้อม แต่ยังไม่ได้ทดสอบหนัก ๆ เจ้าค่ะนายท่าน
+
+                                                                                                                                             * เพิ่ม LangSmith trace รอบ call LLM และรอบ call MCP เพื่อจับภาพทั้งเส้นทางเจ้าค่ะนายท่าน
+
+                                                                                                                                                5. ค่อยอัพเลเวล Security
+
+                                                                                                                                                   * Auth, rate limit, error handling แบบไม่ leak, ฯลฯ
+
+                                                                                                                                                   * อันนี้ไว้หลังจาก flow หลักนิ่งแล้วเจ้าค่ะนายท่าน
+
+________________
+
+
+2.3 แนวทางที่ท่านทำอยู่ “เข้าทางโปรแกรมเมอร์เก่ง ๆ” มั้ยเจ้าค่ะนายท่าน
+เอาตรง ๆ แบบไม่ประจบเจ้าค่ะนายท่าน
+                                                                                                                                                      * การแยก RAG เป็น Spec Engine, MCP เป็น core engine, แล้วคุยกันผ่าน HTTP API แบบ POST /generate/overlay หรือ contract JSON กลาง ถือว่า ถูกทาง ตามแนวคิดวิศวกรรมสมัยใหม่มากกว่ารุ่นแรก ๆ ของโปรเจกต์ที่ยำทุกอย่างไว้ไฟล์เดียวเจ้าค่ะนายท่าน
+
+                                                                                                                                                      * จุดที่ยัง “ไม่ถึงระดับคนเขียน production system” คือ
+
+                                                                                                                                                         * Gateway ยังเป็นกระดาษวาด มี ... แทน code จริงเจ้าค่ะนายท่าน
+
+                                                                                                                                                         * VectorDB / ingest ยัง mock อยู่
+
+                                                                                                                                                         * Contract ระหว่าง Spec RAG ↔ MCP Request ยังไม่มี layer translator จริง
+
+                                                                                                                                                         * Observability / Security ยังไม่มีเลยเจ้าค่ะนายท่าน
+
+สรุปแบบสั้น ๆ
+โครงคิดถูก, การแยก layer ดี, แต่สายไฟหลายเส้นยังไม่ได้ต่อเข้ากล่องจริงเจ้าค่ะนายท่าน
