@@ -1,43 +1,33 @@
 """
-Knowledge Service - The Librarian of Divine Wisdom
-Manages canonical knowledge index following Canonical Funnel pattern
+Knowledge Service v2 - Folder-Based Architecture
+Manages knowledge across 4 folders: db, example, mcp, standard
 
-Philosophy: Ordo ab Chao
-- Single source of truth: knowledge_index.json
-- Group-based retrieval (no "search everything" chaos)
-- Explicit document lifecycle
+Philosophy: 
+- Scan ALL files in 4 folders (not just indexed)
+- knowledge_index.json = metadata/priority (NOT whitelist)
+- Unindexed files still loadable (lower priority)
 """
 
 import json
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from pathlib import Path
-from pydantic import BaseModel
 
 from app.config import settings
+from app.models import KnowledgeFolder, DocumentMeta
 
 logger = logging.getLogger("Aura.Knowledge")
 
 
-class DocMeta(BaseModel):
-    """Metadata for a knowledge document"""
-    id: str
-    path: str
-    group: str
-    tags: List[str] = []
-    version: str = "1.0"
-    language: str = "th"
-
-
 class KnowledgeService:
     """
-    Service layer for canonical knowledge management
+    Folder-based knowledge management
     
     Responsibilities:
-    - Load and validate knowledge_index.json
-    - Filter documents by group
-    - Load document content
-    - Provide context for specific use cases (e.g., mcp_spec)
+    - Scan all files in db/, example/, mcp/, standard/
+    - Load knowledge_index.json for metadata/priority
+    - Provide filtered document lists by folder/group
+    - Lazy load document content
     """
     
     def __init__(self, index_path: Optional[str] = None):
@@ -49,208 +39,279 @@ class KnowledgeService:
         """
         self.index_path = Path(index_path or settings.KNOWLEDGE_INDEX_PATH)
         self.knowledge_root = Path(settings.KNOWLEDGE_ROOT)
-        self._index: List[DocMeta] = []
+        
+        # Folder paths
+        self.folders = {
+            "db": Path(settings.KNOWLEDGE_DIR_DB),
+            "example": Path(settings.KNOWLEDGE_DIR_EXAMPLE),
+            "mcp": Path(settings.KNOWLEDGE_DIR_MCP),
+            "standard": Path(settings.KNOWLEDGE_DIR_STANDARD),
+        }
+        
+        # Internal storage
+        self._docs_by_path: Dict[str, DocumentMeta] = {}
+        self._docs_by_id: Dict[str, DocumentMeta] = {}
+        self._docs_by_group: Dict[str, List[DocumentMeta]] = {}
+        self._docs_unindexed: List[DocumentMeta] = []
+        self._index_data: List[Dict[str, Any]] = []
+        
+        # Load and scan
         self._load_index()
+        self._scan_folders()
+        
+        logger.info(f"KnowledgeService v2 initialized: {len(self._docs_by_path)} documents")
     
     def _load_index(self) -> None:
-        """Load knowledge index from JSON file"""
+        """Load knowledge_index.json for metadata"""
         try:
             if not self.index_path.exists():
                 logger.warning(f"Knowledge index not found: {self.index_path}")
-                logger.info("Creating empty knowledge index")
-                self._index = []
-                self._save_index()
+                self._index_data = []
                 return
             
             with open(self.index_path, 'r', encoding='utf-8') as f:
-                index_data = json.load(f)
+                self._index_data = json.load(f)
             
-            self._index = [DocMeta(**item) for item in index_data]
-            logger.info(f"Loaded {len(self._index)} documents from knowledge index")
+            logger.info(f"Loaded index with {len(self._index_data)} entries")
             
         except Exception as e:
             logger.error(f"Failed to load knowledge index: {e}")
-            self._index = []
+            self._index_data = []
     
-    def _save_index(self) -> None:
-        """Save knowledge index to JSON file"""
-        try:
-            self.index_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            index_data = [doc.model_dump() for doc in self._index]
-            
-            with open(self.index_path, 'w', encoding='utf-8') as f:
-                json.dump(index_data, f, ensure_ascii=False, indent=2)
-            
-            logger.info(f"Saved knowledge index with {len(self._index)} documents")
-            
-        except Exception as e:
-            logger.error(f"Failed to save knowledge index: {e}")
-    
-    def list_groups(self) -> List[str]:
+    def _find_index_entry(self, rel_path: str) -> Optional[Dict[str, Any]]:
         """
-        List all available groups
-        
-        Returns:
-            List of unique group names
-        """
-        groups = sorted(set(doc.group for doc in self._index))
-        logger.debug(f"Available groups: {groups}")
-        return groups
-    
-    def list_docs(self, group: Optional[str] = None) -> List[DocMeta]:
-        """
-        List documents, optionally filtered by group
+        Find index entry matching relative path
         
         Args:
-            group: Group name to filter by (None = all docs)
+            rel_path: Path relative to KNOWLEDGE_ROOT
         
         Returns:
-            List of document metadata
+            Index entry dict or None
         """
-        if group is None:
-            return self._index.copy()
-        
-        filtered = [doc for doc in self._index if doc.group == group]
-        logger.debug(f"Group '{group}': {len(filtered)} documents")
-        return filtered
-    
-    def get_doc_meta(self, doc_id: str) -> Optional[DocMeta]:
-        """
-        Get metadata for a specific document
-        
-        Args:
-            doc_id: Document ID
-        
-        Returns:
-            Document metadata or None if not found
-        """
-        for doc in self._index:
-            if doc.id == doc_id:
-                return doc
-        
-        logger.warning(f"Document not found: {doc_id}")
+        for entry in self._index_data:
+            if entry.get("path") == rel_path:
+                return entry
         return None
     
-    def load_doc_content(self, doc_id: str) -> Optional[str]:
+    def _compute_priority(self, index_entry: Optional[Dict[str, Any]]) -> int:
         """
-        Load content of a document
+        Compute retrieval priority
+        
+        Rules:
+        - "must_read" tag → 95
+        - "deprecated" tag → 20
+        - High-priority groups → 90
+        - Has index but normal → 60
+        - No index → 50
         
         Args:
-            doc_id: Document ID
+            index_entry: Entry from knowledge_index.json
         
         Returns:
-            Document content as string or None if not found
+            Priority score (higher = more important)
         """
-        doc_meta = self.get_doc_meta(doc_id)
-        if doc_meta is None:
-            return None
+        if not index_entry:
+            return 50
         
-        try:
-            doc_path = self.knowledge_root / doc_meta.path
-            
-            if not doc_path.exists():
-                logger.error(f"Document file not found: {doc_path}")
-                return None
-            
-            with open(doc_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            logger.debug(f"Loaded document: {doc_id} ({len(content)} chars)")
-            return content
-            
-        except Exception as e:
-            logger.error(f"Failed to load document {doc_id}: {e}")
-            return None
+        group = index_entry.get("group")
+        tags = index_entry.get("tags", [])
+        
+        if "must_read" in tags:
+            return 95
+        if "deprecated" in tags:
+            return 20
+        if group in ["mcp_spec", "catalog_schema", "thai_standard", "example_project"]:
+            return 90
+        
+        return 60
     
-    def get_docs_for_mcp_spec(self) -> List[DocMeta]:
+    def _scan_folders(self) -> None:
         """
-        Get documents relevant for MCP spec generation
+        Scan all 4 folders for files
         
-        Following HOW_TO_FIX_RAG_v2:
-        - mcp_spec group: MCP design, contracts, schemas
-        - catalog_schema group: DB structure, catalog info
-        - thai_standard group: Electrical standards
+        Process:
+        1. Walk each folder (*.md, *.txt, *.json)
+        2. For each file:
+           - Create DocumentMeta
+           - Match with knowledge_index if exists
+           - Compute priority
+        3. Build internal indices
+        """
+        for folder_name, folder_path in self.folders.items():
+            if not folder_path.exists():
+                logger.warning(f"Folder not found: {folder_path}")
+                continue
+            
+            for file_path in folder_path.rglob("*"):
+                if not file_path.is_file():
+                    continue
+                
+                if file_path.suffix not in [".md", ".txt", ".json"]:
+                    continue
+                
+                # Relative path from KNOWLEDGE_ROOT
+                try:
+                    rel_path = file_path.relative_to(self.knowledge_root)
+                except ValueError:
+                    logger.warning(f"File outside knowledge root: {file_path}")
+                    continue
+                
+                # Find in index
+                index_entry = self._find_index_entry(str(rel_path))
+                
+                # Create DocumentMeta
+                doc_meta = DocumentMeta(
+                    id=index_entry.get("id") if index_entry else None,
+                    path=str(file_path),
+                    rel_path=str(rel_path),
+                    folder=KnowledgeFolder(folder_name),
+                    group=index_entry.get("group") if index_entry else None,
+                    tags=index_entry.get("tags", []) if index_entry else [],
+                    version=index_entry.get("version") if index_entry else None,
+                    language=index_entry.get("language", "th") if index_entry else "th",
+                    priority=self._compute_priority(index_entry)
+                )
+                
+                # Store in indices
+                self._docs_by_path[str(file_path)] = doc_meta
+                
+                if doc_meta.id:
+                    self._docs_by_id[doc_meta.id] = doc_meta
+                
+                if doc_meta.group:
+                    self._docs_by_group.setdefault(doc_meta.group, []).append(doc_meta)
+                else:
+                    self._docs_unindexed.append(doc_meta)
+        
+        logger.info(
+            f"Scanned folders: {len(self._docs_by_path)} files, "
+            f"{len(self._docs_unindexed)} unindexed"
+        )
+    
+    # === Public API ===
+    
+    def list_docs(
+        self,
+        folder: Optional[str] = None,
+        group: Optional[str] = None
+    ) -> List[DocumentMeta]:
+        """
+        List documents with optional filters
+        
+        Args:
+            folder: Filter by folder ("db", "example", "mcp", "standard")
+            group: Filter by group from index (e.g., "mcp_spec")
         
         Returns:
-            List of relevant document metadata
+            List of DocumentMeta sorted by priority descending
         """
-        relevant_groups = ['mcp_spec', 'catalog_schema', 'thai_standard', 'example_project']
+        docs = list(self._docs_by_path.values())
         
-        docs = []
-        for group in relevant_groups:
-            docs.extend(self.list_docs(group))
+        if folder:
+            docs = [d for d in docs if d.folder == folder]
         
-        logger.info(f"Retrieved {len(docs)} docs for mcp_spec generation")
+        if group:
+            docs = [d for d in docs if d.group == group]
+        
+        # Sort by priority descending
+        docs.sort(key=lambda d: d.priority, reverse=True)
+        
         return docs
     
-    def get_docs_for_thai_standard(self) -> List[DocMeta]:
+    def get_docs_for_mcp_spec(self) -> List[DocumentMeta]:
         """
-        Get Thai electrical standard documents
+        Get documents for MCP spec generation
+        
+        Strategy:
+        - Include ALL files from db, mcp, standard, example
+        - Priority ordering (high priority groups first)
         
         Returns:
-            List of standard documents
+            Sorted list by priority descending
         """
-        return self.list_docs('thai_standard')
+        all_docs = []
+        
+        # Add from all 4 folders
+        for folder_name in ["db", "mcp", "standard", "example"]:
+            all_docs.extend(self.list_docs(folder=folder_name))
+        
+        # Already sorted by priority in list_docs
+        return all_docs
     
-    def add_document(self, doc_meta: DocMeta) -> bool:
+    def get_docs_for_ask(self, context_hint: List[str]) -> List[DocumentMeta]:
         """
-        Add a document to the index
+        Get documents for /ask endpoint
+        
+        Context hint mapping:
+        - "db" → folder db
+        - "standard" → folder standard
+        - "mcp_spec" → group mcp_spec
+        - empty list → all folders
+        
+        Args:
+            context_hint: List of folder names or group names
+        
+        Returns:
+            Sorted list by priority descending
+        """
+        if not context_hint:
+            return self.list_docs()
+        
+        docs = []
+        for hint in context_hint:
+            # Try as folder first
+            if hint in ["db", "example", "mcp", "standard"]:
+                docs.extend(self.list_docs(folder=hint))
+            # Try as group
+            elif hint in self._docs_by_group:
+                docs.extend(self._docs_by_group[hint])
+        
+        # Remove duplicates and sort by priority
+        seen: Set[str] = set()
+        unique_docs = []
+        for doc in docs:
+            if doc.path not in seen:
+                seen.add(doc.path)
+                unique_docs.append(doc)
+        
+        unique_docs.sort(key=lambda d: d.priority, reverse=True)
+        
+        return unique_docs
+    
+    def load_doc_content(self, doc_meta: DocumentMeta) -> str:
+        """
+        Load document content (lazy)
         
         Args:
             doc_meta: Document metadata
         
         Returns:
-            True if added successfully
+            File content as string
         """
-        # Check if already exists
-        existing = self.get_doc_meta(doc_meta.id)
-        if existing:
-            logger.warning(f"Document already exists: {doc_meta.id}")
-            return False
-        
-        self._index.append(doc_meta)
-        self._save_index()
-        logger.info(f"Added document: {doc_meta.id}")
-        return True
+        try:
+            with open(doc_meta.path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"Failed to load {doc_meta.path}: {e}")
+            return ""
     
-    def update_document(self, doc_id: str, doc_meta: DocMeta) -> bool:
+    def get_doc_by_id(self, doc_id: str) -> Optional[DocumentMeta]:
         """
-        Update document metadata
+        Get document by ID
         
         Args:
-            doc_id: Document ID to update
-            doc_meta: New metadata
+            doc_id: Document ID from index
         
         Returns:
-            True if updated successfully
+            DocumentMeta or None
         """
-        for i, doc in enumerate(self._index):
-            if doc.id == doc_id:
-                self._index[i] = doc_meta
-                self._save_index()
-                logger.info(f"Updated document: {doc_id}")
-                return True
-        
-        logger.warning(f"Document not found for update: {doc_id}")
-        return False
+        return self._docs_by_id.get(doc_id)
     
-    def remove_document(self, doc_id: str) -> bool:
+    def list_groups(self) -> List[str]:
         """
-        Remove document from index
-        
-        Args:
-            doc_id: Document ID
+        List all groups found in indexed documents
         
         Returns:
-            True if removed successfully
+            Sorted list of group names
         """
-        for i, doc in enumerate(self._index):
-            if doc.id == doc_id:
-                del self._index[i]
-                self._save_index()
-                logger.info(f"Removed document: {doc_id}")
-                return True
-        
-        logger.warning(f"Document not found for removal: {doc_id}")
-        return False
+        return sorted(self._docs_by_group.keys())

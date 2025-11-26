@@ -11,6 +11,53 @@ Philosophy: Ordo ab Chao (Order from Chaos)
 from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime
+from enum import Enum
+
+
+# =============================================================================
+# Knowledge Layer Models (Folder-Based Architecture)
+# =============================================================================
+
+class KnowledgeFolder(str, Enum):
+    """
+    Enumeration of knowledge folders
+    
+    RAG recognizes exactly 4 folders:
+    - db: Catalog snapshots + DB contracts
+    - example: Few-shot examples  
+    - mcp: MCP design docs
+    - standard: Thai electrical standards
+    """
+    DB = "db"
+    EXAMPLE = "example"
+    MCP = "mcp"
+    STANDARD = "standard"
+
+
+class DocumentMeta(BaseModel):
+    """
+    Metadata for a knowledge document
+    
+    Philosophy:
+    - All files in 4 folders are visible to RAG
+    - knowledge_index.json provides metadata/priority (not whitelist)
+    - Unindexed files still loadable (lower priority)
+    """
+    # Identity
+    id: Optional[str] = Field(None, description="Document ID from knowledge_index.json (if exists)")
+    path: str = Field(..., description="Absolute file path")
+    rel_path: str = Field(..., description="Path relative to KNOWLEDGE_ROOT")
+    folder: KnowledgeFolder = Field(..., description="Which of 4 folders this belongs to")
+    
+    # Metadata (from knowledge_index.json if exists)
+    group: Optional[str] = Field(None, description="Document group (e.g., 'mcp_spec', 'catalog_schema')")
+    tags: List[str] = Field(default_factory=list, description="Tags for categorization")
+    version: Optional[str] = Field(None, description="Document version")
+    language: Optional[str] = Field("th", description="Document language")
+    
+    # Computed
+    priority: int = Field(default=50, description="Retrieval priority (higher = more important)")
+
 
 
 # =============================================================================
@@ -180,6 +227,19 @@ class McpSpecResponse(BaseModel):
     llm_metadata: LlmMetadata = Field(..., description="LLM generation audit trail")
 
 
+class InsufficientDataError(BaseModel):
+    """
+    Error body for HTTP 422 when requirements incomplete
+    
+    Used in /api/v1/mcp_spec when data insufficient to generate spec.
+    NOT a response type - used in HTTPException detail only.
+    """
+    error: str = Field(default="Insufficient project requirements", description="Error message")
+    missing_fields: List[str] = Field(default_factory=list, description="Fields that are missing/incomplete")
+    questions: List[str] = Field(default_factory=list, description="Clarifying questions for user")
+    suggestions: List[str] = Field(default_factory=list, description="Suggestions to fix")
+
+
 # =============================================================================
 # Layer 3: Raw Retrieval
 # =============================================================================
@@ -226,6 +286,7 @@ class McpSpecTrustRecord(BaseModel):
     
     # LLM
     llm_model: str = Field(..., description="LLM model used")
+    llm_plan_text: Optional[str] = Field(None, description="Human-readable plan (Phase 4)")
     raw_llm_output: str = Field(..., description="Raw LLM response before parsing")
     
     # Validation

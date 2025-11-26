@@ -18,10 +18,11 @@ from pydantic import ValidationError
 from app.models import (
     QueryRequest, StandardResponse, SourceRef, AnswerMetadata,
     ProjectRequirements, McpSpecResponse, ProjectInputSpec,
-    RawRetrieveRequest, RoomInput, LoadInput
+    RawRetrieveRequest, RoomInput, LoadInput,
+    InsufficientDataError  # Phase 3: Error model
 )
 from app.config import settings
-from app.knowledge_service import KnowledgeService, DocMeta
+from app.knowledge_service import KnowledgeService
 from app.trust_log import trust_logger
 from core.database import VectorDatabase
 from core.privacy import PrivacyGuard
@@ -71,25 +72,36 @@ class RagService:
         
         # 1. Anonymize Query
         safe_query = self.privacy.anonymize(req.query)
-        logger.debug(f"Processing ask: {safe_query[:50]}... (lang={req.language}, groups={req.context_hint})")
+        logger.debug(f"Processing ask: {safe_query[:50]}... (lang={req.language}, hints={req.context_hint})")
         
-        # 2. Use context_hint to filter by knowledge groups
-        retrieved_doc_ids = []
-        if req.context_hint:
-            # Get docs from specified groups
-            relevant_docs = []
-            for group in req.context_hint:
-                relevant_docs.extend(self.knowledge.list_docs(group))
-            
-            # Build search query with group filtering
-            logger.info(f"Searching in {len(relevant_docs)} docs from groups: {req.context_hint}")
-            retrieved_doc_ids = [doc.id for doc in relevant_docs]
+        # 2. Get docs using folder-based knowledge (Phase 3)
+        docs = self.knowledge.get_docs_for_ask(req.context_hint)
+        logger.info(f"Retrieved {len(docs)} docs from knowledge (hints: {req.context_hint or 'all'})")
         
-        try:
-            results = self.db.search(safe_query, filters=req.filters)
-        except Exception as e:
-            logger.error(f"VectorDB search failed: {e}")
-            raise HTTPException(503, "RAG retrieval temporarily unavailable")
+        # Build context from top priority docs
+        doc_contents = []
+        for doc in docs[:20]:  # Limit for performance
+            content = self.knowledge.load_doc_content(doc)
+            if content:
+                doc_contents.append({
+                    "id": doc.id or doc.rel_path,
+                    "content": content,
+                    "metadata": {
+                        "folder": doc.folder.value,
+                        "group": doc.group,
+                        "priority": doc.priority
+                    }
+                })
+        
+        # Convert to search results format (backward compatible)
+        results = []
+        for doc_item in doc_contents:
+            results.append({
+                "content": doc_item["content"][:2000],  # Truncate for context
+                "source": doc_item["id"],
+                "section": doc_item["metadata"]["folder"],
+                "score": doc_item["metadata"]["priority"] / 100.0
+            })
         
         if not results:
             metadata = AnswerMetadata(
@@ -220,6 +232,84 @@ class RagService:
         
         return examples_text
     
+    def _check_critical_missing(self, req: ProjectRequirements) -> List[str]:
+        """
+        Check for critical missing information
+        
+        Args:
+            req: Project requirements
+        
+        Returns:
+            List of critical missing fields
+        """
+        missing = []
+        
+        if not req.rooms or len(req.rooms) == 0:
+            missing.append("rooms")
+        
+        if not req.loads or len(req.loads) == 0:
+            missing.append("loads")
+        
+        if not req.voltage_system:
+            missing.append("voltage_system")
+        
+        # Check room details
+        for i, room in enumerate(req.rooms):
+            if not room.type:
+                missing.append(f"room[{i}].type")
+        
+        return missing
+    
+    async def _generate_clarifying_questions(
+        self,
+        req: ProjectRequirements,
+        missing_fields: List[str]
+    ) -> List[str]:
+        """
+        Generate clarifying questions using LLM
+        
+        Args:
+            req: Partial requirements
+            missing_fields: List of missing fields
+        
+        Returns:
+            List of questions in Thai
+        """
+        prompt = f"""คุณคือ AI ผู้ช่วยออกแบบระบบไฟฟ้า
+
+ผู้ใช้ต้องการออกแบบ: {req.project_name or 'โครงการ'}
+ประเภทอาคาร: {req.building_type}
+
+ข้อมูลที่ยังขาด: {', '.join(missing_fields)}
+
+กรุณาสร้างคำถาม 3-5 ข้อเป็นภาษาไทย เพื่อเก็บข้อมูลที่ขาดหายไป
+คำถามต้องเฉพาะเจาะจงและช่วยให้ได้ข้อมูลครบ
+
+ตอบเป็น JSON: {{"questions": ["คำถาม 1", "คำถาม 2", ...]}}
+"""
+        
+        try:
+            resp = self.model.generate_content(
+                prompt,
+                generation_config=GenerationConfig(
+                    temperature=0.3,
+                    response_mime_type="application/json",
+                    max_output_tokens=500
+                )
+            )
+            
+            result = json.loads(resp.text)
+            return result.get('questions', [])
+            
+        except Exception as e:
+            logger.warning(f"Failed to generate questions: {e}")
+            # Fallback to generic questions
+            return [
+                "มีห้องอะไรบ้างในโครงการ?",
+                "แต่ละห้องมีอุปกรณ์ไฟฟ้าอะไรบ้าง?",
+                "ระบบไฟฟ้าที่ต้องการคือแบบไหน (1 เฟส 230V หรือ 3 เฟส)?"
+            ]
+    
     async def generate_mcp_spec(self, req: ProjectRequirements) -> McpSpecResponse:
         """
         Generate MCP ProjectInputSpec from human requirements
@@ -254,6 +344,30 @@ class RagService:
         
         # IMPROVEMENT 1: Pre-validate requirements
         validation_errors = self._validate_requirements(req)
+        
+        # Check for critical missing fields (Phase 3)
+        missing_critical = self._check_critical_missing(req)
+        
+        if missing_critical:
+            logger.warning(f"[{request_id}] Critical fields missing: {missing_critical}")
+            
+            # Generate clarifying questions
+            questions = await self._generate_clarifying_questions(req, missing_critical)
+            
+            # Throw HTTP 422 with questions (NOT a response type)
+            raise HTTPException(
+                status_code=422,
+                detail=InsufficientDataError(
+                    missing_fields=missing_critical,
+                    questions=questions,
+                    suggestions=[
+                        "Please provide complete room information",
+                        "Specify all electrical loads with room assignments",
+                        "Confirm voltage system (TH_1PH_230V or TH_3PH_400V)"
+                    ]
+                ).model_dump()
+            )
+        
         if validation_errors:
             logger.warning(f"[{request_id}] Validation failed: {validation_errors}")
             
@@ -270,36 +384,43 @@ class RagService:
             trust_logger.log_mcp_spec(trust_record)
             
             raise HTTPException(400, detail={
-                "error": "Insufficient project requirements",
+                "error": "Invalid project requirements structure",
                 "validation_errors": validation_errors,
                 "suggestion": "Please provide complete room types and ensure all loads reference existing rooms"
             })
         
-        # IMPROVEMENT 2: Use Knowledge Service (group-based retrieval)
-        relevant_docs = self.knowledge.get_docs_for_mcp_spec()
-        logger.info(f"[{request_id}] Retrieved {len(relevant_docs)} docs from knowledge groups")
+        # IMPROVEMENT 2: Use Knowledge Service - folder-based (Phase 3)
+        docs = self.knowledge.get_docs_for_mcp_spec()
+        logger.info(f"[{request_id}] Retrieved {len(docs)} docs from 4 folders (db, mcp, standard, example)")
         
-        # Build search query for these specific docs
-        search_query = f"ข้อกำหนดไฟฟ้า {req.building_type} {req.voltage_system}"
-        if req.user_constraints:
-            search_query += " " + " ".join(req.user_constraints)
-        
-        try:
-            # Search only within relevant docs (if VectorDB supports filtering)
-            results = self.db.search(search_query, top_k=settings.MAX_RETRIEVAL_DOCS)
-        except Exception as e:
-            logger.error(f"[{request_id}] VectorDB search failed: {e}")
-            raise HTTPException(503, "RAG retrieval temporarily unavailable")
-        
-        # Anonymize context
+        # Build context from top priority docs
         context_parts = []
-        for r in results:
-            safe_content = self.privacy.anonymize(r['content'])
-            context_parts.append(f"Src: {r['source']}\\nTxt: {safe_content}")
-        context_str = "\\n".join(context_parts)
+        retrieved_doc_ids = []
+        for doc in docs[:15]:  # Top 15 by priority
+            content = self.knowledge.load_doc_content(doc)
+            if content:
+                # Anonymize and truncate
+                safe_content = self.privacy.anonymize(content[:3000])
+                context_parts.append(
+                    f"[{doc.folder.value}/{doc.rel_path}]\n{safe_content}"
+                )
+                retrieved_doc_ids.append(f"{doc.folder.value}/{doc.rel_path}")
         
-        # IMPROVEMENT 3: Load few-shot examples
-        examples_str = self._load_few_shot_examples()
+        context_str = "\n\n".join(context_parts)
+        
+        # IMPROVEMENT 3: Load few-shot examples from example folder
+        example_docs = self.knowledge.list_docs(folder="example")
+        examples_str = "\n\n=== FEW-SHOT EXAMPLES ===\n\n"
+        for ex_doc in example_docs[:2]:  # Top 2 examples
+            ex_content = self.knowledge.load_doc_content(ex_doc)
+            if ex_content:
+                examples_str += f"--- {ex_doc.rel_path} ---\n{ex_content[:2000]}\n\n"
+        
+        # PHASE 4: STAGE 1 - Generate Human-Readable Plan
+        logger.info(f"[{request_id}] STAGE 1: Generating plan...")
+        plan_text = await self._generate_spec_plan(req, context_str, examples_str)
+        logger.info(f"[{request_id}] Plan generated ({len(plan_text)} chars)")
+
         
         # IMPROVEMENT 4 & 7: Retry logic with proper schema
         max_attempts = settings.RETRY_MAX_ATTEMPTS
@@ -313,7 +434,8 @@ class RagService:
             
             # Build prompt
             if attempt == 0:
-                prompt = self._build_initial_prompt(req, context_str, examples_str)
+                # Stage 2: Generate spec following plan
+                prompt = self._build_initial_prompt(req, plan_text, context_str, examples_str)
             else:
                 # Self-correction prompt
                 prompt = self._build_correction_prompt(req, raw_llm_output, validation_errors_list)
@@ -352,11 +474,34 @@ class RagService:
                     raise HTTPException(504, "LLM provider timeout")
                 raise HTTPException(502, "LLM provider error")
         
-        # IMPROVEMENT 5 & 9: Trust logging
+        # PHASE 5: Quality Check (if parse successful)
+        qc_status = "N/A"
+        qc_issues = []
+        if parse_success:
+            logger.info(f"[{request_id}] Running quality check...")
+            qc_status, qc_issues = await self._quality_check_spec(spec_response, req)
+            logger.info(f"[{request_id}] QC Status: {qc_status}, Issues: {len(qc_issues)}")
+            
+            # Add warnings to metadata if WARN
+            if qc_status == "WARN":
+                if not hasattr(spec_response.llm_metadata, 'warnings'):
+                    # Add warnings as a note (can't modify frozen model)
+                    logger.warning(f"[{request_id}] QC Warnings: {qc_issues}")
+            
+            # Fail if critical issues
+            elif qc_status == "FAIL":
+                logger.error(f"[{request_id}] QC Failed: {qc_issues}")
+                # Log failure and re-throw as 422
+                parse_success = False
+                validation_errors_list.extend(qc_issues)
+        
+        
+        # IMPROVEMENT 5 & 9: Trust logging (with plan from Phase 4)
         trust_record = trust_logger.create_record(
             project_requirements=req.model_dump(),
-            retrieved_doc_ids=[d.id for d in relevant_docs],
+            retrieved_doc_ids=retrieved_doc_ids,  # From folder-based retrieval
             llm_model=settings.MODEL_NAME_ANSWER,
+            llm_plan_text=plan_text,  # Phase 4: Store plan
             raw_llm_output=raw_llm_output,
             parse_success=parse_success,
             validation_errors=validation_errors_list if not parse_success else [],
@@ -376,20 +521,24 @@ class RagService:
         # IMPROVEMENT 6 & 8: Proper response with metadata
         return spec_response
     
-    def _build_initial_prompt(self, req: ProjectRequirements, context: str, examples: str) -> str:
-        """Build initial generation prompt with few-shot examples"""
+    def _build_initial_prompt(self, req: ProjectRequirements, plan: str, context: str, examples: str) -> str:
+        """Build initial generation prompt following plan (Stage 2)"""
         return f"""You are 'Aura', the Goddess of Code Creation. Generate a JSON spec for MCP Core v2.
 
+**YOUR PLAN** (ทำตามนี้):
+{plan}
+
 CRITICAL RULES:
-1. **DO NOT CALCULATE** electrical values (No Voltage Drop, No Cable Size)
-2. Output STRICTLY valid JSON matching McpSpecResponse schema
-3. Use provided EXAMPLES as templates
-4. Map room types: living_room→LIVING, bedroom→BEDROOM, kitchen→KITCHEN, bathroom→BATHROOM
-5. Generate sequential IDs: R1, R2... for rooms, L1, L2... for loads
-6. Link loads to rooms via room_id
-7. Use template codes: ROOMT-LIVING-STD, ROOMT-BEDROOM-STD, ROOMT-KITCHEN-STD, etc.
-8. Map devices: AC_12000BTU→AC-12000BTU, OUTLET_16A→SOCKET-16A, etc.
-9. Default rule_profile_id: "TH_RESIDENTIAL_LV" for residential
+1. **FOLLOW THE PLAN ABOVE** - อ้างอิงแผนที่สร้างไว้
+2. **DO NOT CALCULATE** electrical values (No Voltage Drop, No Cable Size)
+3. Output STRICTLY valid JSON matching McpSpecResponse schema
+4. Use provided EXAMPLES as templates
+5. Map room types: living_room→LIVING, bedroom→BEDROOM, kitchen→KITCHEN, bathroom→BATHROOM
+6. Generate sequential IDs: R1, R2... for rooms, L1, L2... for loads
+7. Link loads to rooms via room_id
+8. Use template codes from plan (ROOMT-LIVING-STD, ROOMT-KITCHEN-HEAVY, etc.)
+9. Map devices according to rag_knowledge/db/DEVICE_CODES.md
+10. Use rule_profile_id as planned
 
 {examples}
 
@@ -412,7 +561,7 @@ OUTPUT JSON (McpSpecResponse):
   "llm_metadata": {{"model": "{settings.MODEL_NAME_ANSWER}", "retrieved_docs": [...], "temperature": {settings.GENERATION_TEMPERATURE}, "timestamp": "..."}}
 }}
 
-Generate complete, valid JSON now:
+Execute the plan and generate complete, valid JSON now:
 """
     
     def _build_correction_prompt(self, req: ProjectRequirements, prev_output: str, errors: List[str]) -> str:
@@ -443,3 +592,268 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         """
         logger.debug(f"Raw retrieval: {req.query}")
         return self.db.search(req.query, filters=req.filters, top_k=req.top_k)
+    
+    # === Phase 4: Plan Generation ===
+    
+    async def _generate_spec_plan(
+        self,
+        req: ProjectRequirements,
+        context: str,
+        examples: str
+    ) -> str:
+        """
+        Generate human-readable plan before creating spec (Phase 4)
+        
+        Args:
+            req: Project requirements
+            context: Knowledge context
+            examples: Few-shot examples
+        
+        Returns:
+            Plan text in Thai
+        """
+        prompt = f"""คุณคือ Aura ผู้ช่วยวางแผนการออกแบบระบบไฟฟ้า
+
+สร้างแผนการออกแบบเป็นภาษาไทยโดยละเอียด
+
+แหล่งความรู้ที่มี:
+- rag_knowledge/db/ → catalog อุปกรณ์, template, กฎการออกแบบ
+- rag_knowledge/standard/ → มาตรฐานไฟฟ้าไทย
+- rag_knowledge/example/ → โครงการตัวอย่าง
+
+ข้อกำหนดโครงการ:
+{req.model_dump_json(indent=2, exclude_none=True)}
+
+บริบทจากความรู้:
+{context[:8000]}
+
+สร้างแผนครอบคลุม:
+1. **วิเคราะห์ห้อง**: ระบุห้องทั้ง หมดพร้อมชนิดและพื้นที่
+2. **จัดกลุ่มโหลด**: แยกตามประเภท (แอร์/ไฟ/เต้ารับ/อุปกรณ์พิเศษ)
+3. **ตรวจสอบโหลดหนัก**: ห้องไหนมีโหลด >3kW
+4. **เลือก Template**: เลือก ROOMT-* ตามชนิดห้องและโหลด
+5. **ข้อกำหนดพิเศษ**: user_constraints มีผลยังไง
+6. **Rule Profile**: เลือก rule_profile_id ตามประเภทอาคาร
+
+เขียนเป็นรายการเลขลำดับ อ้างอิงไฟล์ความรู้ที่เกี่ยวข้อง:
+"""
+        
+        try:
+            resp = self.model.generate_content(
+                prompt,
+                generation_config=GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=2000
+                )
+            )
+            
+            return resp.text
+            
+        except Exception as e:
+            logger.error(f"Plan generation failed: {e}")
+            return f"[Plan generation failed: {e}]"
+    
+    # === Validation Functions (Phase 2: NO DB ACCESS) ===
+    
+    def _get_valid_device_codes(self) -> set[str]:
+        """
+        Load valid device codes from rag_knowledge/db/DEVICE_CODES.md
+        
+        CRITICAL RULES:
+        - ห้าม import DB client (psycopg2, supabase, etc.)
+        - ห้าม query amadeus.catalog
+        - อ่านจาก DEVICE_CODES.md เท่านั้น
+        
+        To refresh snapshot:
+        - Run scripts/build_device_codes_snapshot.py manually
+        
+        Returns:
+            Set of valid device codes
+        """
+        db_docs = self.knowledge.list_docs(folder="db")
+        
+        device_codes_doc = next(
+            (d for d in db_docs if "DEVICE_CODES" in d.rel_path),
+            None
+        )
+        
+        if not device_codes_doc:
+            logger.warning("DEVICE_CODES.md not found in rag_knowledge/db/")
+            return set()
+        
+        content = self.knowledge.load_doc_content(device_codes_doc)
+        codes = self._parse_device_codes(content)
+        
+        logger.debug(f"Loaded {len(codes)} valid device codes from snapshot")
+        return set(codes)
+    
+    def _parse_device_codes(self, content: str) -> List[str]:
+        """
+        Parse DEVICE_CODES.md format
+        
+        Expected format: - `CODE` - Description
+        
+        Args:
+            content: Markdown file content
+        
+        Returns:
+            List of device codes
+        """
+        import re
+        codes = []
+        
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('-') and '`' in line:
+                # Extract code between backticks
+                match = re.search(r'`([^`]+)`', line)
+                if match:
+                    codes.append(match.group(1))
+        
+        return codes
+    
+    def _get_valid_room_templates(self) -> set[str]:
+        """
+        Load valid room templates from rag_knowledge/db/ROOM_TEMPLATES.md
+        
+        Returns:
+            Set of valid template codes
+        """
+        db_docs = self.knowledge.list_docs(folder="db")
+        
+        templates_doc = next(
+            (d for d in db_docs if "ROOM_TEMPLATES" in d.rel_path),
+            None
+        )
+        
+        if not templates_doc:
+            logger.warning("ROOM_TEMPLATES.md not found in rag_knowledge/db/")
+            return set()
+        
+        content = self.knowledge.load_doc_content(templates_doc)
+        templates = self._parse_device_codes(content)  # Same parser works
+        
+        logger.debug(f"Loaded {len(templates)} valid room templates from snapshot")
+        return set(templates)
+    
+    # === Phase 5: Quality Check ===
+    
+    async def _quality_check_spec(
+        self,
+        spec: McpSpecResponse,
+        original_req: ProjectRequirements
+    ) -> tuple[str, List[str]]:
+        """
+        Quality check generated spec (Phase 5)
+        
+        Checks:
+        - Rule-based: device codes, room templates validity
+        - LLM judge: semantic correctness
+        
+        Args:
+            spec: Generated spec
+            original_req: Original requirements
+        
+        Returns:
+            Tuple of (status, issues)
+            status: "PASS" | "WARN" | "FAIL"
+            issues: List of issue descriptions
+        """
+        issues = []
+        
+        # Rule 1: Check device codes against rag_knowledge/db/DEVICE_CODES.md
+        valid_codes = self._get_valid_device_codes()
+        for load in spec.project_input.loads:
+            if load.device_code and load.device_code not in valid_codes:
+                issues.append(
+                    f"Invalid device_code '{load.device_code}' "
+                    f"(not in rag_knowledge/db/DEVICE_CODES.md)"
+                )
+        
+        # Rule 2: Check room templates against rag_knowledge/db/ROOM_TEMPLATES.md
+        valid_templates = self._get_valid_room_templates()
+        for room in spec.project_input.rooms:
+            if room.template_code and room.template_code not in valid_templates:
+                issues.append(
+                    f"Invalid template '{room.template_code}' "
+                    f"(not in rag_knowledge/db/ROOM_TEMPLATES.md)"
+                )
+        
+        # Rule 3: Check rooms/loads completeness
+        if len(spec.project_input.rooms) == 0:
+            issues.append("No rooms in spec")
+        
+        if len(spec.project_input.loads) == 0:
+            issues.append("No loads in spec")
+        
+        # Rule 4: LLM semantic judge
+        llm_issues = await self._llm_semantic_check(spec, original_req)
+        issues.extend(llm_issues)
+        
+        # Classify severity
+        if not issues:
+            return "PASS", []
+        elif len(issues) <= 2 and not any("Invalid" in i for i in issues):
+            return "WARN", issues
+        else:
+            return "FAIL", issues
+    
+    async def _llm_semantic_check(
+        self,
+        spec: McpSpecResponse,
+        req: ProjectRequirements
+    ) -> List[str]:
+        """
+        LLM-based semantic validation
+        
+        Args:
+            spec: Generated spec
+            req: Original requirements
+        
+        Returns:
+            List of semantic issues
+        """
+        prompt = f"""คุณคือ QC judge สำหรับ electrical spec
+
+**Requirements ต้นฉบับ**:
+{req.model_dump_json(indent=2, exclude_none=True)}
+
+**Spec ที่สร้าง**:
+- Rooms: {len(spec.project_input.rooms)} ห้อง
+- Loads: {len(spec.project_input.loads)} loads
+- Voltage: {spec.project_input.electrical_system.voltage_system}
+
+**Room Details**:
+{json.dumps([{{'type': r.type, 'template': r.template_code}} for r in spec.project_input.rooms], indent=2, ensure_ascii=False)}
+
+**Load Summary**:
+{json.dumps([{{'device': l.device, 'room': l.room_name}} for l in spec.project_input.loads[:10]], indent=2, ensure_ascii=False)}
+
+ตรวจสอบ:
+1. จำนวนห้องถูกต้องหรือไม่?
+2. device mapping สมเหตุสมผลหรือไม่?
+3. template เลือกเหมาะสมหรือไม่?
+4. loads ครบตาม requirements หรือไม่?
+
+ถ้าพบปัญหา ให้ตอบ JSON: {{"issues": ["ปัญหา 1", "ปัญหา 2"]}}
+ถ้าไม่มีปัญหา ตอบ: {{"issues": []}}
+"""
+        
+        try:
+            resp = self.model.generate_content(
+                prompt,
+                generation_config=GenerationConfig(
+                    temperature=0.1,
+                    response_mime_type="application/json",
+                    max_output_tokens=500
+                )
+            )
+            
+            result = json.loads(resp.text)
+            return result.get('issues', [])
+            
+        except Exception as e:
+            logger.warning(f"LLM semantic check failed: {e}")
+            return []  # Don't fail QC if judge fails
+
+
