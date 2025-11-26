@@ -17,11 +17,11 @@ def test_room_input_basic():
     room = RoomInput(
         name="ห้องนั่งเล่น",
         type="living_room",
-        area_m2=25.0
+        area_sqm=25.0
     )
     assert room.name == "ห้องนั่งเล่น"
     assert room.type == "living_room"
-    assert room.area_m2 == 25.0
+    assert room.area_sqm == 25.0
 
 
 def test_load_input_basic():
@@ -43,8 +43,8 @@ def test_project_requirements_structured():
         building_type="residential",
         voltage_system="TH_1PH_230V",
         rooms=[
-            RoomInput(name="Living", type="living_room", area_m2=20.0),
-            RoomInput(name="Bedroom", type="bedroom", area_m2=15.0)
+            RoomInput(name="Living", type="living_room", area_sqm=20.0),
+            RoomInput(name="Bedroom", type="bedroom", area_sqm=15.0)
         ],
         loads=[
             LoadInput(room_name="Living", device="AC_12000BTU", quantity=1),
@@ -77,7 +77,7 @@ def test_project_input_spec_complete():
                 name="Living",
                 room_type="LIVING",
                 template_code="ROOMT-LIVING-STD",
-                area_m2=20.0
+                area_sqm=20.0
             )
         ],
         loads=[

@@ -113,7 +113,7 @@ class RoomInput(BaseModel):
     """Room specification from user (human-readable)"""
     name: str = Field(..., description="Room name e.g., 'ห้องนอน 1'")
     type: str = Field(..., description="Room type e.g., 'bedroom', 'kitchen'")
-    area_m2: Optional[float] = Field(None, description="Area in square meters")
+    area_sqm: Optional[float] = Field(None, description="Area in square meters")
 
 
 class LoadInput(BaseModel):
@@ -163,7 +163,7 @@ class RoomSpec(BaseModel):
     name: str = Field(..., description="Room name")
     room_type: str = Field(..., description="Type: BEDROOM, KITCHEN, LIVING, BATHROOM, etc.")
     template_code: str = Field(..., description="Room template code e.g., 'ROOMT-BEDROOM-STD'")
-    area_m2: Optional[float] = Field(None, description="Area in m²")
+    area_sqm: Optional[float] = Field(None, description="Area in m²")
 
 
 class LoadSpec(BaseModel):

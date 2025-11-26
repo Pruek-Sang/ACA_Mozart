@@ -6,7 +6,7 @@ Fixed, deterministic ProjectRequirements (NO LLM parsing)
 import json
 from pathlib import Path
 from typing import Dict, Any
-from app.models import ProjectRequirements
+from app.models import ProjectRequirements, RoomInput, LoadInput
 
 
 def load_example_requirements(name: str) -> ProjectRequirements:
@@ -54,41 +54,29 @@ def get_basic_house_requirements() -> ProjectRequirements:
         building_type="residential",
         voltage_system="TH_1PH_230V",
         rooms=[
-            {
-                "name": "Living Room",
-                "type": "LIVING",
-                "area_sqm": 20.0
-            },
-            {
-                "name": "Bedroom 1",
-                "type": "BEDROOM",
-                "area_sqm": 12.0
-            },
-            {
-                "name": "Kitchen",
-                "type": "KITCHEN",
-                "area_sqm": 8.0
-            }
+            RoomInput(name="Living Room", type="LIVING", area_sqm=20.0),
+            RoomInput(name="Bedroom 1", type="BEDROOM", area_sqm=12.0),
+            RoomInput(name="Kitchen", type="KITCHEN", area_sqm=8.0),
         ],
         loads=[
-            {
-                "device": "Air Conditioner 12000 BTU",
-                "room_name": "Bedroom 1",
-                "quantity": 1,
-                "power_rating_w": 1200.0
-            },
-            {
-                "device": "Refrigerator",
-                "room_name": "Kitchen",
-                "quantity": 1,
-                "power_rating_w": 300.0
-            },
-            {
-                "device": "LED Lights",
-                "room_name": "Living Room",
-                "quantity": 4,
-                "power_rating_w": 10.0
-            }
+            LoadInput(
+                device="Air Conditioner 12000 BTU",
+                room_name="Bedroom 1",
+                quantity=1,
+                power_kw=1.2  # 1200W = 1.2kW
+            ),
+            LoadInput(
+                device="Refrigerator",
+                room_name="Kitchen",
+                quantity=1,
+                power_kw=0.3  # 300W = 0.3kW
+            ),
+            LoadInput(
+                device="LED Lights",
+                room_name="Living Room",
+                quantity=4,
+                power_kw=0.01  # 10W = 0.01kW per unit
+            ),
         ],
         user_constraints=[]
     )
@@ -101,36 +89,28 @@ def get_heavy_kitchen_requirements() -> ProjectRequirements:
         building_type="residential",
         voltage_system="TH_1PH_230V",
         rooms=[
-            {
-                "name": "Kitchen",
-                "type": "KITCHEN",
-                "area_sqm": 12.0
-            },
-            {
-                "name": "Living Room",
-                "type": "LIVING",
-                "area_sqm": 25.0
-            }
+            RoomInput(name="Kitchen", type="KITCHEN", area_sqm=12.0),
+            RoomInput(name="Living Room", type="LIVING", area_sqm=25.0),
         ],
         loads=[
-            {
-                "device": "Induction Cooker",
-                "room_name": "Kitchen",
-                "quantity": 1,
-                "power_rating_w": 3000.0
-            },
-            {
-                "device": "Microwave",
-                "room_name": "Kitchen",
-                "quantity": 1,
-                "power_rating_w": 1500.0
-            },
-            {
-                "device": "Refrigerator",
-                "room_name": "Kitchen",
-                "quantity": 1,
-                "power_rating_w": 300.0
-            }
+            LoadInput(
+                device="Induction Cooker",
+                room_name="Kitchen",
+                quantity=1,
+                power_kw=3.0  # 3000W = 3.0kW
+            ),
+            LoadInput(
+                device="Microwave",
+                room_name="Kitchen",
+                quantity=1,
+                power_kw=1.5  # 1500W = 1.5kW
+            ),
+            LoadInput(
+                device="Refrigerator",
+                room_name="Kitchen",
+                quantity=1,
+                power_kw=0.3  # 300W = 0.3kW
+            ),
         ],
         user_constraints=["Heavy load kitchen"]
     )
