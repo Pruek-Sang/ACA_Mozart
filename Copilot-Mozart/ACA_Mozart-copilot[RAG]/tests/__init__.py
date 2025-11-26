@@ -1,4 +1,1 @@
-"""
-Test Package
-Divine test suite for Mozart RAG
-"""
+"""Test package for ACA Mozart RAG"""

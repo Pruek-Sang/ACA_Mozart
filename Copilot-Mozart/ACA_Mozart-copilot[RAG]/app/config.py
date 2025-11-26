@@ -5,7 +5,11 @@ Centralized configuration following Pulchritudo in Simplicitate principle
 
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pathlib import Path
 import os
+
+# Base directory of the project (parent of app/)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -13,9 +17,10 @@ class Settings(BaseSettings):
     Central configuration for Mozart RAG
     
     Philosophy:
-    - All paths absolute and explicit
+    - All paths absolute and explicit (using BASE_DIR)
     - Environment variables override defaults
     - No magic values scattered across codebase
+    - Folder-based knowledge architecture
     """
     
     # === Google Cloud / Vertex AI ===
@@ -28,12 +33,16 @@ class Settings(BaseSettings):
 
     
     # === Vector Database ===
-    VECTOR_DB_PATH: str = "./vector_db"
+    VECTOR_DB_PATH: str = str(BASE_DIR / "vector_db")
     EMBEDDING_MODEL: str = "textembedding-gecko@003"
     
-    # === Knowledge Base ===
-    KNOWLEDGE_ROOT: str = "./rag_knowledge"
-    KNOWLEDGE_INDEX_PATH: str = "./rag_knowledge/knowledge_index.json"
+    # === Knowledge Base (FOLDER-BASED) ===
+    KNOWLEDGE_ROOT: str = str(BASE_DIR / "rag_knowledge")
+    KNOWLEDGE_DIR_DB: str = str(BASE_DIR / "rag_knowledge" / "db")
+    KNOWLEDGE_DIR_EXAMPLE: str = str(BASE_DIR / "rag_knowledge" / "example")
+    KNOWLEDGE_DIR_MCP: str = str(BASE_DIR / "rag_knowledge" / "mcp")
+    KNOWLEDGE_DIR_STANDARD: str = str(BASE_DIR / "rag_knowledge" / "standard")
+    KNOWLEDGE_INDEX_PATH: str = str(BASE_DIR / "rag_knowledge" / "knowledge_index.json")
     
     # === Trust Log ===
     TRUST_LOG_DIR: str = "./logs/mcp_spec"
