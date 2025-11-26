@@ -118,7 +118,7 @@ class TestMcpSpecGeneration:
             
             # Find kitchen room
             kitchen = next(
-                (r for r in spec.project_input.rooms if r.type == "KITCHEN"),
+                (r for r in spec.project_input.rooms if r.room_type == "KITCHEN"),
                 None
             )
             
@@ -141,7 +141,7 @@ class TestQualityCheck:
     @pytest.mark.asyncio
     async def test_qc_detects_invalid_device_code(self):
         """Test QC catches invalid device codes"""
-        from app.models import McpSpecResponse, ProjectInputSpec, RoomInput, LoadInput
+        from app.models import McpSpecResponse, ProjectInputSpec, RoomSpec, LoadSpec
         from app.models import ProjectInfo, ElectricalSystem, Constraints, StandardsProfile, LlmMetadata
         
         service = RagService()
@@ -159,23 +159,21 @@ class TestQualityCheck:
                     earthing="TT"
                 ),
                 rooms=[
-                    RoomInput(
+                    RoomSpec(
                         room_id="R1",
-                        type="LIVING",
+                        room_type="LIVING",
                         name="Living",
                         area_sqm=20.0,
                         template_code="ROOMT-LIVING-STD"
                     )
                 ],
                 loads=[
-                    LoadInput(
+                    LoadSpec(
                         load_id="L1",
                         room_id="R1",
-                        room_name="Living",
-                        device="Bad Device",
                         device_code="INVALID-CODE-999",  # Invalid!
-                        quantity=1,
-                        power_rating_w=1000.0
+                        qty=1,
+                        notes="Bad Device"
                     )
                 ],
                 constraints=Constraints(

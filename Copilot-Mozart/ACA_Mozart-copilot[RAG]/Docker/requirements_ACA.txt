@@ -48,6 +48,9 @@ asyncio==3.4.3
 pytest==7.4.4
 pytest-asyncio==0.23.3
 
+# Vector Database
+chromadb==0.4.22
+
 # Code Quality (Development)
 black==24.1.1
 ruff==0.1.13
