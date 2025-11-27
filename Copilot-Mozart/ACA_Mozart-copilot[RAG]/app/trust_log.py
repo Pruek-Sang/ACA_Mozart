@@ -76,8 +76,8 @@ class TrustLogger:
         try:
             log_file = self._get_log_file_path(record.timestamp)
             
-            # Convert to JSON
-            record_json = record.model_dump()
+            # Convert to JSON (mode='json' serializes datetime as ISO string)
+            record_json = record.model_dump(mode='json')
             record_line = json.dumps(record_json, ensure_ascii=False)
             
             # Append to file
@@ -101,7 +101,8 @@ class TrustLogger:
         validation_errors: Optional[list] = None,
         project_input: Optional[dict] = None,
         user_id: Optional[str] = None,
-        forwarded_to_mcp: bool = False
+        forwarded_to_mcp: bool = False,
+        llm_plan_text: Optional[str] = None
     ) -> McpSpecTrustRecord:
         """
         Create a trust record (helper method)
@@ -127,6 +128,7 @@ class TrustLogger:
             project_requirements=project_requirements,
             retrieved_doc_ids=retrieved_doc_ids,
             llm_model=llm_model,
+            llm_plan_text=llm_plan_text,
             raw_llm_output=raw_llm_output,
             parse_success=parse_success,
             validation_errors=validation_errors or [],

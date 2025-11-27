@@ -1,0 +1,7 @@
+
+# Secrets - NEVER commit
+.env
+.env_ACA
+Docker/.env_ACA
+*.key
+*credentials*.json

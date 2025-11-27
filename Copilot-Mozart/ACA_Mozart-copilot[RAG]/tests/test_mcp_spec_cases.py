@@ -25,9 +25,9 @@ def basic_house_request():
         voltage_system="TH_1PH_230V",
         location="Bangkok",
         rooms=[
-            RoomInput(name="ห้องนั่งเล่น", type="living_room", area_m2=20.0),
-            RoomInput(name="ห้องนอน", type="bedroom", area_m2=15.0),
-            RoomInput(name="ห้องน้ำ", type="bathroom", area_m2=5.0)
+            RoomInput(name="ห้องนั่งเล่น", type="living_room", area_sqm=20.0),
+            RoomInput(name="ห้องนอน", type="bedroom", area_sqm=15.0),
+            RoomInput(name="ห้องน้ำ", type="bathroom", area_sqm=5.0)
         ],
         loads=[
             LoadInput(room_name="ห้องนั่งเล่น", device="AC_12000BTU", quantity=1),
@@ -48,9 +48,9 @@ def heavy_kitchen_request():
         voltage_system="TH_1PH_230V",
         location="Bangkok",
         rooms=[
-            RoomInput(name="ห้องนั่งเล่น 1F", type="living_room", area_m2=30.0),
-            RoomInput(name="ครัว 1F", type="kitchen", area_m2=15.0),
-            RoomInput(name="ห้องนอน 2F", type="bedroom", area_m2=18.0)
+            RoomInput(name="ห้องนั่งเล่น 1F", type="living_room", area_sqm=30.0),
+            RoomInput(name="ครัว 1F", type="kitchen", area_sqm=15.0),
+            RoomInput(name="ห้องนอน 2F", type="bedroom", area_sqm=18.0)
         ],
         loads=[
             LoadInput(room_name="ห้องนั่งเล่น 1F", device="AC_18000BTU", quantity=1),
