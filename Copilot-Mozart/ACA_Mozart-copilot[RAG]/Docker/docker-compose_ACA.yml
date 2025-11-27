@@ -27,6 +27,9 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=8080
       - PYTHONUNBUFFERED=1
+      # LLM Provider - set one of these in .env_ACA:
+      # - GOOGLE_API_KEY (for Google AI - simpler)
+      # - PROJECT_ID + LOCATION (for Vertex AI - enterprise)
     
     # Restart policy
     restart: unless-stopped

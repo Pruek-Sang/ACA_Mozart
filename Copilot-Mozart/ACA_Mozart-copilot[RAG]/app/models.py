@@ -9,8 +9,8 @@ Philosophy: Ordo ab Chao (Order from Chaos)
 """
 
 from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field
-from datetime import datetime
+from pydantic import BaseModel, Field, ConfigDict
+from datetime import datetime, timezone
 from enum import Enum
 
 
@@ -214,7 +214,7 @@ class LlmMetadata(BaseModel):
     model: str = Field(..., description="LLM model used e.g., 'gemini-1.5-pro'")
     retrieved_docs: List[str] = Field(default_factory=list, description="Document IDs used for context")
     temperature: float = Field(default=0.0, description="Generation temperature")
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat(), description="Generation timestamp")
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="Generation timestamp")
 
 
 class McpSpecResponse(BaseModel):
@@ -274,7 +274,9 @@ class McpSpecTrustRecord(BaseModel):
     Trust record for every /api/v1/mcp_spec call
     Follows Canonical Funnel philosophy: full audit trail
     """
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request_id: str = Field(..., description="Unique request ID (UUID)")
     user_id: Optional[str] = Field(None, description="User ID if available")
     
@@ -299,7 +301,4 @@ class McpSpecTrustRecord(BaseModel):
     # Downstream
     forwarded_to_mcp: bool = Field(default=False, description="Was this forwarded to MCP?")
     
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    # Note: datetime serialization is handled automatically by Pydantic V2

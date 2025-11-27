@@ -3,7 +3,8 @@ Configuration Module - The Divine Settings
 Centralized configuration following Pulchritudo in Simplicitate principle
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import ConfigDict
 from typing import Optional
 from pathlib import Path
 import os
@@ -26,6 +27,11 @@ class Settings(BaseSettings):
     # === Google Cloud / Vertex AI ===
     PROJECT_ID: str = "your-project-id"
     LOCATION: str = "us-central1"
+    
+    # === Google AI API (Alternative to Vertex AI) ===
+    # If GOOGLE_API_KEY is set, use Google AI instead of Vertex AI
+    GOOGLE_API_KEY: Optional[str] = None
+    USE_GOOGLE_AI: bool = False  # Auto-detected if API key is present
     
     # === Model Configuration ===
     MODEL_NAME_ANSWER: str = "gemini-2.0-flash-exp"
@@ -64,9 +70,10 @@ class Settings(BaseSettings):
     API_TITLE: str = "Amadeus RAG (Aura v3.2)"
     API_VERSION: str = "3.2.0"
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8"
+    )
 
 
 # Global settings instance

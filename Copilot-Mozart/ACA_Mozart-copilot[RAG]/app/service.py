@@ -10,9 +10,36 @@ Philosophy: The Divine Service Layer
 
 import json
 import logging
-from typing import List, Dict, Any, Optional
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig
+import os
+from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
+
+# =============================================================================
+# LLM Provider Abstraction
+# =============================================================================
+# Supports both Google AI (API Key) and Vertex AI (GCP Credentials)
+# Auto-detects based on available credentials
+# =============================================================================
+
+# Google AI SDK (simpler, uses API key)
+try:
+    import google.generativeai as genai  # type: ignore[import]
+    GOOGLE_AI_AVAILABLE = True
+except ImportError:
+    genai = None  # type: ignore[assignment]
+    GOOGLE_AI_AVAILABLE = False
+
+# Vertex AI SDK (enterprise, uses GCP credentials)
+try:
+    import vertexai  # type: ignore[import]
+    from vertexai.generative_models import GenerativeModel as VertexGenerativeModel  # type: ignore[import]
+    from vertexai.generative_models import GenerationConfig as VertexGenerationConfig  # type: ignore[import]
+    VERTEX_AI_AVAILABLE = True
+except ImportError:
+    vertexai = None  # type: ignore[assignment]
+    VertexGenerativeModel = None  # type: ignore[assignment,misc]
+    VertexGenerationConfig = None  # type: ignore[assignment,misc]
+    VERTEX_AI_AVAILABLE = False
+
 from pydantic import ValidationError
 
 from app.models import (
@@ -46,14 +73,73 @@ class RagService:
     
     def __init__(self):
         """Initialize RAG service with all components"""
-        vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)
-        
         self.db = VectorDatabase()
         self.privacy = PrivacyGuard()
         self.knowledge = KnowledgeService()
-        self.model = GenerativeModel(settings.MODEL_NAME_ANSWER)
+        self.use_google_ai: bool = False
+        self.model: Any = None  # Will be set below
+        
+        # Auto-detect which LLM API to use
+        api_key = settings.GOOGLE_API_KEY or os.getenv("GOOGLE_API_KEY")
+        
+        if api_key and GOOGLE_AI_AVAILABLE and genai is not None:
+            # Use Google AI (simpler, just needs API key)
+            genai.configure(api_key=api_key)  # type: ignore[union-attr]
+            self.model = genai.GenerativeModel(settings.MODEL_NAME_ANSWER)  # type: ignore[union-attr]
+            self.use_google_ai = True
+            logger.info("RagService initialized with Google AI (API Key)")
+        elif VERTEX_AI_AVAILABLE and vertexai is not None and VertexGenerativeModel is not None:
+            # Use Vertex AI (requires GCP credentials)
+            vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)  # type: ignore[union-attr]
+            self.model = VertexGenerativeModel(settings.MODEL_NAME_ANSWER)  # type: ignore[misc]
+            self.use_google_ai = False
+            logger.info("RagService initialized with Vertex AI")
+        else:
+            raise RuntimeError("No LLM API available. Install google-generativeai or google-cloud-aiplatform")
         
         logger.info("RagService initialized with divine components")
+    
+    def _get_generation_config(
+        self, 
+        temperature: Optional[float] = None, 
+        max_tokens: Optional[int] = None, 
+        json_mode: bool = False
+    ) -> dict:
+        """
+        Get generation config for either API
+        Returns dict that works with both APIs
+        """
+        temp = temperature if temperature is not None else settings.GENERATION_TEMPERATURE
+        tokens = max_tokens if max_tokens is not None else settings.MAX_OUTPUT_TOKENS
+        
+        config: Dict[str, Any] = {
+            "temperature": temp,
+            "max_output_tokens": tokens
+        }
+        if json_mode:
+            config["response_mime_type"] = "application/json"
+        
+        return config
+    
+    def _generate_content(self, prompt: str, config: dict) -> str:
+        """
+        Generate content using the configured LLM
+        Works with both Google AI and Vertex AI
+        """
+        if self.use_google_ai:
+            # Google AI uses dict config directly
+            response = self.model.generate_content(
+                prompt,
+                generation_config=config  # type: ignore[arg-type]
+            )
+        else:
+            # Vertex AI uses GenerationConfig object
+            gen_config = VertexGenerationConfig(**config)  # type: ignore[misc]
+            response = self.model.generate_content(
+                prompt,
+                generation_config=gen_config  # type: ignore[arg-type]
+            )
+        return response.text
     
     async def process_ask(self, req: QueryRequest) -> StandardResponse:
         """
@@ -137,11 +223,8 @@ class RagService:
         prompt = f"{lang_instruction}\\n\\nContext: {context_str}\\n\\nQuestion: {safe_query}\\n\\nAnswer (strict from context):"
         
         try:
-            resp = self.model.generate_content(
-                prompt,
-                generation_config=GenerationConfig(temperature=settings.GENERATION_TEMPERATURE)
-            )
-            answer = resp.text
+            config = self._get_generation_config(temperature=settings.GENERATION_TEMPERATURE)
+            answer = self._generate_content(prompt, config)
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
             raise HTTPException(504, "LLM provider timeout")
@@ -224,8 +307,12 @@ class RagService:
         examples_text = "\\n\\n=== FEW-SHOT EXAMPLES ===\\n\\n"
         
         for doc_id in example_ids:
-            # Try to load from knowledge
-            content = self.knowledge.load_doc_content(f"DOC_EX_{doc_id.upper()}")
+            # Try to load from knowledge - get DocumentMeta first, then load content
+            doc_meta = self.knowledge.get_doc_by_id(f"DOC_EX_{doc_id.upper()}")
+            if doc_meta:
+                content = self.knowledge.load_doc_content(doc_meta)
+            else:
+                content = ""
             if content:
                 # Extract just the JSON parts for brevity
                 examples_text += f"--- Example: {doc_id} ---\\n{content[:2000]}\\n\\n"
@@ -289,16 +376,10 @@ class RagService:
 """
         
         try:
-            resp = self.model.generate_content(
-                prompt,
-                generation_config=GenerationConfig(
-                    temperature=0.3,
-                    response_mime_type="application/json",
-                    max_output_tokens=500
-                )
-            )
+            config = self._get_generation_config(temperature=0.3, max_tokens=500, json_mode=True)
+            response_text = self._generate_content(prompt, config)
             
-            result = json.loads(resp.text)
+            result = json.loads(response_text)
             return result.get('questions', [])
             
         except Exception as e:
@@ -428,6 +509,7 @@ class RagService:
         parse_success = False
         validation_errors_list = []
         project_input_dict = None
+        spec_response: Optional[McpSpecResponse] = None  # Initialize to avoid unbound error
         
         for attempt in range(max_attempts):
             logger.info(f"[{request_id}] LLM attempt {attempt + 1}/{max_attempts}")
@@ -441,15 +523,12 @@ class RagService:
                 prompt = self._build_correction_prompt(req, raw_llm_output, validation_errors_list)
             
             try:
-                resp = self.model.generate_content(
-                    prompt,
-                    generation_config=GenerationConfig(
-                        temperature=settings.GENERATION_TEMPERATURE,
-                        response_mime_type="application/json",
-                        max_output_tokens=settings.MAX_OUTPUT_TOKENS
-                    )
+                config = self._get_generation_config(
+                    temperature=settings.GENERATION_TEMPERATURE,
+                    max_tokens=settings.MAX_OUTPUT_TOKENS,
+                    json_mode=True
                 )
-                raw_llm_output = resp.text
+                raw_llm_output = self._generate_content(prompt, config)
                 
                 # Try to parse
                 spec_response = McpSpecResponse.parse_raw(raw_llm_output)
@@ -477,16 +556,15 @@ class RagService:
         # PHASE 5: Quality Check (if parse successful)
         qc_status = "N/A"
         qc_issues = []
-        if parse_success:
+        if parse_success and spec_response is not None:
             logger.info(f"[{request_id}] Running quality check...")
             qc_status, qc_issues = await self._quality_check_spec(spec_response, req)
             logger.info(f"[{request_id}] QC Status: {qc_status}, Issues: {len(qc_issues)}")
             
             # Add warnings to metadata if WARN
             if qc_status == "WARN":
-                if not hasattr(spec_response.llm_metadata, 'warnings'):
-                    # Add warnings as a note (can't modify frozen model)
-                    logger.warning(f"[{request_id}] QC Warnings: {qc_issues}")
+                # Log warnings (can't modify frozen model)
+                logger.warning(f"[{request_id}] QC Warnings: {qc_issues}")
             
             # Fail if critical issues
             elif qc_status == "FAIL":
@@ -519,6 +597,7 @@ class RagService:
             })
         
         # IMPROVEMENT 6 & 8: Proper response with metadata
+        assert spec_response is not None  # Guaranteed by parse_success check above
         return spec_response
     
     def _build_initial_prompt(self, req: ProjectRequirements, plan: str, context: str, examples: str) -> str:
@@ -639,15 +718,8 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
 """
         
         try:
-            resp = self.model.generate_content(
-                prompt,
-                generation_config=GenerationConfig(
-                    temperature=0.2,
-                    max_output_tokens=2000
-                )
-            )
-            
-            return resp.text
+            config = self._get_generation_config(temperature=0.2, max_tokens=2000)
+            return self._generate_content(prompt, config)
             
         except Exception as e:
             logger.error(f"Plan generation failed: {e}")
@@ -824,10 +896,10 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
 - Voltage: {spec.project_input.electrical_system.voltage_system}
 
 **Room Details**:
-{json.dumps([{{'type': r.type, 'template': r.template_code}} for r in spec.project_input.rooms], indent=2, ensure_ascii=False)}
+{json.dumps([{'room_type': r.room_type, 'template': r.template_code} for r in spec.project_input.rooms], indent=2, ensure_ascii=False)}
 
 **Load Summary**:
-{json.dumps([{{'device': l.device, 'room': l.room_name}} for l in spec.project_input.loads[:10]], indent=2, ensure_ascii=False)}
+{json.dumps([{'device_code': l.device_code, 'room_id': l.room_id} for l in spec.project_input.loads[:10]], indent=2, ensure_ascii=False)}
 
 ตรวจสอบ:
 1. จำนวนห้องถูกต้องหรือไม่?
@@ -840,16 +912,10 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
 """
         
         try:
-            resp = self.model.generate_content(
-                prompt,
-                generation_config=GenerationConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                    max_output_tokens=500
-                )
-            )
+            config = self._get_generation_config(temperature=0.1, max_tokens=500, json_mode=True)
+            response_text = self._generate_content(prompt, config)
             
-            result = json.loads(resp.text)
+            result = json.loads(response_text)
             return result.get('issues', [])
             
         except Exception as e:
