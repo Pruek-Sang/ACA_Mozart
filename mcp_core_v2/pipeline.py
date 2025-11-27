@@ -1,6 +1,6 @@
 """Main pipeline orchestrator for electrical design."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from models.contracts import DesignRequest, DesignResult
 from core.template_resolver import get_template_resolver
 from core.load_calculator import get_load_calculator
@@ -116,13 +116,16 @@ class DesignPipeline:
             
             # Size wire with voltage drop consideration
             # Assuming 100 feet distance for now
+            # Import VoltageType enum
+            from models.contracts import VoltageType
+            
             voltage_map = {
-                'VoltageType.SINGLE_PHASE_120V': 120,
-                'VoltageType.SINGLE_PHASE_240V': 240,
-                'VoltageType.THREE_PHASE_208V': 208,
-                'VoltageType.THREE_PHASE_480V': 480
+                VoltageType.SINGLE_PHASE_120V: 120,
+                VoltageType.SINGLE_PHASE_240V: 240,
+                VoltageType.THREE_PHASE_208V: 208,
+                VoltageType.THREE_PHASE_480V: 480
             }
-            voltage = voltage_map.get(str(load.voltage), 120)
+            voltage = voltage_map.get(load.voltage, 120)
             
             wire_result = self.wire_sizer.size_wire_with_voltage_drop(
                 current=current,

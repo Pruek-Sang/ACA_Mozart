@@ -1,6 +1,6 @@
 """Load calculation module for electrical design."""
 
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from models.contracts import ElectricalLoad, PanelSpecification, VoltageType
 from models.baseline import NECBaseline
 from config import get_settings

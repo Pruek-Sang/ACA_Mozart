@@ -1,6 +1,6 @@
 """Compliance checker for NEC and electrical codes."""
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from models.contracts import DesignRequest, ElectricalLoad, LoadType
 from models.baseline import NECBaseline
 from config import get_settings

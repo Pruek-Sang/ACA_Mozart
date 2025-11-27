@@ -198,6 +198,81 @@ class WireSizer:
         
         return "500"  # Maximum size in table
     
+    def calculate_resistance_at_temp(
+        self,
+        r_20c: float,
+        operating_temp_c: float,
+        material: ConductorMaterial = ConductorMaterial.COPPER
+    ) -> float:
+        """Calculate resistance at operating temperature.
+        
+        Formula: R_t = R_20 × (1 + α × ΔT)
+        
+        Args:
+            r_20c: Resistance at 20°C (Ω/1000ft)
+            operating_temp_c: Operating temperature (°C)
+            material: Conductor material
+            
+        Returns:
+            Resistance at operating temperature
+        """
+        import math
+        
+        # Temperature coefficient (per °C)
+        alpha = 0.00393 if material == ConductorMaterial.COPPER else 0.00403
+        
+        delta_t = operating_temp_c - 20.0
+        r_operating = r_20c * (1.0 + alpha * delta_t)
+        
+        return r_operating
+    
+    def calculate_vd_with_reactance(
+        self,
+        current: float,
+        distance_feet: float,
+        r_ohm_per_1000ft: float,
+        x_ohm_per_1000ft: float,
+        voltage: float,
+        power_factor: float,
+        phase_type: str = 'single'
+    ) -> tuple[float, float]:
+        """Calculate voltage drop with reactance (R + jX).
+        
+        Formula (Single Phase): VD = 2 × L × I × (R×cosθ + X×sinθ) / 1000
+        Formula (Three Phase):  VD = √3 × L × I × (R×cosθ + X×sinθ) / 1000
+        
+        Args:
+            current: Load current (A)
+            distance_feet: One-way distance (feet)
+            r_ohm_per_1000ft: Resistance (Ω/1000ft)
+            x_ohm_per_1000ft: Reactance (Ω/1000ft)
+            voltage: Nominal voltage (V)
+            power_factor: Power factor (0-1)
+            phase_type: 'single' or 'three'
+            
+        Returns:
+            Tuple of (voltage_drop_volts, voltage_drop_percent)
+        """
+        import math
+        
+        cos_theta = power_factor
+        sin_theta = math.sqrt(1 - cos_theta**2) if cos_theta < 1.0 else 0.0
+        
+        # Effective impedance: Z = R×cosθ + X×sinθ
+        z_eff = r_ohm_per_1000ft * cos_theta + x_ohm_per_1000ft * sin_theta
+        
+        # Calculate voltage drop
+        if phase_type.lower() == 'three':
+            # Three-phase: VD = √3 × L × I × Z / 1000
+            vd_volt = math.sqrt(3) * distance_feet * current * z_eff / 1000.0
+        else:
+            # Single-phase: VD = 2 × L × I × Z / 1000 (round trip)
+            vd_volt = 2.0 * distance_feet * current * z_eff / 1000.0
+        
+        vd_pct = (vd_volt / voltage) * 100.0
+        
+        return vd_volt, vd_pct
+    
     def calculate_neutral_size(
         self,
         phase_wire_size: str,
