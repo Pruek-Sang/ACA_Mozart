@@ -67,11 +67,49 @@ class WireSizer:
         voltage: float,
         max_voltage_drop_percent: float = 3.0,
         material: ConductorMaterial = ConductorMaterial.COPPER,
-        temperature_rating: int = 75
+        temperature_rating: int = 75,
+        ambient_temp_c: float = 30.0,
+        num_conductors: int = 3,
+        power_factor: float = 1.0,
+        insulation_thickness_mm: float = 0.0,
+        soil_resistivity: float = 0.0
     ) -> Dict[str, Any]:
-        """Size wire considering both ampacity and voltage drop."""
-        # First, size by ampacity
-        ampacity_result = self.size_wire_by_ampacity(current, material, temperature_rating)
+        """Size wire considering ampacity, voltage drop, and derating factors.
+        
+        Args:
+            current: Load current (A)
+            distance_feet: One-way distance (feet)
+            voltage: Nominal voltage (V)
+            max_voltage_drop_percent: Maximum allowed VD (%)
+            material: Conductor material
+            temperature_rating: Conductor temp rating (60, 75, or 90°C)
+            ambient_temp_c: Ambient temperature (°C)
+            num_conductors: Number of current-carrying conductors
+            power_factor: Power factor (0-1)
+            insulation_thickness_mm: Thermal insulation thickness (mm)
+            soil_resistivity: Soil thermal resistivity (K·m/W, 0 if not buried)
+            
+        Returns:
+            Dict with wire size, ampacity, voltage drop, and derating info
+        """
+        from models.baseline import DeratingFactors
+        
+        # Calculate derating factors
+        derating_total, derating_breakdown = DeratingFactors.calculate_total_derating(
+            ambient_temp_c=ambient_temp_c,
+            num_conductors=num_conductors,
+            conductor_temp_rating=temperature_rating,
+            soil_resistivity=soil_resistivity,
+            insulation_thickness_mm=insulation_thickness_mm
+        )
+        
+        # Calculate required ampacity (before derating)
+        required_ampacity = current / derating_total if derating_total > 0 else current
+        
+        # First, size by derated ampacity
+        ampacity_result = self.size_wire_by_ampacity(
+            required_ampacity, material, temperature_rating
+        )
         
         if 'error' in ampacity_result:
             return ampacity_result
@@ -79,7 +117,10 @@ class WireSizer:
         # Check voltage drop for ampacity-sized wire
         wire_size = ampacity_result['wire_size']
         vd, vd_pct = self._calculate_voltage_drop(
-            current, distance_feet, wire_size, voltage
+            current, distance_feet, wire_size, voltage,
+            operating_temp_c=temperature_rating,
+            power_factor=power_factor,
+            material=material
         )
         
         # If voltage drop is acceptable, return
@@ -88,7 +129,11 @@ class WireSizer:
                 **ampacity_result,
                 'voltage_drop': vd,
                 'voltage_drop_percent': vd_pct,
-                'sized_for': 'ampacity'
+                'sized_for': 'ampacity',
+                'derating_factors': derating_breakdown,
+                'derating_total': derating_total,
+                'current_before_derating': current,
+                'current_after_derating': required_ampacity
             }
         
         # Need to upsize for voltage drop
@@ -98,34 +143,43 @@ class WireSizer:
             ampacity_table = self.wire_baseline.aluminum_ampacity_75C
         
         # Try larger wire sizes
-        wire_sizes = list(ampacity_table.keys())
-        current_index = wire_sizes.index(wire_size)
-        
-        for i in range(current_index + 1, len(wire_sizes)):
-            test_size = wire_sizes[i]
+        for size, ampacity in ampacity_table.items():
+            if ampacity < required_ampacity:
+                continue
+            
             vd, vd_pct = self._calculate_voltage_drop(
-                current, distance_feet, test_size, voltage
+                current, distance_feet, size, voltage,
+                operating_temp_c=temperature_rating,
+                power_factor=power_factor,
+                material=material
             )
             
             if vd_pct <= max_voltage_drop_percent:
                 return {
-                    'wire_size': test_size,
-                    'ampacity': ampacity_table[test_size],
+                    'wire_size': size,
+                    'ampacity': ampacity,
                     'material': material.value,
                     'temperature_rating': temperature_rating,
                     'required_current': current,
+                    'required_ampacity': required_ampacity,
+                    'margin': ampacity - required_ampacity,
                     'voltage_drop': vd,
                     'voltage_drop_percent': vd_pct,
                     'sized_for': 'voltage_drop',
-                    'upsized_from': wire_size
+                    'derating_factors': derating_breakdown,
+                    'derating_total': derating_total,
+                    'current_before_derating': current,
+                    'current_after_derating': required_ampacity
                 }
         
         # Could not meet voltage drop requirement
         return {
             'error': 'Cannot meet voltage drop requirement with available wire sizes',
             'required_current': current,
+            'required_ampacity': required_ampacity,
             'distance_feet': distance_feet,
-            'max_voltage_drop_percent': max_voltage_drop_percent
+            'max_voltage_drop_percent': max_voltage_drop_percent,
+            'derating_total': derating_total
         }
     
     def _calculate_voltage_drop(
@@ -133,24 +187,57 @@ class WireSizer:
         current: float,
         distance_feet: float,
         wire_size: str,
-        voltage: float
+        voltage: float,
+        operating_temp_c: float = 75.0,
+        power_factor: float = 1.0,
+        material: ConductorMaterial = ConductorMaterial.COPPER
     ) -> tuple:
-        """Calculate voltage drop for a wire size."""
-        # Get wire resistance
-        resistance_per_1000 = self.wire_baseline.copper_resistance.get(wire_size, 0)
+        """Calculate voltage drop with temperature correction and reactance.
         
-        if resistance_per_1000 == 0:
+        Args:
+            current: Load current (A)
+            distance_feet: One-way distance (feet)
+            wire_size: Wire size (AWG or kcmil)
+            voltage: Nominal voltage (V)
+            operating_temp_c: Operating temperature (°C)
+            power_factor: Power factor (0-1)
+            material: Conductor material
+            
+        Returns:
+            Tuple of (voltage_drop_volts, voltage_drop_percent)
+        """
+        # Get wire resistance at 20°C
+        if material == ConductorMaterial.COPPER:
+            r_20c = self.wire_baseline.copper_resistance.get(wire_size, 0)
+        else:
+            r_20c = self.wire_baseline.aluminum_resistance.get(wire_size, 0)
+        
+        if r_20c == 0:
             logger.warning(f"No resistance data for wire size {wire_size}")
             return 0, 0
         
-        # Calculate total resistance (round trip)
-        total_resistance = (resistance_per_1000 * distance_feet * 2) / 1000
+        # Apply temperature correction
+        r_operating = self.calculate_resistance_at_temp(r_20c, operating_temp_c, material)
         
-        # Calculate voltage drop
-        voltage_drop = current * total_resistance
-        voltage_drop_percent = (voltage_drop / voltage) * 100
+        # Typical reactance for copper wire (Ω/1000ft)
+        # Simplified: X ≈ 0.05 Ω/1000ft for most sizes in conduit
+        x_per_1000ft = 0.054  # Conservative estimate
         
-        return voltage_drop, voltage_drop_percent
+        # Calculate VD with reactance
+        # Assuming single-phase (most common for branch circuits)
+        import math
+        
+        cos_theta = power_factor
+        sin_theta = math.sqrt(1 - cos_theta**2) if cos_theta < 1.0 else 0.0
+        
+        # Effective impedance
+        z_eff = r_operating * cos_theta + x_per_1000ft * sin_theta
+        
+        # Voltage drop (round trip for single-phase)
+        vd_volt = 2.0 * distance_feet * current * z_eff / 1000.0
+        vd_pct = (vd_volt / voltage) * 100.0
+        
+        return vd_volt, vd_pct
     
     def get_wire_properties(self, wire_size: str) -> Dict[str, Any]:
         """Get properties of a wire size."""
