@@ -11,6 +11,7 @@ from core.compliance_checker import get_compliance_checker
 from core.autolisp_generator import get_autolisp_generator
 from core.result_builder import get_result_builder
 from models.catalog_models import BreakerPoles, ConductorMaterial
+from config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,8 @@ class DesignPipeline:
     """Orchestrates the complete electrical design process."""
     
     def __init__(self):
-        """Initialize the design pipeline."""
+        """Initialize design pipeline with all required modules."""
+        self.settings = get_settings()
         self.template_resolver = get_template_resolver()
         self.load_calculator = get_load_calculator()
         self.wire_sizer = get_wire_sizer()
@@ -127,12 +129,36 @@ class DesignPipeline:
             }
             voltage = voltage_map.get(load.voltage, 120)
             
+            # Determine power factor
+            pf = load.power_factor if load.power_factor else self.settings.default_power_factor
+            
+            # Determine number of conductors based on voltage type
+            if load.voltage in [VoltageType.THREE_PHASE_208V, VoltageType.THREE_PHASE_480V]:
+                num_conductors = 3  # 3-phase (3 current-carrying conductors)
+            else:
+                num_conductors = 2  # Single-phase (2 current-carrying: hot + neutral)
+            
+            # Get ambient temperature from settings (default 30°C if not configured)
+            ambient_temp = getattr(self.settings, 'ambient_temperature_c', 30.0)
+            
+            # Determine distance (in future, could come from load.distance_m)
+            # For now, use conservative default based on location/floor
+            distance_feet = 100  # Conservative default
+            # TODO: Future enhancement - get from load.location or load.distance_m
+            
+            # Call wire sizer with full derating support
             wire_result = self.wire_sizer.size_wire_with_voltage_drop(
                 current=current,
-                distance_feet=100,  # Default assumption
+                distance_feet=distance_feet,
                 voltage=voltage,
                 max_voltage_drop_percent=3.0,
-                material=ConductorMaterial.COPPER
+                material=ConductorMaterial.COPPER,
+                temperature_rating=75,  # NEC standard for THHN/THWN
+                ambient_temp_c=ambient_temp,
+                num_conductors=num_conductors,
+                power_factor=pf,
+                insulation_thickness_mm=0.0,  # No thermal insulation (typical)
+                soil_resistivity=0.0  # Not buried (typical branch circuit)
             )
             
             # Add ground wire sizing
