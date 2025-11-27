@@ -190,3 +190,201 @@ class ConduitBaseline(BaseModel):
         "750": 1.0496,
         "1000": 1.3478
     }
+
+
+class DeratingFactors:
+    """Derating factors from catalog (DF001-DF004)."""
+    
+    # DF001: Conductor Grouping (IEC 60364-5-52 / EIT)
+    # Number of current-carrying conductors in conduit/tray
+    @staticmethod
+    def get_grouping_factor(num_conductors: int) -> float:
+        """Get conductor grouping derating factor.
+        
+        Args:
+            num_conductors: Number of current-carrying conductors
+            
+        Returns:
+            Derating factor (0.4 to 1.0)
+        """
+        conductor_grouping = {
+            (1, 3): 1.0,    # 1-3 conductors
+            (4, 6): 0.8,    # 4-6 conductors
+            (7, 9): 0.7,    # 7-9 conductors
+            (10, 20): 0.5,  # 10-20 conductors
+            (21, 30): 0.4   # 21-30 conductors
+        }
+        
+        for (min_c, max_c), factor in conductor_grouping.items():
+            if min_c <= num_conductors <= max_c:
+                return factor
+        
+        # If more than 30 conductors, use most conservative factor
+        return 0.4
+    
+    # DF002: Ambient Temperature Correction @ 75°C (NEC Table 310.15(B)(2)(a))
+    @staticmethod
+    def get_temperature_factor(
+        ambient_temp_c: float,
+        conductor_temp_rating: int = 75
+    ) -> float:
+        """Get ambient temperature correction factor.
+        
+        Args:
+            ambient_temp_c: Ambient temperature in Celsius
+            conductor_temp_rating: Conductor temperature rating (60, 75, or 90°C)
+            
+        Returns:
+            Temperature correction factor
+        """
+        # Select appropriate table
+        if conductor_temp_rating == 60:
+            temp_table = {
+                30: 1.0,
+                35: 0.91,
+                40: 0.82,
+                45: 0.71,
+                50: 0.58
+            }
+        elif conductor_temp_rating == 90:
+            temp_table = {
+                30: 1.0,
+                35: 0.96,
+                40: 0.91,
+                45: 0.87,
+                50: 0.82
+            }
+        else:  # Default to 75°C
+            temp_table = {
+                30: 1.0,   # 30°C
+                35: 0.94,  # 35°C
+                40: 0.88,  # 40°C
+                45: 0.82,  # 45°C
+                50: 0.75   # 50°C
+            }
+        
+        # Find closest temperature in table
+        temps = sorted(temp_table.keys())
+        
+        # If temp is at or below base (30°C), no derating
+        if ambient_temp_c <= temps[0]:
+            return 1.0
+        
+        # If temp is above max in table, use most conservative factor
+        if ambient_temp_c > temps[-1]:
+            return temp_table[temps[-1]]
+        
+        # Find appropriate factor
+        for temp in temps:
+            if ambient_temp_c <= temp:
+                return temp_table[temp]
+        
+        return temp_table[temps[-1]]
+    
+    # DF003: Soil Thermal Resistivity (IEC 60287 / IEC 60364-5-52)
+    @staticmethod
+    def get_soil_factor(soil_resistivity_km_per_w: float) -> float:
+        """Get soil thermal resistivity derating factor.
+        
+        Args:
+            soil_resistivity_km_per_w: Soil thermal resistivity (K·m/W)
+            
+        Returns:
+            Soil derating factor
+        """
+        soil_thermal_resistivity = {
+            1.0: 1.0,   # 1.0 K·m/W (good soil)
+            1.5: 0.9,   # 1.5 K·m/W
+            2.0: 0.8,   # 2.0 K·m/W
+            2.5: 0.7    # 2.5 K·m/W (poor soil)
+        }
+        resistivities = sorted(soil_thermal_resistivity.keys())
+        
+        # If better than best soil, use 1.0
+        if soil_resistivity_km_per_w <= resistivities[0]:
+            return 1.0
+        
+        # If worse than worst soil, use most conservative
+        if soil_resistivity_km_per_w >= resistivities[-1]:
+            return soil_thermal_resistivity[resistivities[-1]]
+        
+        # Find appropriate factor
+        for resistivity in resistivities:
+            if soil_resistivity_km_per_w <= resistivity:
+                return soil_thermal_resistivity[resistivity]
+        
+        return soil_thermal_resistivity[resistivities[-1]]
+    
+    # DF004: Thermal Insulation (IEC 60364-5-52)
+    @staticmethod
+    def get_insulation_factor(insulation_thickness_mm: float) -> float:
+        """Get thermal insulation derating factor.
+        
+        Args:
+            insulation_thickness_mm: Thermal insulation thickness (mm)
+            
+        Returns:
+            Insulation derating factor
+        """
+        thermal_insulation = {
+            0: 1.0,     # No insulation
+            50: 0.85,   # 50mm insulation
+            100: 0.75,  # 100mm insulation
+            200: 0.6    # 200mm insulation
+        }
+        thicknesses = sorted(thermal_insulation.keys())
+        
+        # If no insulation, use 1.0
+        if insulation_thickness_mm <= 0:
+            return 1.0
+        
+        # If thicker than max, use most conservative
+        if insulation_thickness_mm >= thicknesses[-1]:
+            return thermal_insulation[thicknesses[-1]]
+        
+        # Find appropriate factor
+        for thickness in thicknesses:
+            if insulation_thickness_mm <= thickness:
+                return thermal_insulation[thickness]
+        
+        return thermal_insulation[thicknesses[-1]]
+    
+    @staticmethod
+    def calculate_total_derating(
+        ambient_temp_c: float = 30.0,
+        num_conductors: int = 3,
+        conductor_temp_rating: int = 75,
+        soil_resistivity: float = 0.0,
+        insulation_thickness_mm: float = 0.0
+    ) -> tuple[float, dict]:
+        """Calculate total derating factor.
+        
+        Args:
+            ambient_temp_c: Ambient temperature
+            num_conductors: Number of conductors
+            conductor_temp_rating: Conductor temperature rating
+            soil_resistivity: Soil thermal resistivity (0 if not buried)
+            insulation_thickness_mm: Thermal insulation thickness
+            
+        Returns:
+            Tuple of (total_factor, factor_breakdown)
+        """
+        temp_factor = DeratingFactors.get_temperature_factor(
+            ambient_temp_c, conductor_temp_rating
+        )
+        grouping_factor = DeratingFactors.get_grouping_factor(num_conductors)
+        soil_factor = DeratingFactors.get_soil_factor(soil_resistivity) if soil_resistivity > 0 else 1.0
+        insulation_factor = DeratingFactors.get_insulation_factor(insulation_thickness_mm)
+        
+        # Total derating is product of all factors
+        total = temp_factor * grouping_factor * soil_factor * insulation_factor
+        
+        breakdown = {
+            'temperature': temp_factor,
+            'grouping': grouping_factor,
+            'soil': soil_factor,
+            'insulation': insulation_factor,
+            'total': total
+        }
+        
+        return total, breakdown

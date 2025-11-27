@@ -1,6 +1,6 @@
 """Result builder for aggregating design results."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from models.contracts import DesignRequest, DesignResult
 from datetime import datetime
 import logging
