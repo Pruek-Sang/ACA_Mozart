@@ -12,6 +12,7 @@ from core.autolisp_generator import get_autolisp_generator
 from core.result_builder import get_result_builder
 from models.catalog_models import BreakerPoles, ConductorMaterial
 from config import get_settings
+from exceptions import InvalidSpecError, UnsupportedProjectError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,11 +33,42 @@ class DesignPipeline:
         self.autolisp_generator = get_autolisp_generator()
         self.result_builder = get_result_builder()
     
+    def _validate_request(self, request: DesignRequest):
+        """Validate design request before processing.
+        
+        Raises:
+            InvalidSpecError: If required fields are missing or invalid
+            UnsupportedProjectError: If project type is not supported
+        """
+        # Check for required panels
+        if not request.panels or len(request.panels) == 0:
+            logger.warning("Request has no panels - using flexible mode")
+            # Don't raise error, allow flexible design
+        
+        # Check for service voltage
+        if not request.service_voltage:
+            raise InvalidSpecError("service_voltage is required")
+        
+        # Check utility service size
+        if not request.utility_service_size or request.utility_service_size <= 0:
+            raise InvalidSpecError("utility_service_size must be a positive number")
+        
+        # Future: Check building type restrictions
+        # if hasattr(request, 'building_type'):
+        #     if request.building_type == "factory" or request.building_type == "industrial":
+        #         raise UnsupportedProjectError(
+        #             "MCP v2 supports residential and light commercial only. "
+        #             "Industrial/factory projects require MCP Enterprise."
+        #         )
+    
     def execute(self, request: DesignRequest) -> DesignResult:
         """Execute the complete design pipeline."""
         logger.info(f"Starting design pipeline for session {request.session_id}")
         
         try:
+            # Validate input
+            self._validate_request(request)
+            
             # Step 1: Resolve templates
             logger.info("Step 1: Resolving design templates")
             templates = self._resolve_templates(request)
