@@ -80,16 +80,19 @@ class IngestionEngine:
         # Try to find in index by relative path
         for key, meta in self.knowledge_index.items():
             if path.name == Path(key).name or str(path).endswith(key):
+                # Convert tags list to comma-separated string (ChromaDB doesn't accept lists)
+                tags = meta.get("tags", [])
+                tags_str = ",".join(tags) if isinstance(tags, list) else str(tags)
                 return {
                     "id": meta.get("id"),
                     "group": meta.get("group"),
-                    "tags": meta.get("tags", []),
+                    "tags": tags_str,  # String, not list!
                     "priority": meta.get("priority", 50),
                     "language": meta.get("language", "th")
                 }
         
         # Default metadata
-        return {"priority": 50, "language": "th"}
+        return {"priority": 50, "language": "th", "tags": ""}
     
     def _detect_folder(self, file_path: str) -> str:
         """Detect which knowledge folder this file belongs to"""
