@@ -164,34 +164,35 @@ class RagService:
         safe_query = self.privacy.anonymize(req.query)
         logger.debug(f"Processing ask: {safe_query[:50]}... (lang={req.language}, hints={req.context_hint})")
         
-        # 2. Get docs using folder-based knowledge (Phase 3)
-        docs = self.knowledge.get_docs_for_ask(req.context_hint)
-        logger.info(f"Retrieved {len(docs)} docs from knowledge (hints: {req.context_hint or 'all'})")
+        # 2. SEMANTIC SEARCH using ChromaDB (ใช้ vector search จริงๆ)
+        filters = None
+        if req.context_hint:
+            # Map context_hint to folder filter
+            if len(req.context_hint) == 1 and req.context_hint[0] in ["db", "mcp", "standard", "example"]:
+                filters = {"folder": req.context_hint[0]}
         
-        # Build context from top priority docs
-        doc_contents = []
-        for doc in docs[:20]:  # Limit for performance
-            content = self.knowledge.load_doc_content(doc)
-            if content:
-                doc_contents.append({
-                    "id": doc.id or doc.rel_path,
-                    "content": content,
-                    "metadata": {
-                        "folder": doc.folder.value,
-                        "group": doc.group,
-                        "priority": doc.priority
-                    }
-                })
+        # Try ChromaDB first (semantic search)
+        vector_results = self.db.search(safe_query, filters=filters, top_k=settings.DEFAULT_TOP_K)
         
-        # Convert to search results format (backward compatible)
-        results = []
-        for doc_item in doc_contents:
-            results.append({
-                "content": doc_item["content"][:2000],  # Truncate for context
-                "source": doc_item["id"],
-                "section": doc_item["metadata"]["folder"],
-                "score": doc_item["metadata"]["priority"] / 100.0
-            })
+        if vector_results:
+            logger.info(f"ChromaDB returned {len(vector_results)} results for: {safe_query[:30]}...")
+            results = vector_results
+        else:
+            # Fallback to folder-based if ChromaDB empty
+            logger.warning("ChromaDB empty, falling back to folder-based retrieval")
+            docs = self.knowledge.get_docs_for_ask(req.context_hint)
+            logger.info(f"Retrieved {len(docs)} docs from knowledge (hints: {req.context_hint or 'all'})")
+            
+            results = []
+            for doc in docs[:10]:
+                content = self.knowledge.load_doc_content(doc)
+                if content:
+                    results.append({
+                        "content": content[:2000],
+                        "source": doc.id or doc.rel_path,
+                        "section": doc.folder.value,
+                        "score": doc.priority / 100.0
+                    })
         
         if not results:
             metadata = AnswerMetadata(
@@ -220,11 +221,21 @@ class RagService:
         
         # 4. Generate Answer with language instruction
         if req.language == "th":
-            lang_instruction = "คำตอบเป็นภาษาไทย อธิบายให้เข้าใจง่าย"
+            lang_instruction = """คุณเป็นผู้เชี่ยวชาญไฟฟ้า ตอบสั้นๆ กระชับ ได้ใจความ
+กฎ:
+- ตอบตรงคำถาม ไม่อธิบายยืดยาว
+- ถ้ามีตัวเลข ให้ตอบตัวเลขก่อน แล้วอธิบายสั้นๆ
+- ถ้าไม่มีข้อมูล ให้บอกว่า "ไม่พบข้อมูลในระบบ"
+- จำกัดคำตอบไม่เกิน 3 ประโยค"""
         else:
-            lang_instruction = "Answer in English, explain clearly"
+            lang_instruction = """You are an electrical expert. Answer concisely.
+Rules:
+- Answer directly, no lengthy explanations
+- If there are numbers, state them first
+- If no data found, say "No data in system"
+- Limit to 3 sentences max"""
         
-        prompt = f"{lang_instruction}\\n\\nContext: {context_str}\\n\\nQuestion: {safe_query}\\n\\nAnswer (strict from context):"
+        prompt = f"{lang_instruction}\n\nContext:\n{context_str}\n\nQuestion: {safe_query}\n\nAnswer:"
         
         try:
             config = self._get_generation_config(temperature=settings.GENERATION_TEMPERATURE)
