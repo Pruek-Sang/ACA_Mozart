@@ -10,10 +10,12 @@ Philosophy: Aura's Memory Initialization
 - Ingests all 4 knowledge folders
 - Preserves metadata from knowledge_index.json
 - Idempotent (safe to run multiple times)
+- Batch processing with delay (ไม่ให้ Gemini API rate limit)
 """
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -21,6 +23,29 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.database import VectorDatabase
 from core.ingest import IngestionEngine
+
+# Batch settings (ป้องกัน Gemini API rate limit)
+BATCH_SIZE = 5  # จำนวน chunks ต่อ batch
+BATCH_DELAY = 1.0  # delay ระหว่าง batch (วินาที)
+
+
+def upsert_with_batching(db: VectorDatabase, docs: list) -> int:
+    """Upsert documents in small batches with delay"""
+    total = 0
+    for i in range(0, len(docs), BATCH_SIZE):
+        batch = docs[i:i + BATCH_SIZE]
+        try:
+            db.upsert(batch)
+            total += len(batch)
+            # Show progress
+            print(".", end="", flush=True)
+            # Delay between batches
+            if i + BATCH_SIZE < len(docs):
+                time.sleep(BATCH_DELAY)
+        except Exception as e:
+            print(f"\n      ⚠️ Batch error: {e}")
+            time.sleep(2)  # Wait longer on error
+    return total
 
 
 def main():
@@ -30,6 +55,7 @@ def main():
     args = parser.parse_args()
     
     # Initialize
+    print("🔄 Initializing VectorDatabase...")
     db = VectorDatabase()
     engine = IngestionEngine()
     
@@ -41,6 +67,7 @@ def main():
     print(f"📂 Knowledge root: {knowledge_root}")
     print(f"💾 Vector DB: {db.persist_dir}")
     print(f"📊 Current document count: {db.count()}")
+    print(f"⚙️  Batch size: {BATCH_SIZE}, Delay: {BATCH_DELAY}s")
     print()
     
     # Clear if requested
@@ -82,10 +109,10 @@ def main():
                 docs = engine.process_file(str(file_path))
                 
                 if docs:
-                    # Upsert to DB
-                    db.upsert(docs)
-                    folder_docs += len(docs)
-                    print(f"✅ {len(docs)} chunks")
+                    # Upsert to DB with batching
+                    count = upsert_with_batching(db, docs)
+                    folder_docs += count
+                    print(f" ✅ {count} chunks")
                 else:
                     print("⚠️  No chunks extracted")
                     

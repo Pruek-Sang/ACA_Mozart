@@ -1,5 +1,109 @@
 [
   {
+    "id": "DOC_DB_DEVICE_CODES",
+    "path": "db/DEVICE_CODES.md",
+    "group": "catalog_schema",
+    "tags": ["must_read", "device", "catalog", "mapping"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_DB_ROOM_TEMPLATES",
+    "path": "db/ROOM_TEMPLATES.md",
+    "group": "catalog_schema",
+    "tags": ["must_read", "room", "template", "mapping"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_DB_PROJECT_CONFIG",
+    "path": "db/PROJECT_CONFIG.md",
+    "group": "catalog_schema",
+    "tags": ["config", "project", "voltage"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_DB_CATALOG_CONTRACT",
+    "path": "db/📜 CATALOG_CONTRACT – สัญญาระหว่าง amadeus.catalog, MCP, และ RAG.md",
+    "group": "catalog_schema",
+    "tags": ["contract", "schema"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_MCP_CAPABILITIES",
+    "path": "mcp/1)MCP_CAPABILITIES_AND_LIMITS.md",
+    "group": "mcp_spec",
+    "tags": ["must_read", "mcp", "capabilities", "limits"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_MCP_INPUT_QUALITY",
+    "path": "mcp/2) MCP_INPUT_QUALITY_RULES.md",
+    "group": "mcp_spec",
+    "tags": ["must_read", "mcp", "validation", "quality"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_MCP_INTERPRETATION",
+    "path": "mcp/3) MCP_SPEC_INTERPRETATION_GUIDE.md",
+    "group": "mcp_spec",
+    "tags": ["mcp", "interpretation"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_MCP_ERROR_PLAYBOOK",
+    "path": "mcp/4) MCP_ERROR_PLAYBOOK.md",
+    "group": "mcp_spec",
+    "tags": ["mcp", "error", "troubleshoot"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_MCP_RUN_EXAMPLES",
+    "path": "mcp/5) MCP_RUN_EXAMPLES.md",
+    "group": "mcp_spec",
+    "tags": ["mcp", "example", "run"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_STD_THAI_STANDARD",
+    "path": "standard/มาตรฐานทางวิศวกรรมไฟฟ้า Thai standard.md",
+    "group": "thai_standard",
+    "tags": ["must_read", "วสท", "ampacity", "THW", "cable"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_STD_EIT_2564",
+    "path": "standard/เอกสารมาตรฐาน วสท. 2564 และเอกสารอ้างอิง.md",
+    "group": "thai_standard",
+    "tags": ["must_read", "วสท", "2564", "ampacity"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_STD_RESIDENTIAL_LV",
+    "path": "standard/Residential LV Electrical Design.md",
+    "group": "thai_standard",
+    "tags": ["residential", "design", "LV"],
+    "version": "1.0",
+    "language": "en"
+  },
+  {
+    "id": "DOC_STD_RAG_GUIDELINE",
+    "path": "standard/3. แนวทางปฏิบัติสำหรับ RAG System**.md",
+    "group": "thai_standard",
+    "tags": ["rag", "guideline"],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
     "id": "DOC_EX_EXAMPLE_REQ_INPUTSPEC_HOUSE_1FLOOR_BASIC",
     "path": "example/example_req_inputspec_house_1floor_basic.md",
     "group": "example_project",

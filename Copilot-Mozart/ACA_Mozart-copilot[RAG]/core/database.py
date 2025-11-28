@@ -4,11 +4,12 @@ ChromaDB implementation for RAG document storage and retrieval
 
 Philosophy: Aura's Memory Bank
 - Local persistence for MVP (no external dependencies)
-- Semantic search via sentence-transformers
+- Semantic search via Gemini Embedding API (ไม่กิน RAM!)
 - Full text preserved with metadata
 """
 
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import hashlib
@@ -35,17 +36,37 @@ def _get_chromadb():
 
 
 def _get_embedding_function():
-    """Lazy load embedding function"""
+    """
+    Get Embedding Function
+    
+    Priority:
+    1. Gemini Embedding API (ไม่กิน RAM!) - ต้องมี GOOGLE_API_KEY
+    2. None (ใช้ keyword search แทน) - ถ้า API key ไม่มี
+    
+    WARNING: ไม่ใช้ local embedding (all-MiniLM) เพราะกิน RAM มาก!
+    """
     global _embedding_function
     if _embedding_function is None:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        
+        if not api_key:
+            logger.warning("GOOGLE_API_KEY not set - embedding disabled, will use keyword search")
+            return None
+        
         try:
             from chromadb.utils import embedding_functions
-            # Use default all-MiniLM-L6-v2 (fast, good quality)
-            _embedding_function = embedding_functions.DefaultEmbeddingFunction()
-        except ImportError:
-            raise ImportError(
-                "ChromaDB embedding not available. Run: pip install chromadb"
+            # Use Gemini Embedding API - ไม่ต้องโหลด model local!
+            _embedding_function = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
+                api_key=api_key,
+                model_name="models/text-embedding-004"  # Gemini embedding model
             )
+            logger.info("Using Gemini Embedding API (text-embedding-004)")
+        except Exception as e:
+            # ⚠️ ไม่ใช้ DefaultEmbeddingFunction เพราะกิน RAM!
+            logger.error(f"Gemini Embedding failed: {e}")
+            logger.warning("Embedding disabled - will use keyword search as fallback")
+            return None
+    
     return _embedding_function
 
 
@@ -55,9 +76,12 @@ class VectorDatabase:
     
     Features:
     - Persistent local storage (survives restarts)
-    - Semantic search with sentence-transformers
+    - Semantic search with Gemini Embedding API (ไม่กิน RAM!)
     - Metadata filtering (folder, group, tags)
     - Source-based deletion for re-ingestion
+    
+    ⚠️ WARNING: ไม่ใช้ local embedding (sentence-transformers/all-MiniLM)
+               เพราะกิน RAM มาก ทำให้เครื่องค้าง!
     
     Collection schema:
     - id: md5 hash of source_path + chunk_index
@@ -86,17 +110,27 @@ class VectorDatabase:
         # Initialize persistent client
         self.client = chromadb.PersistentClient(path=str(self.persist_dir))
         
-        # Get or create collection with embedding function
-        self.collection = self.client.get_or_create_collection(
-            name=self.COLLECTION_NAME,
-            embedding_function=_get_embedding_function(),
-            metadata={"hnsw:space": "cosine"}  # Use cosine similarity
-        )
+        # Get embedding function (may be None if API key not set)
+        embedding_fn = _get_embedding_function()
+        self.embedding_enabled = embedding_fn is not None
         
-        logger.info(
-            f"VectorDatabase initialized: {self.persist_dir}, "
-            f"documents={self.collection.count()}"
-        )
+        # Get or create collection
+        if self.embedding_enabled:
+            self.collection = self.client.get_or_create_collection(
+                name=self.COLLECTION_NAME,
+                embedding_function=embedding_fn,  # type: ignore[arg-type]
+                metadata={"hnsw:space": "cosine"}
+            )
+            logger.info(f"VectorDatabase initialized with Gemini Embedding: {self.persist_dir}")
+        else:
+            # No embedding - store documents for keyword search
+            self.collection = self.client.get_or_create_collection(
+                name=self.COLLECTION_NAME,
+                metadata={"hnsw:space": "cosine"}
+            )
+            logger.warning(f"VectorDatabase initialized WITHOUT embedding (keyword mode): {self.persist_dir}")
+        
+        logger.info(f"Document count: {self.collection.count()}")
     
     def _generate_id(self, source_path: str, chunk_index: int = 0) -> str:
         """Generate deterministic ID from source and chunk index"""
@@ -110,7 +144,11 @@ class VectorDatabase:
         top_k: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        Semantic search for relevant documents
+        Search for relevant documents
+        
+        Uses:
+        - Semantic search (if Gemini Embedding enabled)
+        - Keyword search (fallback if no embedding)
         
         Args:
             query: Natural language query
@@ -124,40 +162,77 @@ class VectorDatabase:
             logger.warning("Search on empty collection")
             return []
         
-        # Build where clause from filters
-        where = None
-        if filters:
-            # ChromaDB where syntax
-            where = {k: v for k, v in filters.items()}
+        where = {k: v for k, v in filters.items()} if filters else None
         
         try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=min(top_k, self.collection.count()),
-                where=where,
-                include=["documents", "metadatas", "distances"]
-            )
-            
-            # Transform to standard format
-            output = []
-            if results["documents"] and results["documents"][0]:
-                for i, doc in enumerate(results["documents"][0]):
-                    metadata = results["metadatas"][0][i] if results["metadatas"] else {}
-                    distance = results["distances"][0][i] if results["distances"] else 0
-                    
-                    output.append({
-                        "content": doc,
-                        "source": metadata.get("source_path", "unknown"),
-                        "score": 1 - distance,  # Convert distance to similarity
-                        "metadata": metadata
-                    })
-            
-            logger.debug(f"Search found {len(output)} results for: {query[:50]}...")
-            return output
-            
+            if self.embedding_enabled:
+                return self._semantic_search(query, where, top_k)
+            return self._keyword_search(query, where, top_k)
         except Exception as e:
             logger.error(f"Search failed: {e}")
             return []
+    
+    def _semantic_search(
+        self, query: str, where: Optional[Dict], top_k: int
+    ) -> List[Dict[str, Any]]:
+        """Semantic search with Gemini Embedding"""
+        results = self.collection.query(
+            query_texts=[query],
+            n_results=min(top_k, self.collection.count()),
+            where=where,
+            include=["documents", "metadatas", "distances"]
+        )
+        
+        output = []
+        if results["documents"] and results["documents"][0]:
+            for i, doc in enumerate(results["documents"][0]):
+                metadata = results["metadatas"][0][i] if results["metadatas"] else {}
+                distance = results["distances"][0][i] if results["distances"] else 0
+                output.append({
+                    "content": doc,
+                    "source": metadata.get("source_path", "unknown"),
+                    "score": 1 - distance,
+                    "metadata": metadata
+                })
+        
+        logger.debug(f"Semantic search found {len(output)} results for: {query[:50]}...")
+        return output
+    
+    def _keyword_search(
+        self, query: str, where: Optional[Dict], top_k: int
+    ) -> List[Dict[str, Any]]:
+        """Keyword search fallback (no embedding)"""
+        all_docs = self.collection.get(
+            where=where,
+            include=["documents", "metadatas"]
+        )
+        
+        if not all_docs["documents"]:
+            return []
+        
+        query_keywords = set(query.lower().split())
+        scored_results = []
+        
+        for i, doc in enumerate(all_docs["documents"]):
+            matches = sum(1 for kw in query_keywords if kw in doc.lower())
+            score = matches / max(len(query_keywords), 1)
+            if score > 0:
+                scored_results.append((i, score, doc))
+        
+        scored_results.sort(key=lambda x: x[1], reverse=True)
+        
+        output = []
+        for idx, score, doc in scored_results[:top_k]:
+            metadata = all_docs["metadatas"][idx] if all_docs["metadatas"] else {}
+            output.append({
+                "content": doc,
+                "source": metadata.get("source_path", "unknown"),
+                "score": score,
+                "metadata": metadata
+            })
+        
+        logger.debug(f"Keyword search found {len(output)} results for: {query[:50]}...")
+        return output
     
     def upsert(self, documents: List[Dict[str, Any]]) -> bool:
         """

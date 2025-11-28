@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     USE_GOOGLE_AI: bool = False  # Auto-detected if API key is present
     
     # === Model Configuration ===
-    MODEL_NAME_ANSWER: str = "gemini-2.0-flash-exp"
-    MODEL_NAME_JUDGE: str = "gemini-2.0-flash-exp"
+    MODEL_NAME_ANSWER: str = "gemini-2.5-pro-preview-05-06"
+    MODEL_NAME_JUDGE: str = "gemini-2.5-pro-preview-05-06"
 
     
     # === Vector Database ===
