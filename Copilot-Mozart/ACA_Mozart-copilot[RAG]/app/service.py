@@ -11,6 +11,7 @@ Philosophy: The Divine Service Layer
 import json
 import logging
 import os
+import warnings
 from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
 
 # =============================================================================
@@ -29,10 +30,13 @@ except ImportError:
     GOOGLE_AI_AVAILABLE = False
 
 # Vertex AI SDK (enterprise, uses GCP credentials)
+# Suppress deprecation warning - will migrate before June 2026
 try:
-    import vertexai  # type: ignore[import]
-    from vertexai.generative_models import GenerativeModel as VertexGenerativeModel  # type: ignore[import]
-    from vertexai.generative_models import GenerationConfig as VertexGenerationConfig  # type: ignore[import]
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*deprecated.*", category=UserWarning)
+        import vertexai  # type: ignore[import]
+        from vertexai.generative_models import GenerativeModel as VertexGenerativeModel  # type: ignore[import]
+        from vertexai.generative_models import GenerationConfig as VertexGenerationConfig  # type: ignore[import]
     VERTEX_AI_AVAILABLE = True
 except ImportError:
     vertexai = None  # type: ignore[assignment]
@@ -691,6 +695,10 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         Returns:
             Plan text in Thai
         """
+        # Get valid templates for prompt
+        valid_templates = self._get_valid_room_templates()
+        templates_list = ", ".join(sorted(valid_templates)) if valid_templates else "ROOMT-LIVING-STD, ROOMT-KITCHEN-STD, ROOMT-BEDROOM-STD, ROOMT-BATHROOM-STD"
+        
         prompt = f"""คุณคือ Aura ผู้ช่วยวางแผนการออกแบบระบบไฟฟ้า
 
 สร้างแผนการออกแบบเป็นภาษาไทยโดยละเอียด
@@ -700,6 +708,9 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
 - rag_knowledge/standard/ → มาตรฐานไฟฟ้าไทย
 - rag_knowledge/example/ → โครงการตัวอย่าง
 
+**⚠️ VALID ROOM TEMPLATES (ใช้ได้เท่านี้เท่านั้น):**
+{templates_list}
+
 ข้อกำหนดโครงการ:
 {req.model_dump_json(indent=2, exclude_none=True)}
 
@@ -707,10 +718,14 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
 {context[:8000]}
 
 สร้างแผนครอบคลุม:
-1. **วิเคราะห์ห้อง**: ระบุห้องทั้ง หมดพร้อมชนิดและพื้นที่
+1. **วิเคราะห์ห้อง**: ระบุห้องทั้งหมดพร้อมชนิดและพื้นที่
 2. **จัดกลุ่มโหลด**: แยกตามประเภท (แอร์/ไฟ/เต้ารับ/อุปกรณ์พิเศษ)
 3. **ตรวจสอบโหลดหนัก**: ห้องไหนมีโหลด >3kW
-4. **เลือก Template**: เลือก ROOMT-* ตามชนิดห้องและโหลด
+4. **เลือก Template**: ใช้ ROOMT-* จากรายการด้านบนเท่านั้น! เช่น:
+   - ห้องนั่งเล่น → ROOMT-LIVING-STD (ขนาดปกติ) หรือ ROOMT-LIVING-LARGE (≥25 ตร.ม.)
+   - ครัว → ROOMT-KITCHEN-STD หรือ ROOMT-KITCHEN-HEAVY (มีเตาแม่เหล็ก/โหลดหนัก)
+   - ห้องนอน → ROOMT-BEDROOM-STD หรือ ROOMT-BEDROOM-MASTER
+   - ห้องน้ำ → ROOMT-BATHROOM-STD หรือ ROOMT-BATHROOM-MASTER
 5. **ข้อกำหนดพิเศษ**: user_constraints มีผลยังไง
 6. **Rule Profile**: เลือก rule_profile_id ตามประเภทอาคาร
 

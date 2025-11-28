@@ -1,0 +1,15 @@
+;; Mock DXF File - Simple House (1 floor)
+;; Contains: 1 Bedroom, 1 Panel
+;; Format: Simplified for testing
+
+LAYER: A-ROOM-BEDROOM
+POLYGON: (0,0) (4000,0) (4000,6000) (0,6000)
+
+LAYER: A-DOOR
+POINT: (2000,0) WIDTH:900
+
+LAYER: A-WINDOW
+POINT: (4000,3000) WIDTH:1500 HEIGHT:1200
+
+LAYER: E-PANEL-MAIN
+POINT: (500,500)
