@@ -11,7 +11,7 @@ Philosophy: Canonical Funnel Trust Records
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 import uuid
@@ -58,7 +58,7 @@ class TrustLogger:
             Path to log file
         """
         if timestamp is None:
-            timestamp = datetime.utcnow()
+            timestamp = datetime.now(timezone.utc)
         
         date_str = timestamp.strftime("%Y-%m-%d")
         return self.log_dir / f"{date_str}.jsonl"
@@ -122,7 +122,7 @@ class TrustLogger:
             Trust record ready to log
         """
         return McpSpecTrustRecord(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             request_id=str(uuid.uuid4()),
             user_id=user_id,
             project_requirements=project_requirements,
@@ -189,7 +189,7 @@ class TrustLogger:
             retention_days = settings.TRUST_LOG_RETENTION_DAYS
         
         try:
-            cutoff_date = datetime.utcnow().timestamp() - (retention_days * 86400)
+            cutoff_date = datetime.now(timezone.utc).timestamp() - (retention_days * 86400)
             deleted_count = 0
             
             for log_file in self.log_dir.glob("*.jsonl"):
