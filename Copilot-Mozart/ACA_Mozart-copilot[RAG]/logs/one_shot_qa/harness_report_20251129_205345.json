@@ -1,0 +1,165 @@
+{
+  "run_id": "20251129_205345",
+  "timestamp": "2025-11-29T20:54:33.652731",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 3,
+  "passed": 0,
+  "soft_fail": 0,
+  "hard_fail": 3,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 3\n✅ PASS: 0\n⚠️  SOFT-FAIL: 0\n❌ HARD-FAIL: 3\n⏭️  SKIPPED: 0\n\nPass Rate: 0.0%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse ampacity value from answer"
+        ],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "NO",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Missing: The AI should have been able to answer the question using the provided documents. Source 2 mentions that a 2.5 sq mm wire is used for lighting circuits with a 15A breaker. While it doesn't explicitly state the ampacity, it provides a reasonable estimate."
+        ],
+        "reasoning": "The AI failed to provide an answer, stating that it could not find the information in the system. However, the provided documents contain relevant information that could have been used to answer the question."
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 18063.41,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "HARD-FAIL",
+        "validations": [
+          {
+            "field": "voltage_drop",
+            "expected": "3.0",
+            "actual": "5.0",
+            "passed": false,
+            "message": "VD: expected 3.0% ±0.2%, got 5.0%"
+          }
+        ],
+        "errors": [],
+        "warnings": [
+          "VD limit 3% NOT mentioned",
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "The answer is correct and directly supported by source document 3, which states that voltage drop should not exceed 5%."
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "5% คือค่าแรงดันตก (Voltage Drop) สูงสุดที่ยอมรับได้สำหรับวงจรย่อยตามมาตรฐาน",
+      "execution_time_ms": 22251.622,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [
+          {
+            "field": "rcd_requirement",
+            "expected": "RCD for bathroom",
+            "actual": "not mentioned",
+            "passed": false,
+            "message": "RCD requirement for bathroom NOT mentioned"
+          }
+        ],
+        "errors": [],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "NO",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Missing: The answer should have provided the RCD/RCBO sensitivity for bathroom circuits, typically 30mA."
+        ],
+        "reasoning": "The AI failed to answer the question and instead stated that it could not find the information. The provided documents are irrelevant to the question."
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 7862.53,
+      "error": null
+    }
+  ]
+}

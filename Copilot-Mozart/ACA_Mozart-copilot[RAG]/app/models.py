@@ -69,6 +69,7 @@ class SourceRef(BaseModel):
     file: str = Field(..., description="Source file path or doc_id")
     section: str = Field(default="N/A", description="Section within document")
     score: Optional[float] = Field(None, description="Relevance score if from retrieval")
+    content: Optional[str] = Field(None, description="Short snippet of retrieved content for auditing/judge")
 
 
 # =============================================================================

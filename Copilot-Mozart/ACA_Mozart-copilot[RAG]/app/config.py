@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     TRUST_LOG_RETENTION_DAYS: int = 90
     
     # === RAG Parameters ===
-    MAX_CONTEXT_CHARS: int = 20000
+    MAX_CONTEXT_CHARS: int = 300000
     DEFAULT_TOP_K: int = 5
     MAX_RETRIEVAL_DOCS: int = 10
     

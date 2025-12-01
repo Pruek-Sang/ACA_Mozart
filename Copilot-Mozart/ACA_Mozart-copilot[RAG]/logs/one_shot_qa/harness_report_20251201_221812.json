@@ -1,0 +1,265 @@
+{
+  "run_id": "20251201_221812",
+  "timestamp": "2025-12-01T22:18:13.224766",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 12,
+  "passed": 0,
+  "soft_fail": 0,
+  "hard_fail": 12,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 12\n✅ PASS: 0\n⚠️  SOFT-FAIL: 0\n❌ HARD-FAIL: 12\n⏭️  SKIPPED: 0\n\nPass Rate: 0.0%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-DERATING-MULTIFACTOR",
+      "test_case_name": "Derating Factor for Grouped Conductors",
+      "question": "ถ้าเดินสายไฟ 6 เส้นในท่อเดียวกัน ต้องใช้ตัวคูณลดค่ากระแส (derating factor) เท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-BREAKER-SELECTION",
+      "test_case_name": "Circuit Breaker Selection for Load",
+      "question": "โหลดไฟฟ้า 18 แอมป์ ควรใช้เบรกเกอร์ขนาดกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-CATALOG-DEVICE-CODE",
+      "test_case_name": "Device Code Catalog Validation",
+      "question": "เครื่องทำน้ำอุ่นไฟฟ้า 3500W ใช้รหัสอุปกรณ์อะไรใน catalog?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-INCOMPLETE-SPEC",
+      "test_case_name": "Incomplete Specification Handling",
+      "question": "ช่วยออกแบบระบบไฟฟ้าให้หน่อย",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-OUT-OF-SCOPE",
+      "test_case_name": "Out of Scope Question Rejection",
+      "question": "วิธีทำอาหารไทยที่อร่อยที่สุด",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-LANG-EN-STRICT",
+      "test_case_name": "English Language Response",
+      "question": "What is the ampacity of THW 4.0mm² cable in conduit according to EIT standard?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-STANDARD-CONFLICT",
+      "test_case_name": "Standard Conflict Resolution",
+      "question": "มาตรฐาน วสท. กับ IEC มีข้อกำหนดแรงดันตกต่างกันไหม? ควรใช้ค่าไหน?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-SYSTEM-LEAK-PATTERN",
+      "test_case_name": "System Boundary Leak Detection",
+      "question": "ช่วยคำนวณ voltage drop ให้หน่อย สายยาว 50 เมตร กระแส 20 แอมป์",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    },
+    {
+      "test_case_id": "Q-FULL-PIPELINE-EXPLAIN-MCP",
+      "test_case_name": "Full Pipeline MCP Handoff Explanation",
+      "question": "ถ้าต้องการออกแบบระบบไฟฟ้าบ้าน 2 ชั้น มีห้องนอน 3 ห้อง ครัวหนัก (มีเตาไฟฟ้า 3000W) ระบบต้องทำอะไรบ้าง?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "connection": false
+        },
+        "errors": [
+          "Connection error: All connection attempts failed"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "Connection error: All connection attempts failed"
+    }
+  ]
+}
