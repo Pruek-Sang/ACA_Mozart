@@ -89,17 +89,21 @@ def parse_ampacity_from_answer(answer: str) -> Optional[ParsedValue]:
     - "กระแส 24 แอมป์"
     - "current carrying capacity is 24A"
     """
+    # Prioritize patterns with explicit units to avoid matching wire sizes (e.g. 2.5 mm)
     patterns = [
-        r'(?:ampacity|current carrying capacity|กระแสพิกัด|พิกัดกระแส)[^\d]*(\d+(?:\.\d+)?)\s*(?:A|แอมป์|ampere)?',
-        r'(\d+(?:\.\d+)?)\s*(?:A|แอมป์|ampere)(?:\s+ampacity)?',
-        r'(?:กระแส|current)[^\d]*(\d+(?:\.\d+)?)\s*(?:A|แอมป์)?',
-        r'(\d+(?:\.\d+)?)\s*ampere',
+        # Explicit unit match: 24 A, 24 Amp, 24 แอมป์
+        r'(\d+(?:\.\d+)?)\s*(?:A|Amp|Amps|Ampere|แอมป์)(?!\w)',
+        
+        # Contextual match: Ampacity ... 24 (ensure no mm after)
+        r'(?:ampacity|current|กระแส|พิกัด)[^\d\n]{0,50}?\s*(\d+(?:\.\d+)?)\s*(?!mm|sq|ตร|ต\.ร\.)',
     ]
     
     for pattern in patterns:
         match = re.search(pattern, answer, re.IGNORECASE)
         if match:
             value = float(match.group(1))
+            # Filter out unreasonable values (e.g. 2.5A for a power cable is unlikely, usually > 10)
+            # But we shouldn't hardcode physics here. Just trust the regex.
             return ParsedValue(
                 raw_text=match.group(0),
                 value=value,
@@ -168,29 +172,41 @@ def parse_wire_size_from_answer(answer: str) -> Optional[ParsedValue]:
 
 def parse_breaker_rating_from_answer(answer: str) -> Optional[ParsedValue]:
     """
-    Parse breaker rating from answer text.
+    Parse circuit breaker rating from answer text.
     
     Patterns matched:
-    - "16A breaker", "เบรกเกอร์ 16A"
-    - "MCB 16A", "RCBO 16A"
-    - "circuit breaker rated 16A"
+    - "use 20A breaker"
+    - "เบรกเกอร์ขนาด 20 A"
+    - "breaker rating of 20A"
+    - "ใช้เบรกเกอร์ 20 แอมป์"
     """
     patterns = [
-        r'(?:breaker|เบรกเกอร์|MCB|RCBO|CB)[^\d]*(\d+)\s*(?:A|แอมป์)?',
-        r'(\d+)\s*(?:A|แอมป์)\s*(?:breaker|เบรกเกอร์|MCB|RCBO)?',
-        r'(?:rated|พิกัด)[^\d]*(\d+)\s*(?:A|แอมป์)',
+        # Explicit size/rating mention
+        r'(?:breaker|cb|circuit breaker|เบรกเกอร์)[^\d\n]{0,20}?(?:size|rating|ขนาด|พิกัด)[^\d\n]{0,10}?\s*(\d+(?:\.\d+)?)',
+        
+        # "Use X Amp" pattern
+        r'(?:use|select|choose|ใช้|เลือก)[^\d\n]{0,20}?(?:breaker|cb|เบรกเกอร์)?[^\d\n]{0,10}?\s*(\d+(?:\.\d+)?)',
+        
+        # Simple "Breaker X A" pattern (careful with headers)
+        r'(?:breaker|cb|เบรกเกอร์)\s*(\d+(?:\.\d+)?)',
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, answer, re.IGNORECASE)
-        if match:
-            value = int(match.group(1))
-            return ParsedValue(
-                raw_text=match.group(0),
-                value=value,
-                unit="A",
-                context=answer[max(0, match.start()-20):match.end()+20]
-            )
+        for match in re.finditer(pattern, answer, re.IGNORECASE):
+            try:
+                value = float(match.group(1))
+                # Filter out small numbers that might be list indices (e.g. "1. ...")
+                # Breakers are usually > 6A (min standard is usually 6 or 10)
+                if value > 5:
+                    return ParsedValue(
+                        raw_text=match.group(0),
+                        value=value,
+                        unit="A",
+                        context=answer[max(0, match.start()-20):match.end()+20]
+                    )
+            except ValueError:
+                continue
+                
     return None
 
 
@@ -202,24 +218,34 @@ def parse_derating_factor_from_answer(answer: str) -> Optional[ParsedValue]:
     - "derating factor of 0.8"
     - "ตัวคูณลดค่า 0.8"
     - "k = 0.8"
+    - "ค่าตัวคูณลดค่าคือ **0.80**" (Markdown bolding)
     """
     patterns = [
-        r'(?:derating factor|ตัวคูณลดค่า|correction factor)[^\d]*(\d+(?:\.\d+)?)',
+        # Match "derating factor" followed by number (allowing for markdown chars like *)
+        r'(?:derating factor|ตัวคูณลดค่า|correction factor)[^\d\n]{0,50}?\s*(\d+(?:\.\d+)?)',
+        
+        # Match k = 0.8
         r'(?:k|K)\s*=\s*(\d+(?:\.\d+)?)',
+        
+        # Match number followed by "derating" (less common but possible)
         r'(\d+(?:\.\d+)?)\s*(?:derating|ลดค่า)',
     ]
     
     for pattern in patterns:
-        match = re.search(pattern, answer, re.IGNORECASE)
-        if match:
-            value = float(match.group(1))
-            if 0 < value <= 1.0:  # Valid range for derating
-                return ParsedValue(
-                    raw_text=match.group(0),
-                    value=value,
-                    unit="factor",
-                    context=answer[max(0, match.start()-20):match.end()+20]
-                )
+        # Use finditer to check ALL matches, not just the first one
+        for match in re.finditer(pattern, answer, re.IGNORECASE):
+            try:
+                value = float(match.group(1))
+                if 0 < value <= 1.0:  # Valid range for derating
+                    return ParsedValue(
+                        raw_text=match.group(0),
+                        value=value,
+                        unit="factor",
+                        context=answer[max(0, match.start()-20):match.end()+20]
+                    )
+            except ValueError:
+                continue
+                
     return None
 
 
@@ -442,7 +468,7 @@ def validate_derating_factor(
 
 def validate_device_codes(device_codes: List[ParsedValue]) -> List[ValidationResult]:
     """
-    Validate that all device codes exist in catalog.
+    Validate that all device codes exist in catalog or room templates.
     
     Args:
         device_codes: List of ParsedValue containing device codes
@@ -453,13 +479,24 @@ def validate_device_codes(device_codes: List[ParsedValue]) -> List[ValidationRes
     results = []
     for parsed in device_codes:
         code = str(parsed.value)
-        valid = is_valid_device_code(code)
+        is_device = is_valid_device_code(code)
+        is_room_template = is_valid_room_template(code)
+        valid = is_device or is_room_template
+        
+        if valid:
+            if is_device:
+                msg = f"Device code {code}: valid (DEVICE_CODES)"
+            else:
+                msg = f"Device code {code}: valid (ROOM_TEMPLATE)"
+        else:
+            msg = f"Device code {code}: NOT FOUND in catalog"
+            
         results.append(ValidationResult(
             field_name="device_code",
-            expected="in DEVICE_CODES.md",
+            expected="in DEVICE_CODES.md or ROOM_TEMPLATES.md",
             actual=code,
             passed=valid,
-            message=f"Device code {code}: {'valid' if valid else 'NOT FOUND in catalog'}"
+            message=msg
         ))
     return results
 

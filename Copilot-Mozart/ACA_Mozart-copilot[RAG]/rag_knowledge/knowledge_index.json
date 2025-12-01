@@ -21,7 +21,22 @@
       "ampacity",
       "derating",
       "table",
-      "rcd"
+      "rcd",
+      "breaker"
+    ],
+    "version": "1.0",
+    "language": "th"
+  },
+  {
+    "id": "DOC_STD_BREAKER_RULES",
+    "path": "standard/BREAKER_80_PERCENT_RULE.md",
+    "group": "thai_standard",
+    "tags": [
+      "must_read",
+      "breaker",
+      "80-percent-rule",
+      "safety-factor",
+      "circuit-protection"
     ],
     "version": "1.0",
     "language": "th"
