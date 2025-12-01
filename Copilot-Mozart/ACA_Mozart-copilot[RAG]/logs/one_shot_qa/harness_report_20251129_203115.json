@@ -1,0 +1,160 @@
+{
+  "run_id": "20251129_203115",
+  "timestamp": "2025-11-29T20:31:45.780091",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 3,
+  "passed": 0,
+  "soft_fail": 0,
+  "hard_fail": 3,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 3\n✅ PASS: 0\n⚠️  SOFT-FAIL: 0\n❌ HARD-FAIL: 3\n⏭️  SKIPPED: 0\n\nPass Rate: 0.0%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse ampacity value from answer"
+        ],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "NO",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Missing: The AI should be able to find the ampacity of THW 2.5 sq.mm. cable from the source documents or external knowledge."
+        ],
+        "reasoning": "The AI fails to provide the ampacity of the specified cable, stating that it cannot find the information. This is a failure since the AI should be able to find this information in the source documents or from its general knowledge."
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 12275.303,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse voltage drop from answer"
+        ],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "NO",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Missing: The answer should state the maximum voltage drop allowed in a residential branch circuit according to the EIT standard (วสท.).",
+          "The answer states that no information was found, which is incorrect as the documents mention the EIT standard (วสท.)."
+        ],
+        "reasoning": "The AI fails to provide the correct answer and states that no information was found. The documents mention the relevant standard (วสท.) but do not contain the specific percentage value for maximum voltage drop."
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 10287.399000000001,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [
+          {
+            "field": "rcd_requirement",
+            "expected": "RCD for bathroom",
+            "actual": "not mentioned",
+            "passed": false,
+            "message": "RCD requirement for bathroom NOT mentioned"
+          }
+        ],
+        "errors": [],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "NO",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Missing: The AI did not find the answer in the documents.",
+          "The documents provided do not contain the answer to the question."
+        ],
+        "reasoning": "The AI states that it cannot find the answer in the documents provided. The documents are about electrical systems, earthing, and database structures, but do not contain information about the required sensitivity of RCD or RCBO devices in bathrooms."
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 8009.981,
+      "error": null
+    }
+  ]
+}

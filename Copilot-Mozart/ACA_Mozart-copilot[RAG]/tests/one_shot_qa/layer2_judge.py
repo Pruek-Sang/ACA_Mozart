@@ -13,6 +13,8 @@ Layer 2: Semantic Judge (LLM Evaluator)
 """
 
 import json
+import os
+import asyncio
 from typing import Optional, Dict, Any, List, Literal
 from dataclasses import dataclass, field
 from enum import Enum
@@ -23,6 +25,13 @@ try:
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
+
+# Optional: google-generativeai (API key only path)
+try:
+    import google.generativeai as gai  # type: ignore
+    GENERATIVEAI_AVAILABLE = True
+except ImportError:
+    GENERATIVEAI_AVAILABLE = False
 
 
 class Layer2Verdict(str, Enum):
@@ -171,44 +180,87 @@ async def evaluate_with_gemini(
             error="google-genai package not installed"
         )
     
-    try:
-        # Initialize client
-        client = genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location
+    api_key = os.getenv("GOOGLE_API_KEY")
+    user_prompt = build_judge_prompt(question, answer, sources, expected_language)
+    
+    # Try API-key path via google-generativeai first (no Vertex/ADC)
+    if api_key and GENERATIVEAI_AVAILABLE and not project_id:
+        try:
+            gai.configure(api_key=api_key)
+            model = gai.GenerativeModel(model_name)
+            # Run sync call in thread to keep async signature
+            def _call():
+                return model.generate_content(
+                    user_prompt,
+                    generation_config={
+                        "system_instruction": JUDGE_SYSTEM_PROMPT,
+                        "temperature": 0.1,
+                        "max_output_tokens": 1024,
+                    }
+                )
+            response = await asyncio.to_thread(_call)
+            raw_output = response.text
+            evaluation = parse_judge_response(raw_output)
+            if evaluation is None:
+                return Layer2Result(
+                    verdict=Layer2Verdict.HARD_FAIL,
+                    evaluation=None,
+                    raw_llm_output=raw_output,
+                    error="Failed to parse judge response as JSON"
+                )
+            verdict = determine_verdict(evaluation)
+            return Layer2Result(
+                verdict=verdict,
+                evaluation=evaluation,
+                raw_llm_output=raw_output
+            )
+        except Exception:
+            # fall through to genai client path
+            pass
+    
+    # Fallback: google-genai client (Vertex if project_id provided, else API key)
+    if not GENAI_AVAILABLE:
+        return Layer2Result(
+            verdict=Layer2Verdict.SKIPPED,
+            evaluation=None,
+            raw_llm_output=None,
+            error="google-genai package not installed"
         )
+    
+    try:
+        if project_id:
+            client = genai.Client(vertexai=True, project=project_id, location=location)
+        elif api_key:
+            client = genai.Client(api_key=api_key)
+        else:
+            return Layer2Result(
+                verdict=Layer2Verdict.HARD_FAIL,
+                evaluation=None,
+                raw_llm_output=None,
+                error="No API key or project_id provided for judge"
+            )
         
-        # Build prompt
-        user_prompt = build_judge_prompt(question, answer, sources, expected_language)
-        
-        # Generate response
         response = await client.aio.models.generate_content(
             model=model_name,
             contents=[user_prompt],
             config=types.GenerateContentConfig(
                 system_instruction=JUDGE_SYSTEM_PROMPT,
-                temperature=0.1,  # Low temp for consistent judgment
+                temperature=0.1,
                 max_output_tokens=1024,
             )
         )
         
         raw_output = response.text
-        
-        # Parse JSON response
         evaluation = parse_judge_response(raw_output)
-        
         if evaluation is None:
             return Layer2Result(
-                verdict=Layer2Verdict.SOFT_FAIL,
+                verdict=Layer2Verdict.HARD_FAIL,
                 evaluation=None,
                 raw_llm_output=raw_output,
                 error="Failed to parse judge response as JSON"
             )
         
-        # Determine verdict from evaluation
         verdict = determine_verdict(evaluation)
-        
         return Layer2Result(
             verdict=verdict,
             evaluation=evaluation,
@@ -217,7 +269,7 @@ async def evaluate_with_gemini(
         
     except Exception as e:
         return Layer2Result(
-            verdict=Layer2Verdict.SKIPPED,
+            verdict=Layer2Verdict.HARD_FAIL,
             evaluation=None,
             raw_llm_output=None,
             error=f"LLM error: {str(e)}"

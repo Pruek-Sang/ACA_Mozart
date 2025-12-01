@@ -41,20 +41,22 @@ class Layer0Result:
 # These mirror the actual models from app/models.py
 
 class SourceRef(BaseModel):
-    """Source reference from retrieval"""
-    content: str
-    metadata: Dict[str, Any] = {}
+    """Source reference from retrieval - matches app/models.py"""
+    file: str  # Source file path or doc_id
+    section: str = "N/A"  # Section within document
+    score: Optional[float] = None  # Relevance score if from retrieval
+    content: Optional[str] = None  # Optional snippet for auditing/judge
 
 
 class AnswerMetadata(BaseModel):
-    """Metadata about the answer generation"""
+    """Metadata about the answer generation - matches app/models.py"""
     llm_model: str
-    retrieved_docs: int
+    retrieved_docs: List[str] = []  # List of document IDs, not int
     retrieval_group: Optional[str] = None
 
 
 class StandardResponse(BaseModel):
-    """Expected response schema from /api/v1/ask"""
+    """Expected response schema from /api/v1/ask - matches app/models.py"""
     answer: str
     sources: List[SourceRef]
     confidence: str  # "High", "Medium", "Low"
@@ -180,7 +182,7 @@ async def run_layer0(
         try:
             response = await client.post(
                 api_url,
-                json={"question": query}
+                json={"query": query}  # ✅ Fixed: "question" → "query"
             )
             http_status = response.status_code
             raw_response = response.text

@@ -29,8 +29,23 @@ class PrivacyGuard:
     
     def __init__(self):
         """Initialize privacy guard with LLM judge model"""
-        vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)
-        self.judge_model = GenerativeModel(settings.MODEL_NAME_JUDGE)
+        from dotenv import load_dotenv
+        import os
+        import google.generativeai as genai
+        
+        load_dotenv()
+        api_key = os.getenv("GOOGLE_API_KEY")
+        
+        if api_key:
+            genai.configure(api_key=api_key)
+            self.judge_model = genai.GenerativeModel(settings.MODEL_NAME_JUDGE)
+            logger.info("PrivacyGuard initialized with Google AI")
+        else:
+            logger.warning("GOOGLE_API_KEY not found. PrivacyGuard disabled.")
+            self.judge_model = None
+            
+        # vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)
+        # self.judge_model = GenerativeModel(settings.MODEL_NAME_JUDGE)
         
         # PII patterns (Thai-specific + common)
         self.patterns = [
@@ -88,13 +103,16 @@ class PrivacyGuard:
         - Only return one word.
         """
         
+        if not self.judge_model:
+            return True, "CHECK_SKIPPED_NO_MODEL"
+            
         try:
             resp = self.judge_model.generate_content(
                 prompt,
-                generation_config=GenerationConfig(
-                    temperature=0.0,
-                    max_output_tokens=10
-                )
+                generation_config={
+                    "temperature": 0.0,
+                    "max_output_tokens": 10
+                }
             )
             res_text = resp.text.strip().upper()
             

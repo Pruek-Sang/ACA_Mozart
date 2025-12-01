@@ -1,0 +1,347 @@
+{
+  "run_id": "20251201_234255",
+  "timestamp": "2025-12-01T23:44:26.590977",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 12,
+  "passed": 0,
+  "soft_fail": 1,
+  "hard_fail": 11,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 12\n✅ PASS: 0\n⚠️  SOFT-FAIL: 1\n❌ HARD-FAIL: 11\n⏭️  SKIPPED: 0\n\nPass Rate: 0.0%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "HARD-FAIL",
+        "validations": [
+          {
+            "field": "ampacity",
+            "expected": "24",
+            "actual": "2.5",
+            "passed": false,
+            "message": "THW 2.5mm² ampacity: expected 24A ±5.0%, got 2.5A"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "SOFT-FAIL",
+        "answer_quality": "GOOD",
+        "uses_docs": "PARTIAL",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "สวัสดีครับ ผมเป็นผู้เชี่ยวชาญด้านไฟฟ้า พร้อมให้ข้อมูลที่คุณต้องการครับ\n\nLet's think step by step\n\n1.  **วิเคราะห์คำถาม:** ผู้ใช้ต้องการทราบ \"พิกัดกระแส (Ampacity)\" ของ \"สาย THW\" ขนาด \"2.5 ตร.มม.\" เมื่อ \"เดินในท่อร้อยสาย\"\n2.  **ค้นหาข้อมูลในเอกสาร:**\n    *   ผมได้ตรวจสอบเอกสาร `ข้อมูลเทคนิคเฉพาะทาง.md` ในหัวข้อ \"2.3 ขนาดสายไฟและ Ampacity\" พบว่ามีการกล่าวถึงหลักการเลือกขนาดสายไฟโดยพิจารณาจาก Ampacity และแนะนำให้ใช้ \"ตาราง วสท. 5-20 (สาย PVC)\" ซึ่งสาย THW เป็นสายประเภท PVC แต่ในเอกสารไม่ได้แนบตาราง",
+      "execution_time_ms": 18383.113,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "voltage_drop",
+            "expected": "3.0",
+            "actual": "3.0",
+            "passed": true,
+            "message": "VD: expected 3.0% ±0.2%, got 3.0%"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "GOOD",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ตามที่คุณสอบถามเกี่ยวกับค่าแรงดันตกสูงสุดที่ยอมรับได้ในวงจรย่อยสำหรับบ้านพักอาศัยตามมาตรฐาน วสท. ผมได้ดำเนินการตรวจสอบข้อมูลตามขั้นตอนดังนี้ครับ\n\n### Let's think step by step\n\n1.  **วิเคราะห์คำถาม:** ต้องการทราบค่า \"แรงดันตกสูงสุด\" (Maximum Voltage Drop) ในหน่วย \"เปอร์เซ็นต์\" สำหรับ \"วงจรย่อย\" ใน \"บ้านพักอาศัย\" โดยอ้างอิงจาก \"มาตรฐาน วสท.\"\n\n2.  **ค้นหาข้อมูล:** ผมได้ทำการค้นหาคำสำคัญ \"แรงดันตก\" และ \"Voltage Drop\" ในเอกสารทั้งหมดที่เกี่ยวข้องกับมาตรฐาน\n\n3.  **ตรวจสอบเอกสาร:**\n    *   ผมพบข้อมูลที",
+      "execution_time_ms": 24665.511,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-DERATING-MULTIFACTOR",
+      "test_case_name": "Derating Factor for Grouped Conductors",
+      "question": "ถ้าเดินสายไฟ 6 เส้นในท่อเดียวกัน ต้องใช้ตัวคูณลดค่ากระแส (derating factor) เท่าไหร่?",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse derating factor from answer"
+        ],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "SOFT-FAIL",
+        "answer_quality": "GOOD",
+        "uses_docs": "PARTIAL",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "สวัสดีครับ ในฐานะผู้เชี่ยวชาญด้านไฟฟ้า ผมจะทำการตรวจสอบข้อมูลเพื่อหาคำตอบให้คุณตามขั้นตอนต่อไปนี้ครับ\n\n### การวิเคราะห์และค้นหาคำตอบ (Let's think step by step)\n\n1.  **ทำความเข้าใจคำถาม:** คำถามต้องการทราบค่า \"ตัวคูณลดค่ากระแส (derating factor)\" สำหรับกรณีที่มีสายไฟฟ้าจำนวน 6 เส้นร้อยในท่อเดียวกัน\n2.  **ตรวจสอบเอกสารที่เกี่ยวข้อง:** ผมจะค้นหาคำว่า \"derating factor\", \"ตัวคูณลด\", หรือข้อมูลที่เกี่ยวข้องกับจำนวนสายไฟในท่อจากเอกสารทั้งหมดที่ได้รับมา\n3.  **ค้นหาในเอกสาร `📜 CATALOG_CONTRACT – สัญญาระหว",
+      "execution_time_ms": 22424.084,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-BREAKER-SELECTION",
+      "test_case_name": "Circuit Breaker Selection for Load",
+      "question": "โหลดไฟฟ้า 18 แอมป์ ควรใช้เบรกเกอร์ขนาดกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"7f354cc4-9e85-4332-92d9-d5f4fc798f1d\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"7f354cc4-9e85-4332-92d9-d5f4fc798f1d\"}"
+    },
+    {
+      "test_case_id": "Q-CATALOG-DEVICE-CODE",
+      "test_case_name": "Device Code Catalog Validation",
+      "question": "เครื่องทำน้ำอุ่นไฟฟ้า 3500W ใช้รหัสอุปกรณ์อะไรใน catalog?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"6defc50d-373f-4869-9aee-60c59e0ff0d5\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"6defc50d-373f-4869-9aee-60c59e0ff0d5\"}"
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"9cb19209-b7dc-495c-8d56-0875376b8b2b\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"9cb19209-b7dc-495c-8d56-0875376b8b2b\"}"
+    },
+    {
+      "test_case_id": "Q-INCOMPLETE-SPEC",
+      "test_case_name": "Incomplete Specification Handling",
+      "question": "ช่วยออกแบบระบบไฟฟ้าให้หน่อย",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"a5821091-f681-4a5f-8195-4e5555af0c35\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"a5821091-f681-4a5f-8195-4e5555af0c35\"}"
+    },
+    {
+      "test_case_id": "Q-OUT-OF-SCOPE",
+      "test_case_name": "Out of Scope Question Rejection",
+      "question": "วิธีทำอาหารไทยที่อร่อยที่สุด",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"d3d06d5d-c68f-4b66-89aa-6abfcd7d80b0\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"d3d06d5d-c68f-4b66-89aa-6abfcd7d80b0\"}"
+    },
+    {
+      "test_case_id": "Q-LANG-EN-STRICT",
+      "test_case_name": "English Language Response",
+      "question": "What is the ampacity of THW 4.0mm² cable in conduit according to EIT standard?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"86a1d44c-aa77-4a87-ae28-19631a00e295\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"86a1d44c-aa77-4a87-ae28-19631a00e295\"}"
+    },
+    {
+      "test_case_id": "Q-STANDARD-CONFLICT",
+      "test_case_name": "Standard Conflict Resolution",
+      "question": "มาตรฐาน วสท. กับ IEC มีข้อกำหนดแรงดันตกต่างกันไหม? ควรใช้ค่าไหน?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"c89ce98d-4a7e-4eff-9928-3bcbe491bfa0\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"c89ce98d-4a7e-4eff-9928-3bcbe491bfa0\"}"
+    },
+    {
+      "test_case_id": "Q-SYSTEM-LEAK-PATTERN",
+      "test_case_name": "System Boundary Leak Detection",
+      "question": "ช่วยคำนวณ voltage drop ให้หน่อย สายยาว 50 เมตร กระแส 20 แอมป์",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"84050af4-c060-40e1-b04a-dc665a9916c2\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"84050af4-c060-40e1-b04a-dc665a9916c2\"}"
+    },
+    {
+      "test_case_id": "Q-FULL-PIPELINE-EXPLAIN-MCP",
+      "test_case_name": "Full Pipeline MCP Handoff Explanation",
+      "question": "ถ้าต้องการออกแบบระบบไฟฟ้าบ้าน 2 ชั้น มีห้องนอน 3 ห้อง ครัวหนัก (มีเตาไฟฟ้า 3000W) ระบบต้องทำอะไรบ้าง?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"1e576c3d-5339-495e-b8cf-8f54aac1db92\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 504: {\"error\":\"LLM provider timeout\",\"request_id\":\"1e576c3d-5339-495e-b8cf-8f54aac1db92\"}"
+    }
+  ]
+}

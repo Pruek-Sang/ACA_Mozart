@@ -114,21 +114,26 @@ class VectorDatabase:
         embedding_fn = _get_embedding_function()
         self.embedding_enabled = embedding_fn is not None
         
-        # Get or create collection
-        if self.embedding_enabled:
-            self.collection = self.client.get_or_create_collection(
-                name=self.COLLECTION_NAME,
-                embedding_function=embedding_fn,  # type: ignore[arg-type]
-                metadata={"hnsw:space": "cosine"}
-            )
-            logger.info(f"VectorDatabase initialized with Gemini Embedding: {self.persist_dir}")
-        else:
-            # No embedding - store documents for keyword search
-            self.collection = self.client.get_or_create_collection(
-                name=self.COLLECTION_NAME,
-                metadata={"hnsw:space": "cosine"}
-            )
-            logger.warning(f"VectorDatabase initialized WITHOUT embedding (keyword mode): {self.persist_dir}")
+        # Try loading existing collection first to avoid embedding conflict
+        try:
+            self.collection = self.client.get_collection(name=self.COLLECTION_NAME)
+            logger.info(f"Loaded existing collection without changing embedding: {self.persist_dir}")
+        except Exception:
+            # Create collection (only set embedding on creation)
+            if self.embedding_enabled:
+                self.collection = self.client.get_or_create_collection(
+                    name=self.COLLECTION_NAME,
+                    embedding_function=embedding_fn,  # type: ignore[arg-type]
+                    metadata={"hnsw:space": "cosine"}
+                )
+                logger.info(f"VectorDatabase initialized with Gemini Embedding: {self.persist_dir}")
+            else:
+                # No embedding - store documents for keyword search
+                self.collection = self.client.get_or_create_collection(
+                    name=self.COLLECTION_NAME,
+                    metadata={"hnsw:space": "cosine"}
+                )
+                logger.warning(f"VectorDatabase initialized WITHOUT embedding (keyword mode): {self.persist_dir}")
         
         logger.info(f"Document count: {self.collection.count()}")
     

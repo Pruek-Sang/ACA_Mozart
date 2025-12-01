@@ -1,0 +1,585 @@
+{
+  "run_id": "20251129_081059",
+  "timestamp": "2025-11-29T08:14:02.609817",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 12,
+  "passed": 0,
+  "soft_fail": 3,
+  "hard_fail": 9,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 12\n✅ PASS: 0\n⚠️  SOFT-FAIL: 3\n❌ HARD-FAIL: 9\n⏭️  SKIPPED: 0\n\nPass Rate: 0.0%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse ampacity value from answer"
+        ],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer too short",
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 9774.401,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse voltage drop from answer"
+        ],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer too short",
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 7684.543,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-DERATING-MULTIFACTOR",
+      "test_case_name": "Derating Factor for Grouped Conductors",
+      "question": "ถ้าเดินสายไฟ 6 เส้นในท่อเดียวกัน ต้องใช้ตัวคูณลดค่ากระแส (derating factor) เท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse derating factor from answer"
+        ],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer too short",
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 5921.921,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-BREAKER-SELECTION",
+      "test_case_name": "Circuit Breaker Selection for Load",
+      "question": "โหลดไฟฟ้า 18 แอมป์ ควรใช้เบรกเกอร์ขนาดกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "HARD-FAIL",
+        "validations": [
+          {
+            "field": "breaker_rating",
+            "expected": "25",
+            "actual": "20",
+            "passed": false,
+            "message": "Load 18A exceeds 80% of 20A breaker (16.0A)"
+          }
+        ],
+        "errors": [],
+        "warnings": [
+          "80% rule NOT mentioned",
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "OK",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "20 แอมป์ (A)\n\nควรเลือกขนาดเบรกเกอร์ให้สูงกว่ากระแสโหลดเล็กน้อย ซึ่ง 20A เป็นขนาดมาตรฐานที่เหมาะสมและหาได้ง่าย",
+      "execution_time_ms": 27231.603,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-CATALOG-DEVICE-CODE",
+      "test_case_name": "Device Code Catalog Validation",
+      "question": "เครื่องทำน้ำอุ่นไฟฟ้า 3500W ใช้รหัสอุปกรณ์อะไรใน catalog?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md",
+            "actual": "HEATER-3500W",
+            "passed": true,
+            "message": "Device code HEATER-3500W: valid"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "OK",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "HEATER-3500W คือรหัสสำหรับเครื่องทำน้ำอุ่น 3500W ตามฐานข้อมูลอุปกรณ์",
+      "execution_time_ms": 17958.817,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "rcd_requirement",
+            "expected": "RCD for bathroom",
+            "actual": "mentioned",
+            "passed": true,
+            "message": "RCD 30mA mentioned for bathroom"
+          }
+        ],
+        "errors": [],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "OK",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "30mA สำหรับวงจรในห้องน้ำและพื้นที่เปียก เพื่อป้องกันอันตรายจากไฟดูดตามมาตรฐานที่กำหนด",
+      "execution_time_ms": 19501.650999999998,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-INCOMPLETE-SPEC",
+      "test_case_name": "Incomplete Specification Handling",
+      "question": "ช่วยออกแบบระบบไฟฟ้าให้หน่อย",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": null,
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "OK",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "asks_clarification": true,
+        "language_match": true
+      },
+      "answer": "เพื่อให้สามารถออกแบบได้ โปรดระบุข้อมูลที่จำเป็น เช่น ประเภทอาคาร, รายการห้องทั้งหมด, และอุปกรณ์ไฟฟ้าที่จะติดตั้งในแต่ละห้อง เพื่อให้ระบบคำนวณโหลดและวงจรที่เหมาะสมได้ถูกต้องตามมาตรฐาน",
+      "execution_time_ms": 23473.223,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-OUT-OF-SCOPE",
+      "test_case_name": "Out of Scope Question Rejection",
+      "question": "วิธีทำอาหารไทยที่อร่อยที่สุด",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": null,
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer too short",
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "should_refuse": false,
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 8471.587,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-LANG-EN-STRICT",
+      "test_case_name": "English Language Response",
+      "question": "What is the ampacity of THW 4.0mm² cable in conduit according to EIT standard?",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse ampacity value from answer"
+        ],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "NO",
+        "violations": [
+          "Answer too short",
+          "Answer doesn't seem to use source documents",
+          "Expected English but answer contains Thai"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": false
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 8290.729000000001,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-STANDARD-CONFLICT",
+      "test_case_name": "Standard Conflict Resolution",
+      "question": "มาตรฐาน วสท. กับ IEC มีข้อกำหนดแรงดันตกต่างกันไหม? ควรใช้ค่าไหน?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "HARD-FAIL",
+        "validations": [
+          {
+            "field": "voltage_drop",
+            "expected": "3.0",
+            "actual": "5.0",
+            "passed": false,
+            "message": "VD: expected 3.0% ±0.2%, got 5.0%"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "OK",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "≤5% ตามมาตรฐานที่ระบุ แรงดันตกไม่ควรเกิน 5% และแนะนำไม่เกิน 3% เอกสารนี้อ้างอิงมาตรฐาน วสท. และ IEC ร่วมกัน จึงใช้ค่านี้เป็นเกณฑ์หลัก",
+      "execution_time_ms": 21036.942,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-SYSTEM-LEAK-PATTERN",
+      "test_case_name": "System Boundary Leak Detection",
+      "question": "ช่วยคำนวณ voltage drop ให้หน่อย สายยาว 50 เมตร กระแส 20 แอมป์",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "SOFT-FAIL",
+        "validations": [],
+        "errors": [
+          "Could not parse voltage drop from answer"
+        ],
+        "warnings": [
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "BROKEN",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer too short",
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "asks_clarification": false,
+        "language_match": true
+      },
+      "answer": "ไม่พบข้อมูลในระบบ",
+      "execution_time_ms": 9131.634999999998,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-FULL-PIPELINE-EXPLAIN-MCP",
+      "test_case_name": "Full Pipeline MCP Handoff Explanation",
+      "question": "ถ้าต้องการออกแบบระบบไฟฟ้าบ้าน 2 ชั้น มีห้องนอน 3 ห้อง ครัวหนัก (มีเตาไฟฟ้า 3000W) ระบบต้องทำอะไรบ้าง?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [],
+        "errors": [],
+        "warnings": [
+          "No device codes found in answer (may be expected)",
+          "No standard reference (วสท/IEC) found"
+        ]
+      },
+      "layer2_result": {
+        "verdict": "HARD-FAIL",
+        "answer_quality": "GOOD",
+        "uses_docs": "NO",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [
+          "Answer doesn't seem to use source documents"
+        ],
+        "reasoning": "Mock evaluation using heuristics"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ต้องเริ่มจากการคำนวณโหลดรวมของอุปกรณ์ไฟฟ้าทั้งหมด เช่น เต้ารับ แสงสว่าง แอร์ และครัว จากนั้นคำนวณ Demand Load เพื่อหาขนาดเมนเบรกเกอร์ที่เหมาะสม สุดท้ายคือการออกแบบแยกวงจรย่อยสำหรับแต่ละส่วน โดยเฉพาะแอร์และครัวที่ต้องมีวงจรเฉพาะ",
+      "execution_time_ms": 24338.548,
+      "error": null
+    }
+  ]
+}

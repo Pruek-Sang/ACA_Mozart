@@ -83,6 +83,10 @@ class RagService:
         self.use_google_ai: bool = False
         self.model: Any = None  # Will be set below
         
+        # Force load .env to ensure GOOGLE_API_KEY is available
+        from dotenv import load_dotenv
+        load_dotenv()
+
         # Auto-detect which LLM API to use
         api_key = settings.GOOGLE_API_KEY or os.getenv("GOOGLE_API_KEY")
         
@@ -92,14 +96,14 @@ class RagService:
             self.model = genai.GenerativeModel(settings.MODEL_NAME_ANSWER)  # type: ignore[union-attr]
             self.use_google_ai = True
             logger.info("RagService initialized with Google AI (API Key)")
-        elif VERTEX_AI_AVAILABLE and vertexai is not None and VertexGenerativeModel is not None:
-            # Use Vertex AI (requires GCP credentials)
-            vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)  # type: ignore[union-attr]
-            self.model = VertexGenerativeModel(settings.MODEL_NAME_ANSWER)  # type: ignore[misc]
-            self.use_google_ai = False
-            logger.info("RagService initialized with Vertex AI")
+        # elif VERTEX_AI_AVAILABLE and vertexai is not None and VertexGenerativeModel is not None:
+        #     # Use Vertex AI (requires GCP credentials)
+        #     vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)  # type: ignore[union-attr]
+        #     self.model = VertexGenerativeModel(settings.MODEL_NAME_ANSWER)  # type: ignore[misc]
+        #     self.use_google_ai = False
+        #     logger.info("RagService initialized with Vertex AI")
         else:
-            raise RuntimeError("No LLM API available. Install google-generativeai or google-cloud-aiplatform")
+            raise RuntimeError("GOOGLE_API_KEY not found in .env or environment. Vertex AI fallback disabled.")
         
         logger.info("RagService initialized with divine components")
     
@@ -181,6 +185,9 @@ class RagService:
             # Fallback to folder-based if ChromaDB empty
             logger.warning("ChromaDB empty, falling back to folder-based retrieval")
             docs = self.knowledge.get_docs_for_ask(req.context_hint)
+            print(f"DEBUG: Found {len(docs)} docs for hints {req.context_hint}")
+            for d in docs:
+                print(f"DEBUG: Doc: {d.path} (Priority: {d.priority})")
             logger.info(f"Retrieved {len(docs)} docs from knowledge (hints: {req.context_hint or 'all'})")
             
             results = []
@@ -188,12 +195,17 @@ class RagService:
                 content = self.knowledge.load_doc_content(doc)
                 if content:
                     results.append({
-                        "content": content[:2000],
+                        "content": content[:settings.MAX_CONTEXT_CHARS],
                         "source": doc.id or doc.rel_path,
                         "section": doc.folder.value,
                         "score": doc.priority / 100.0
                     })
-        
+
+        # Add sanitized snippets for downstream auditing/judge
+        for r in results:
+            if "content" in r:
+                r["content_snippet"] = self.privacy.anonymize(r["content"])[:500]
+
         if not results:
             metadata = AnswerMetadata(
                 llm_model="N/A",
@@ -214,19 +226,25 @@ class RagService:
             safe_content = self.privacy.anonymize(r['content'])
             part = f"Src: {r['source']} (Sec: {r.get('section')})\\nTxt: {safe_content}\\n\\n"
             
-            if len(context_str) + len(part) < settings.MAX_CONTEXT_CHARS:
+            if len(context_str) + len(part) <= settings.MAX_CONTEXT_CHARS:
                 context_str += part
             else:
+                # Truncate to fit remaining space
+                remaining = settings.MAX_CONTEXT_CHARS - len(context_str)
+                if remaining > 100:
+                    context_str += part[:remaining]
                 break
         
         # 4. Generate Answer with language instruction
         if req.language == "th":
-            lang_instruction = """คุณเป็นผู้เชี่ยวชาญไฟฟ้า ตอบสั้นๆ กระชับ ได้ใจความ
+            lang_instruction = """คุณเป็นผู้เชี่ยวชาญไฟฟ้า
 กฎ:
-- ตอบตรงคำถาม ไม่อธิบายยืดยาว
-- ถ้ามีตัวเลข ให้ตอบตัวเลขก่อน แล้วอธิบายสั้นๆ
-- ถ้าไม่มีข้อมูล ให้บอกว่า "ไม่พบข้อมูลในระบบ"
-- จำกัดคำตอบไม่เกิน 3 ประโยค"""
+- ตอบเป็นภาษาไทย
+- ให้คิดทีละขั้นตอน (Let's think step by step) เพื่อหาคำตอบจาก Context
+- ต้องระบุชื่อเอกสารและตารางที่ใช้อ้างอิงเสมอ (เช่น: (Source: KEY_TABLES.md))
+- พยายามค้นหาคำตอบจาก Context ให้ดีที่สุด โดยเฉพาะส่วนท้ายของเอกสาร
+- ถ้าหาไม่เจอจริงๆ ให้บอกว่า "ไม่พบข้อมูลในระบบ"
+"""
         else:
             lang_instruction = """You are an electrical expert. Answer concisely.
 Rules:
@@ -257,7 +275,12 @@ Rules:
             confidence = "Medium"
         
         sources = [
-            SourceRef(file=r['source'], section=r.get('section', 'N/A'), score=r['score'])
+            SourceRef(
+                file=r['source'],
+                section=r.get('section', 'N/A'),
+                score=r['score'],
+                content=r.get('content_snippet')
+            )
             for r in results
         ]
         
@@ -947,5 +970,3 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         except Exception as e:
             logger.warning(f"LLM semantic check failed: {e}")
             return []  # Don't fail QC if judge fails
-
-

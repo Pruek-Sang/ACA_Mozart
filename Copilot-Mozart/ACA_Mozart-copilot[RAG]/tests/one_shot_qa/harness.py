@@ -214,7 +214,9 @@ async def run_single_test(
         # Skip Layer 1 for out-of-scope and incomplete spec cases
         l1_result = None
         if test_case.category.value not in ["out_of_scope", "incomplete"]:
-            source_dicts = [{"content": s.get("content", "")} for s in sources]
+            # API returns sources with 'file' and 'section', not 'content'
+            # For Layer 1, we need to pass source info for validation
+            source_dicts = [{"file": s.get("file", ""), "section": s.get("section", "")} for s in sources]
             l1_result = run_layer1(
                 answer=answer,
                 sources=source_dicts,
@@ -239,7 +241,15 @@ async def run_single_test(
             }
         
         # ===== LAYER 2 =====
-        source_dicts = [{"content": s.get("content", "")} for s in sources]
+        # API returns sources with 'file' and 'section', pass for semantic judge
+        source_dicts = [
+            {
+                "file": s.get("file", ""),
+                "section": s.get("section", ""),
+                "content": s.get("content", "")
+            }
+            for s in sources
+        ]
         l2_result = await run_layer2(
             question=test_case.question,
             answer=answer,
