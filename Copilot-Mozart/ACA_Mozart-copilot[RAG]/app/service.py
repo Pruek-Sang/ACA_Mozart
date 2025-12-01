@@ -236,6 +236,7 @@ class RagService:
                 break
         
         # 4. Generate Answer with language instruction
+        # 4. Generate Answer with language instruction
         if req.language == "th":
             lang_instruction = """คุณเป็นผู้เชี่ยวชาญไฟฟ้า
 กฎ:
@@ -243,14 +244,38 @@ class RagService:
 - ให้คิดทีละขั้นตอน (Let's think step by step) เพื่อหาคำตอบจาก Context
 - ต้องระบุชื่อเอกสารและตารางที่ใช้อ้างอิงเสมอ (เช่น: (Source: KEY_TABLES.md))
 - พยายามค้นหาคำตอบจาก Context ให้ดีที่สุด โดยเฉพาะส่วนท้ายของเอกสาร
-- ถ้าหาไม่เจอจริงๆ ให้บอกว่า "ไม่พบข้อมูลในระบบ"
+- สำหรับการเลือกเบรกเกอร์:
+  * ห้ามตอบโดยดูแค่ว่า "เบรกเกอร์ > โหลด"
+  * ขั้นตอนที่ 1: คำนวณ Load × 1.25
+  * ขั้นตอนที่ 2: ค้นหา standard size ที่มากกว่าค่าที่คำนวณได้
+  * Standard sizes: 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125 A
+  * ตัวอย่าง:
+    - 7A × 1.25 = 8.75 → เลือก 10A
+    - 14A × 1.25 = 17.5 → เลือก 20A (ไม่ใช่ 16A)
+    - 18A × 1.25 = 22.5 → เลือก 25A (ไม่ใช่ 20A หรือ 22A)
+    - 21A × 1.25 = 26.25 → เลือก 32A (ไม่ใช่ 25A)
+  * ❗ ห้ามตอบขนาดที่ไม่อยู่ใน standard sizes (เช่น 22, 28, 35)
+- ถ้าข้อมูลไม่ครบ (เช่น ขาดขนาดสาย, ขาดแรงดัน) ต้องถามให้ชัดเจนว่า "กรุณาระบุ [ข้อมูลที่ขาด]"
+- ถ้าคำถามไม่เกี่ยวกับระบบไฟฟ้า ตอบสั้นๆ ว่า "ไม่มีข้อมูลในระบบ"
 """
         else:
             lang_instruction = """You are an electrical expert. Answer concisely.
 Rules:
 - Answer directly, no lengthy explanations
 - If there are numbers, state them first
-- If no data found, say "No data in system"
+- For breaker selection:
+  * Do NOT think "breaker > load = OK"
+  * Step 1: Calculate Load × 1.25
+  * Step 2: Find standard size greater than calculated value
+  * Standard sizes: 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125 A
+  * Examples:
+    - 7A × 1.25 = 8.75 → select 10A
+    - 14A × 1.25 = 17.5 → select 20A (NOT 16A)
+    - 18A × 1.25 = 22.5 → select 25A (NOT 20A or 22A)
+    - 21A × 1.25 = 26.25 → select 32A (NOT 25A)
+  * ❗ Do NOT answer non-standard sizes (e.g. 22, 28, 35)
+- If missing data (e.g. wire size, voltage), ask clearly: "Please specify [missing data]"
+- If question is not about electrical systems, answer briefly: "No data in system"
 - Limit to 3 sentences max"""
         
         prompt = f"{lang_instruction}\n\nContext:\n{context_str}\n\nQuestion: {safe_query}\n\nAnswer:"
