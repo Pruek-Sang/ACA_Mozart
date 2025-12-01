@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACA Mozart - End-to-End Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .response-box {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .autolisp-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 500px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        
+        .download-btn {
+            background: #28a745;
+            margin-top: 10px;
+        }
+        
+        .download-btn:hover {
+            background: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 ACA Mozart</h1>
+            <p>End-to-End Electrical Design Demo</p>
+            <p style="font-size: 0.9em; margin-top: 5px;">RAG → MCP → AutoLISP</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- Left Panel: Input -->
+            <div class="panel">
+                <h2>📝 Step 1: Project Input</h2>
+                
+                <div class="input-group">
+                    <label for="projectInput">อธิบายโปรเจค (ภาษาไทย)</label>
+                    <textarea 
+                        id="projectInput" 
+                        placeholder="ตัวอย่าง:&#10;&#10;ออกแบบระบบไฟฟ้าบ้าน 2 ชั้น&#10;ชื่อโปรเจค: บ้านคุณสมชาย&#10;มีห้องนอน 3 ห้อง&#10;ห้องน้ำ 2 ห้อง&#10;ห้องครัว 1 ห้อง&#10;แอร์ 12000 BTU ห้องนอนหลัก&#10;เตาไฟฟ้า 3000W&#10;เครื่องทำน้ำอุ่น 3500W"
+                    ></textarea>
+                </div>
+                
+                <button class="btn" onclick="sendToRAG()">
+                    🚀 Send to RAG
+                </button>
+                
+                <div id="ragStatus"></div>
+                <div id="ragResponse" class="response-box" style="display: none;"></div>
+            </div>
+            
+            <!-- Right Panel: MCP & AutoLISP -->
+            <div class="panel">
+                <h2>⚡ Step 2: MCP Calculation</h2>
+                
+                <button class="btn" onclick="sendToMCP()" id="mcpBtn" disabled>
+                    ⚙️ Calculate with MCP
+                </button>
+                
+                <div id="mcpStatus"></div>
+                <div id="mcpResponse" class="response-box" style="display: none;"></div>
+                
+                <div style="margin-top: 30px;">
+                    <h2>📐 Step 3: AutoLISP Output</h2>
+                    <div id="autolispOutput" class="autolisp-viewer" style="display: none;"></div>
+                    <button class="download-btn btn" onclick="downloadAutoLISP()" id="downloadBtn" style="display: none;">
+                        💾 Download .lsp File
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJSON = null;
+        let currentAutoLISP = null;
+        
+        // Configuration
+        const GATEWAY_URL = 'http://localhost:8000';
+        const RAG_URL = 'http://localhost:8080';
+        const MCP_URL = 'http://localhost:5000';
+        
+        // Step 1: Send to RAG
+        async function sendToRAG() {
+            const input = document.getElementById('projectInput').value.trim();
+            
+            if (!input) {
+                alert('กรุณากรอกข้อมูลโปรเจค');
+                return;
+            }
+            
+            showStatus('ragStatus', 'loading', '⏳ กำลังส่งไป RAG...');
+            document.getElementById('ragResponse').style.display = 'none';
+            
+            try {
+                // Try gateway first, fallback to direct RAG
+                let response;
+                try {
+                    response = await fetch(`${GATEWAY_URL}/orchestrate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ input: input })
+                    });
+                } catch (e) {
+                    console.log('Gateway failed, trying direct RAG');
+                    response = await fetch(`${RAG_URL}/api/v1/ask`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            query: input,
+                            language: 'th'
+                        })
+                    });
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const answer = data.answer || data.data?.answer || JSON.stringify(data);
+                
+                // Try to extract JSON
+                const jsonMatch = answer.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    try {
+                        currentJSON = JSON.parse(jsonMatch[0]);
+                        showStatus('ragStatus', 'success', '✅ ได้ JSON จาก RAG แล้ว!');
+                        document.getElementById('ragResponse').textContent = JSON.stringify(currentJSON, null, 2);
+                        document.getElementById('ragResponse').style.display = 'block';
+                        document.getElementById('mcpBtn').disabled = false;
+                    } catch (e) {
+                        throw new Error('ไม่สามารถ parse JSON ได้');
+                    }
+                } else {
+                    // Show answer anyway
+                    showStatus('ragStatus', 'error', '⚠️ ไม่พบ JSON ในคำตอบ');
+                    document.getElementById('ragResponse').textContent = answer;
+                    document.getElementById('ragResponse').style.display = 'block';
+                }
+                
+            } catch (error) {
+                showStatus('ragStatus', 'error', `❌ Error: ${error.message}`);
+                console.error(error);
+            }
+        }
+        
+        // Step 2: Send to MCP
+        async function sendToMCP() {
+            if (!currentJSON) {
+                alert('ยังไม่มี JSON จาก RAG');
+                return;
+            }
+            
+            showStatus('mcpStatus', 'loading', '⏳ กำลังคำนวณกับ MCP...');
+            document.getElementById('mcpResponse').style.display = 'none';
+            document.getElementById('autolispOutput').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${MCP_URL}/api/calculate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentJSON)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`MCP Error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'success' || data.autolisp) {
+                    showStatus('mcpStatus', 'success', '✅ คำนวณสำเร็จ!');
+                    document.getElementById('mcpResponse').textContent = JSON.stringify(data, null, 2);
+                    document.getElementById('mcpResponse').style.display = 'block';
+                    
+                    // Extract AutoLISP
+                    if (data.autolisp) {
+                        currentAutoLISP = data.autolisp;
+                        document.getElementById('autolispOutput').textContent = currentAutoLISP;
+                        document.getElementById('autolispOutput').style.display = 'block';
+                        document.getElementById('downloadBtn').style.display = 'block';
+                    }
+                } else {
+                    throw new Error(data.error || 'MCP failed');
+                }
+                
+            } catch (error) {
+                showStatus('mcpStatus', 'error', `❌ Error: ${error.message}`);
+                console.error(error);
+            }
+        }
+        
+        // Step 3: Download AutoLISP
+        function downloadAutoLISP() {
+            if (!currentAutoLISP) {
+                alert('ยังไม่มี AutoLISP code');
+                return;
+            }
+            
+            const blob = new Blob([currentAutoLISP], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'electrical_design.lsp';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Helper: Show status
+        function showStatus(elementId, type, message) {
+            const el = document.getElementById(elementId);
+            el.className = `status ${type}`;
+            el.textContent = message;
+            el.style.display = 'block';
+        }
+        
+        // Auto-fill example on load
+        window.addEventListener('load', () => {
+            document.getElementById('projectInput').value = 
+`ออกแบบระบบไฟฟ้าบ้าน 2 ชั้น
+ชื่อโปรเจค: บ้านคุณสมชาย
+มีห้องนอน 3 ห้อง
+ห้องน้ำ 2 ห้อง
+ห้องครัว 1 ห้อง (ครัวหนัก)
+ห้องนั่งเล่น 1 ห้อง
+
+เครื่องใช้ไฟฟ้า:
+- แอร์ 12000 BTU ห้องนอนหลัก
+- เตาไฟฟ้า 3000W ห้องครัว
+- เครื่องทำน้ำอุ่น 3500W ห้องน้ำใหญ่`;
+        });
+    </script>
+</body>
+</html>
