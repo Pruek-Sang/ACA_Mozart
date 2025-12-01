@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 import httpx
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 # =============================================================================
@@ -305,6 +306,15 @@ app = FastAPI(
     title="ACA Mozart Gateway",
     version="1.0.0",
     description="Intent Router for MOZART (RAG/MCP) and AMADEUS (AGI) services"
+)
+
+# Add CORS middleware for frontend integration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Development - allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Global instances
