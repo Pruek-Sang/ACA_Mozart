@@ -29,19 +29,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first (leverage Docker cache)
-COPY requirements_ACA.txt .
+COPY Docker/requirements_ACA.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements_ACA.txt
 
 # Copy application code
-COPY ../app ./app
-COPY ../core ./core
-COPY ../main.py .
+COPY app ./app
+COPY core ./core
+COPY main_ACA.py ./main.py
 
 # Copy knowledge base and configurations
-COPY ../rag_knowledge ./rag_knowledge
-COPY ../.env.example .env.example
+COPY rag_knowledge ./rag_knowledge
+COPY .env.example .env.example
 
 # Create necessary directories
 RUN mkdir -p logs/mcp_spec vector_db

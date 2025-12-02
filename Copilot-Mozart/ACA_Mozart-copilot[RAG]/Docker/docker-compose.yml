@@ -1,0 +1,105 @@
+# ═══════════════════════════════════════════════════════════════════
+# Mozart Full Stack - Docker Compose
+# ═══════════════════════════════════════════════════════════════════
+# Services:
+#   1. mozart-rag (port 8080) - RAG Spec Engine with AI
+#   2. mcp-core (port 5001) - Electrical Calculation Engine
+# ═══════════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  # ═══════════════════════════════════════════════════════════════════
+  # MCP Core v2 - Electrical Calculation Engine
+  # ═══════════════════════════════════════════════════════════════════
+  mcp-core:
+    container_name: mcp-core-v2
+    build:
+      context: ../../mcp_core_v2
+      dockerfile: Docker/Dockerfile
+    image: mcp-core:2.0.0
+    
+    ports:
+      - "5001:5001"
+    
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=5001
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    networks:
+      - mozart-network
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Mozart RAG - AI-Powered Spec Engine
+  # ═══════════════════════════════════════════════════════════════════
+  mozart-rag:
+    container_name: mozart-rag-aca
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile_ACA
+    image: mozart-rag:3.2.0
+    
+    depends_on:
+      mcp-core:
+        condition: service_healthy
+    
+    ports:
+      - "8080:8080"
+    
+    env_file:
+      - .env_ACA
+    
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8080
+      - PYTHONUNBUFFERED=1
+      # MCP Core connection
+      - MCP_CORE_URL=http://mcp-core:5001
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    networks:
+      - mozart-network
+
+# Define networks
+networks:
+  mozart-network:
+    driver: bridge
+    name: mozart-fullstack-network
+
+# Optional: Volumes for persistent data
+# volumes:
+#   mozart-vector-db:
+#     name: mozart-vector-db
+#   mcp-logs:
+#     name: mcp-logs
