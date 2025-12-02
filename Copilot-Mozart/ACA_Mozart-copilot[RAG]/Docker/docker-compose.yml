@@ -6,8 +6,6 @@
 #   2. mcp-core (port 5001) - Electrical Calculation Engine
 # ═══════════════════════════════════════════════════════════════════
 
-version: '3.8'
-
 services:
   # ═══════════════════════════════════════════════════════════════════
   # MCP Core v2 - Electrical Calculation Engine
@@ -15,7 +13,7 @@ services:
   mcp-core:
     container_name: mcp-core-v2
     build:
-      context: ../../mcp_core_v2
+      context: ../../../mcp_core_v2
       dockerfile: Docker/Dockerfile
     image: mcp-core:2.0.0
     
@@ -53,8 +51,8 @@ services:
     container_name: mozart-rag-aca
     build:
       context: ..
-      dockerfile: Docker/Dockerfile_ACA
-    image: mozart-rag:3.2.0
+      dockerfile: Docker/Dockerfile_light
+    image: mozart-rag:3.2.1
     
     depends_on:
       mcp-core:
