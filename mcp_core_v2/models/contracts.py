@@ -12,7 +12,16 @@ def _utc_now() -> datetime:
 
 
 class VoltageType(str, Enum):
-    """Voltage type enumeration."""
+    """Voltage type enumeration.
+    
+    Thai Standard (EIT/TIS): 230V single-phase, 400V three-phase
+    US Standard (NEC): 120V/240V single-phase, 208V/480V three-phase
+    """
+    # Thai/IEC Standard
+    SINGLE_PHASE_230V = "230V_1PH"    # Thai residential standard
+    THREE_PHASE_400V = "400V_3PH"     # Thai commercial standard
+    
+    # US Standard (for compatibility)
     SINGLE_PHASE_120V = "120V_1PH"
     SINGLE_PHASE_240V = "240V_1PH"
     THREE_PHASE_208V = "208V_3PH"

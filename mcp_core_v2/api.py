@@ -152,12 +152,12 @@ def _mock_design_result(request: DesignRequestInput) -> DesignResultOutput:
     
     # Calculate totals
     total_watts = sum(load.power_watts * load.quantity for load in request.loads)
-    total_amps = total_watts / 240  # Assume 240V
+    total_amps = total_watts / 230  # Thai standard 230V
     
     # Mock wire sizing
     wire_sizing = {}
     for load in request.loads:
-        amps = (load.power_watts * load.quantity) / 240
+        amps = (load.power_watts * load.quantity) / 230  # Thai standard 230V
         if amps <= 15:
             wire = "2.5 mm² (14 AWG)"
         elif amps <= 20:
@@ -176,7 +176,7 @@ def _mock_design_result(request: DesignRequestInput) -> DesignResultOutput:
     # Mock breaker selections
     breaker_selections = {}
     for load in request.loads:
-        amps = (load.power_watts * load.quantity) / 240
+        amps = (load.power_watts * load.quantity) / 230  # Thai standard 230V
         # Round up to standard sizes
         if amps <= 15:
             breaker = 15
@@ -245,7 +245,13 @@ def _convert_to_internal(request: DesignRequestInput):
     """Convert API input to internal DesignRequest format"""
     
     # Map voltage strings to VoltageType enum
+    # Thai standard (EIT): 230V 1-phase, 400V 3-phase
+    # US standard (NEC): 120V/240V 1-phase, 208V/480V 3-phase
     voltage_map = {
+        # Thai/IEC Standard
+        "230V_1PH": VoltageType.SINGLE_PHASE_230V,
+        "400V_3PH": VoltageType.THREE_PHASE_400V,
+        # US Standard
         "120V_1PH": VoltageType.SINGLE_PHASE_120V,
         "240V_1PH": VoltageType.SINGLE_PHASE_240V,
         "208V_3PH": VoltageType.THREE_PHASE_208V,
