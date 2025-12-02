@@ -2,11 +2,13 @@
 """Comprehensive Phase 1 Test Suite - 80%+ Coverage"""
 
 import sys
-sys.path.insert(0, '/mnt/BigDrive/Linux_Work/ACA_Mozart/mcp_core_v2')
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import math
 from models.contracts import ElectricalLoad, VoltageType, LoadType, Location
 from models.baseline import DeratingFactors, WireBaseline, NECBaseline
+from models.catalog_models import BreakerPoles
 from core.load_calculator import get_load_calculator
 from core.wire_sizer import get_wire_sizer
 from core.breaker_selector import get_breaker_selector
@@ -381,16 +383,16 @@ try:
     
     # Size breaker
     breaker_selector = get_breaker_selector()
-    breaker_result = breaker_selector.select_breaker(ac_current, poles=2)  # 2-pole for 240V
+    breaker_result = breaker_selector.select_breaker(ac_current, poles=BreakerPoles.DOUBLE)  # 2-pole for 240V
     
     test_result("AC circuit - current calculation", ac_current > 0)
     test_result("AC circuit - wire sizing", 'wire_size' in wire_result)
-    test_result("AC circuit - breaker selection", 'rating' in breaker_result)
+    test_result("AC circuit - breaker selection", 'breaker_rating' in breaker_result)
     
     print(f"     Complete Design:")
     print(f"       Current: {ac_current:.2f}A")
     print(f"       Wire: {wire_result.get('wire_size', 'N/A')} AWG")
-    print(f"       Breaker: {breaker_result.get('rating', 'N/A')}A")
+    print(f"       Breaker: {breaker_result.get('breaker_rating', 'N/A')}A")
 except Exception as e:
     test_result("AC Circuit Integration", False, str(e))
 
