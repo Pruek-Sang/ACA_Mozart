@@ -28,13 +28,17 @@ class LoadCalculator:
         power_watts = load.power_watts * load.quantity
         
         # Extract voltage value from enum
+        # Thai standard: 230V 1-phase, 400V 3-phase
+        # US standard: 120V/240V 1-phase, 208V/480V 3-phase
         voltage_map = {
-            VoltageType.SINGLE_PHASE_120V: 120,
-            VoltageType.SINGLE_PHASE_240V: 240,
-            VoltageType.THREE_PHASE_208V: 208,
-            VoltageType.THREE_PHASE_480V: 480
+            VoltageType.SINGLE_PHASE_230V: 230,  # Thai standard
+            VoltageType.THREE_PHASE_400V: 400,   # Thai standard
+            VoltageType.SINGLE_PHASE_120V: 120,  # US standard
+            VoltageType.SINGLE_PHASE_240V: 240,  # US standard (≈230V)
+            VoltageType.THREE_PHASE_208V: 208,   # US standard
+            VoltageType.THREE_PHASE_480V: 480    # US standard
         }
-        voltage = voltage_map.get(load.voltage, 120)
+        voltage = voltage_map.get(load.voltage, 230)  # Default to Thai 230V
         
         # Calculate current based on voltage type
         if load.voltage in [VoltageType.SINGLE_PHASE_120V, VoltageType.SINGLE_PHASE_240V]:
@@ -77,13 +81,16 @@ class LoadCalculator:
             }
         
         # Get panel voltage for demand calculation
+        # Thai standard: 230V 1-phase, 400V 3-phase
         voltage_map = {
-            VoltageType.SINGLE_PHASE_120V: 120,
-            VoltageType.SINGLE_PHASE_240V: 240,
-            VoltageType.THREE_PHASE_208V: 208,
-            VoltageType.THREE_PHASE_480V: 480
+            VoltageType.SINGLE_PHASE_230V: 230,  # Thai standard
+            VoltageType.THREE_PHASE_400V: 400,   # Thai standard
+            VoltageType.SINGLE_PHASE_120V: 120,  # US standard
+            VoltageType.SINGLE_PHASE_240V: 240,  # US standard
+            VoltageType.THREE_PHASE_208V: 208,   # US standard
+            VoltageType.THREE_PHASE_480V: 480    # US standard
         }
-        panel_voltage = voltage_map.get(panel.voltage, 240)  # Default to 240V for residential
+        panel_voltage = voltage_map.get(panel.voltage, 230)  # Default to Thai 230V
         
         # Apply demand factors with correct voltage
         demand_current = self._apply_demand_factors(panel_loads, total_current, panel_voltage)

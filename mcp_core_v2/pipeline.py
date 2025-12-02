@@ -153,13 +153,16 @@ class DesignPipeline:
             # Import VoltageType enum
             from models.contracts import VoltageType
             
+            # Thai standard: 230V 1-phase, 400V 3-phase
             voltage_map = {
-                VoltageType.SINGLE_PHASE_120V: 120,
-                VoltageType.SINGLE_PHASE_240V: 240,
-                VoltageType.THREE_PHASE_208V: 208,
-                VoltageType.THREE_PHASE_480V: 480
+                VoltageType.SINGLE_PHASE_230V: 230,  # Thai standard
+                VoltageType.THREE_PHASE_400V: 400,   # Thai standard
+                VoltageType.SINGLE_PHASE_120V: 120,  # US standard
+                VoltageType.SINGLE_PHASE_240V: 240,  # US standard
+                VoltageType.THREE_PHASE_208V: 208,   # US standard
+                VoltageType.THREE_PHASE_480V: 480    # US standard
             }
-            voltage = voltage_map.get(load.voltage, 120)
+            voltage = voltage_map.get(load.voltage, 230)  # Default to Thai 230V
             
             # Determine power factor
             pf = load.power_factor if load.power_factor else self.settings.default_power_factor
