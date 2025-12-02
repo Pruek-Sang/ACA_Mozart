@@ -76,8 +76,17 @@ class LoadCalculator:
                 'is_continuous': load.is_continuous
             }
         
-        # Apply demand factors
-        demand_current = self._apply_demand_factors(panel_loads, total_current)
+        # Get panel voltage for demand calculation
+        voltage_map = {
+            VoltageType.SINGLE_PHASE_120V: 120,
+            VoltageType.SINGLE_PHASE_240V: 240,
+            VoltageType.THREE_PHASE_208V: 208,
+            VoltageType.THREE_PHASE_480V: 480
+        }
+        panel_voltage = voltage_map.get(panel.voltage, 240)  # Default to 240V for residential
+        
+        # Apply demand factors with correct voltage
+        demand_current = self._apply_demand_factors(panel_loads, total_current, panel_voltage)
         
         return {
             'panel_id': panel.id,
@@ -91,9 +100,16 @@ class LoadCalculator:
     def _apply_demand_factors(
         self, 
         loads: List[ElectricalLoad],
-        total_current: float
+        total_current: float,
+        panel_voltage: float = 240.0
     ) -> float:
-        """Apply NEC demand factors to loads."""
+        """Apply NEC demand factors to loads.
+        
+        Args:
+            loads: List of electrical loads
+            total_current: Total current before demand factors
+            panel_voltage: Panel voltage for current calculation (default 240V)
+        """
         # Group loads by type
         lighting_va = sum(
             load.power_watts * load.quantity 
@@ -132,8 +148,9 @@ class LoadCalculator:
         )
         demand_va += other_va
         
-        # Convert back to current (simplified - assumes average voltage)
-        demand_current = demand_va / 120  # Simplified
+        # Convert VA to current using actual panel voltage
+        # I = VA / V (for single phase)
+        demand_current = demand_va / panel_voltage
         
         return demand_current
     
