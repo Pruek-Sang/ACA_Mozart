@@ -70,6 +70,10 @@ class Settings(BaseSettings):
     API_TITLE: str = "Amadeus RAG (Aura v3.2)"
     API_VERSION: str = "3.2.0"
     
+    # === MCP Core Integration ===
+    MCP_CORE_URL: str = "http://localhost:5001"
+    MCP_TIMEOUT: float = 60.0
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8"
