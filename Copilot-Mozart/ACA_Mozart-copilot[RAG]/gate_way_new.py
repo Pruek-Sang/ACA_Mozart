@@ -241,24 +241,60 @@ class ServiceProxy:
         """
         Call MOZART (RAG Service)
         
-        Routes to /api/v1/ask or /api/v1/mcp_spec based on request
+        Routes to:
+        - /api/v1/design for design requests (spec + MCP calculation)
+        - /api/v1/mcp_spec for spec-only requests
+        - /api/v1/ask for general questions
         """
         try:
-            # Determine which RAG endpoint to use
-            # If input looks like it wants a spec, use mcp_spec
-            if any(kw in request.input.lower() for kw in ["spec", "สร้าง", "generate", "ออกแบบ"]):
-                # Would need project requirements - for now just use ask
-                endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
-            else:
-                endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
+            user_input_lower = request.input.lower()
             
-            response = await self.client.post(
-                endpoint,
-                json={
+            # Check if this is a design request (wants full calculation)
+            is_design_request = any(kw in user_input_lower for kw in [
+                "ออกแบบ", "design", "คำนวณ", "sizing", "calculate",
+                "breaker", "wire", "สาย", "เบรกเกอร์"
+            ])
+            
+            # Check if this is a spec request (wants spec only)
+            is_spec_request = any(kw in user_input_lower for kw in [
+                "spec", "สร้าง", "generate", "json"
+            ])
+            
+            # Route to appropriate endpoint
+            if is_design_request and hasattr(request, 'context') and request.context:
+                # Full design with calculation - needs ProjectRequirements
+                endpoint = f"{MOZART_ENDPOINT}/api/v1/design"
+                payload = request.context.get("project_requirements", {
+                    "project_name": "Gateway Request",
+                    "building_type": "residential",
+                    "voltage_system": "TH_1PH_230V",
+                    "rooms": [],
+                    "loads": []
+                })
+            elif is_spec_request and hasattr(request, 'context') and request.context:
+                # Spec only - needs ProjectRequirements
+                endpoint = f"{MOZART_ENDPOINT}/api/v1/mcp_spec"
+                payload = request.context.get("project_requirements", {
+                    "project_name": "Gateway Request",
+                    "building_type": "residential",
+                    "voltage_system": "TH_1PH_230V",
+                    "rooms": [],
+                    "loads": []
+                })
+            else:
+                # General question - use ask endpoint
+                endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
+                payload = {
                     "query": request.input,
                     "context_hint": [],
                     "language": "th"
-                },
+                }
+            
+            logger.info(f"[{trace_id}] Calling {endpoint}")
+            
+            response = await self.client.post(
+                endpoint,
+                json=payload,
                 headers={"X-Trace-ID": trace_id}
             )
             response.raise_for_status()

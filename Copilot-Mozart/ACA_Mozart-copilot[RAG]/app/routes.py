@@ -23,6 +23,8 @@ from app.models import (
 )
 from app.service import RagService
 from app.config import settings
+from app.mcp_adapter import McpAdapter, convert_to_mcp
+from app.mcp_client import McpClient, McpDesignResponse
 from core.ingest import IngestionEngine
 from core.database import VectorDatabase
 
@@ -121,6 +123,70 @@ async def mcp_spec(req: ProjectRequirements):
     All requests are logged to trust_log for audit.
     """
     return await rag_service.generate_mcp_spec(req)
+
+
+@app.post("/api/v1/design")
+async def design_electrical_system(req: ProjectRequirements):
+    """
+    End-to-end electrical design: Requirements → RAG → MCP → Results
+    
+    This endpoint chains:
+    1. RAG: Generate MCP spec from human requirements
+    2. Adapter: Convert RAG output to MCP format
+    3. MCP Core: Calculate wire sizing, breakers, etc.
+    
+    Returns combined result with both spec and calculations.
+    
+    Errors:
+    - 400: Invalid/incomplete requirements
+    - 422: Spec generation failed
+    - 503: MCP Core unavailable
+    - 504: Timeout (RAG or MCP)
+    """
+    # Step 1: Generate spec via RAG
+    logger.info(f"Design request for: {req.project_name}")
+    spec_response = await rag_service.generate_mcp_spec(req)
+    
+    # Step 2: Convert to MCP format
+    adapter = McpAdapter()
+    mcp_request = adapter.convert(spec_response.project_input)
+    
+    # Log any unknown devices
+    if adapter.unknown_devices:
+        logger.warning(f"Unknown devices in request: {adapter.unknown_devices}")
+    
+    # Step 3: Call MCP Core
+    mcp_client = McpClient()
+    
+    # Check MCP availability first
+    if not await mcp_client.health_check():
+        logger.warning("MCP Core not available, returning spec only")
+        return {
+            "status": "partial",
+            "message": "MCP Core not available - returning spec only",
+            "spec": spec_response.model_dump(),
+            "mcp_request": mcp_request.to_dict(),
+            "design_result": None
+        }
+    
+    # Call MCP design
+    mcp_response = await mcp_client.design(mcp_request)
+    
+    if mcp_response.success:
+        return {
+            "status": "complete",
+            "spec": spec_response.model_dump(),
+            "design_result": mcp_response.to_dict()
+        }
+    else:
+        # MCP failed but we have the spec
+        return {
+            "status": "partial",
+            "message": f"MCP calculation failed: {mcp_response.error_message}",
+            "spec": spec_response.model_dump(),
+            "mcp_request": mcp_request.to_dict(),
+            "design_result": mcp_response.to_dict()
+        }
 
 
 @app.post("/api/v1/retrieve_raw")
