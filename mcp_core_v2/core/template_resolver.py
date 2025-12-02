@@ -81,6 +81,18 @@ class TemplateResolver:
             }
         )
         
+        # Residential appliance template (water heaters, ranges, dryers, etc.)
+        self.templates['residential_appliance'] = DesignTemplate(
+            'residential_appliance',
+            {
+                'circuit_type': 'appliance',
+                'wire_type': 'THHN',
+                'conduit_type': 'EMT',
+                'is_dedicated': True,  # Most appliances need dedicated circuits
+                'derating_factor': 1.0
+            }
+        )
+        
         # Three-phase equipment template
         self.templates['three_phase_equipment'] = DesignTemplate(
             'three_phase_equipment',
@@ -103,16 +115,29 @@ class TemplateResolver:
             LoadType.RECEPTACLE: 'commercial_receptacle',
             LoadType.HVAC: 'hvac_dedicated',
             LoadType.MOTOR: 'motor_circuit',
+            LoadType.APPLIANCE: 'residential_appliance',  # Added for appliances
         }
         
         template_name = template_map.get(load.load_type)
         if not template_name:
-            logger.warning(f"No template found for load type {load.load_type}")
-            return {}
+            # Use default template for unknown types instead of warning
+            logger.debug(f"Using default template for load type {load.load_type}")
+            return {
+                'wire_type': 'THHN',
+                'conduit_type': 'EMT',
+                'is_dedicated': False,
+                'derating_factor': 1.0
+            }
         
         template = self.get_template(template_name)
         if not template:
-            return {}
+            # Return sensible defaults if template not found
+            return {
+                'wire_type': 'THHN',
+                'conduit_type': 'EMT',
+                'is_dedicated': load.power_watts > 1500,  # Dedicated if >1500W
+                'derating_factor': 1.0
+            }
         
         context = {
             'load_id': load.id,

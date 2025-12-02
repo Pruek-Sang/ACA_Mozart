@@ -49,9 +49,13 @@ class BreakerSelector:
             breaker_type=breaker_type
         )
         
+        # Convert poles to integer (1, 2, or 3) for cleaner output
+        poles_int = int(poles.value.replace('P', ''))
+        
         result = {
             'breaker_rating': selected_rating,
-            'poles': poles.value,
+            'poles': poles_int,
+            'poles_str': poles.value,  # Keep string version for reference
             'breaker_type': breaker_type.value,
             'load_current': load_current,
             'continuous_load': continuous_load,
