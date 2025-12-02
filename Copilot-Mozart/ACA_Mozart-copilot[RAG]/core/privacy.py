@@ -10,8 +10,17 @@ Philosophy: Sententia ex Veritate (Truth from Source)
 
 import re
 import logging
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig
+
+# Optional vertexai import (for Docker lightweight mode)
+try:
+    import vertexai
+    from vertexai.generative_models import GenerativeModel, GenerationConfig
+    VERTEX_AVAILABLE = True
+except ImportError:
+    VERTEX_AVAILABLE = False
+    vertexai = None
+    GenerativeModel = None
+    GenerationConfig = None
 
 from app.config import settings
 
@@ -43,9 +52,6 @@ class PrivacyGuard:
         else:
             logger.warning("GOOGLE_API_KEY not found. PrivacyGuard disabled.")
             self.judge_model = None
-            
-        # vertexai.init(project=settings.PROJECT_ID, location=settings.LOCATION)
-        # self.judge_model = GenerativeModel(settings.MODEL_NAME_JUDGE)
         
         # PII patterns (Thai-specific + common)
         self.patterns = [

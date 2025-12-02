@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════════
+# Mozart RAG Dockerfile - Lightweight Version (Fast Build)
+# ═══════════════════════════════════════════════════════════════════
+# Build time: ~2-3 minutes (vs 30+ minutes with Vertex AI)
+# Uses Google AI only (set GOOGLE_API_KEY)
+# ═══════════════════════════════════════════════════════════════════
+
+FROM python:3.11-slim
+
+LABEL maintainer="Mozart Team"
+LABEL description="Mozart RAG Spec Engine - Lightweight"
+LABEL version="3.2.1"
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Minimal system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Use lightweight requirements
+COPY Docker/requirements_light.txt .
+RUN pip install --no-cache-dir -r requirements_light.txt
+
+# Copy app
+COPY app ./app
+COPY core ./core
+COPY main_ACA.py ./main.py
+COPY rag_knowledge ./rag_knowledge
+
+# Create dirs
+RUN mkdir -p logs/mcp_spec vector_db
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8080/')" || exit 1
+
+CMD ["python", "main.py"]
