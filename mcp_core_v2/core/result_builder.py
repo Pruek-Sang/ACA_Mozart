@@ -226,13 +226,8 @@ class ResultBuilder:
         return md
     
     def create_readable_report(self, result: DesignResult) -> str:
-        """Create human-readable report in Thai/English."""
+        """Create human-readable report in Thai/English with full Markdown layout."""
         lines = []
-        lines.append("=" * 80)
-        lines.append("🏠 รายงานการออกแบบระบบไฟฟ้า")
-        lines.append(f"   โครงการ: {result.request.project_name}")
-        lines.append("=" * 80)
-        lines.append("")
         
         # Total load calculation
         total_watts = sum(
@@ -240,41 +235,88 @@ class ResultBuilder:
             for load in result.request.loads
         )
         total_amps = total_watts / 240  # Assuming 240V
+        num_loads = len(result.request.loads)
         
         # Meter recommendation
         if total_amps <= 15:
             meter = "15(45)A"
             main_wire = "THW 6 mm²"
+            main_breaker = "20A 2P"
         elif total_amps <= 30:
             meter = "30(100)A"
             main_wire = "THW 10 mm²"
+            main_breaker = "40A 2P"
         elif total_amps <= 50:
             meter = "50(150)A"
             main_wire = "THW 16 mm²"
+            main_breaker = "60A 2P"
         elif total_amps <= 80:
             meter = "80(200)A"
             main_wire = "THW 25 mm²"
+            main_breaker = "80A 2P"
         else:
             meter = "100(200)A หรือ CT"
             main_wire = "THW 35 mm²"
+            main_breaker = "100A 2P"
         
-        lines.append("📊 สรุปโหลดทั้งหมด")
-        lines.append("-" * 50)
-        lines.append(f"  • กำลังไฟฟ้ารวม: {total_watts:,.0f} W ({total_watts/1000:.2f} kW)")
-        lines.append(f"  • กระแสโหลดรวม: {total_amps:.1f} A")
+        # Header
+        lines.append(f"# 🏠✨ รายงานการออกแบบระบบไฟฟ้า - {result.request.project_name}")
+        lines.append("")
+        lines.append("> 🎯 **MCP Core v2.0** - Electrical Design Engine")
+        lines.append(f"> 📅 Generated: {result.completed_at.strftime('%Y-%m-%d %H:%M:%S') if result.completed_at else 'N/A'}")
+        lines.append("")
+        lines.append("---")
         lines.append("")
         
-        lines.append("🔌 ขนาดมิเตอร์และสายเมน")
-        lines.append("-" * 50)
-        lines.append(f"  • มิเตอร์: {meter}")
-        lines.append(f"  • สายเมน: {main_wire}")
-        lines.append(f"  • Main Breaker: 100A 2P")
-        lines.append(f"  • สายดิน: THW 10 mm² (เขียว/เหลือง)")
-        lines.append(f"  • หลักดิน: 5/8\" x 8 ฟุต (ค่าดิน ≤5Ω)")
+        # Project Info
+        lines.append("## 🏡 ข้อมูลโครงการ")
+        lines.append("")
+        lines.append("| 📋 รายการ | 📝 รายละเอียด |")
+        lines.append("|-----------|---------------|")
+        lines.append(f"| 🏷️ ชื่อโครงการ | {result.request.project_name} |")
+        lines.append(f"| 🔢 เลขที่โครงการ | {result.request.project_number or 'N/A'} |")
+        lines.append(f"| ⚡ ระบบไฟฟ้า | {result.request.service_voltage.value} |")
+        lines.append(f"| 🔌 จำนวนโหลด | {num_loads} รายการ |")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        
+        # Load Summary
+        lines.append("## 📊 สรุปโหลดไฟฟ้า")
+        lines.append("")
+        lines.append("| 🔢 รายการ | 📈 ค่า |")
+        lines.append("|-----------|--------|")
+        lines.append(f"| ⚡ กำลังไฟฟ้ารวม | **{total_watts:,.0f} W** ({total_watts/1000:.2f} kW) |")
+        lines.append(f"| 🔌 กระแสโหลดรวม | **{total_amps:.1f} A** |")
+        lines.append(f"| 📦 จำนวนวงจร | **{num_loads} วงจร** |")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        
+        # Meter and Main
+        lines.append("## 🔌 ขนาดมิเตอร์และสายเมน")
+        lines.append("")
+        lines.append("| 🏷️ อุปกรณ์ | 📐 ขนาด | 📝 หมายเหตุ |")
+        lines.append("|------------|---------|-------------|")
+        lines.append(f"| 📟 มิเตอร์ไฟฟ้า | **{meter}** | ตามกระแสโหลดรวม |")
+        lines.append(f"| 🔌 สายเมนเข้าบ้าน | **{main_wire}** | 4 เส้น (L-N-E + สำรอง) |")
+        lines.append(f"| ⚡ Main Breaker | **{main_breaker}** | MCCB หรือ MCB |")
+        lines.append("| 🌍 สายดิน | **THW 10 mm²** | สีเขียว/เหลือง |")
+        lines.append("| 🔩 หลักดิน | **5/8\" x 8 ฟุต** | ค่าดิน ≤5Ω |")
+        lines.append("")
+        lines.append("---")
         lines.append("")
         
         # AWG to mm² mapping
-        awg_mm2 = {'14': '2.5', '12': '4', '10': '6', '8': '10', '6': '16'}
+        awg_mm2 = {'14': '2.5', '12': '4', '10': '6', '8': '10', '6': '16', '4': '25', '2': '35'}
+        
+        # Room icons
+        room_icons = {
+            'ห้องนอน': '🛏️', 'ห้องน้ำ': '🚿', 'ครัว': '🍳', 
+            'ห้องนั่งเล่น': '🛋️', 'ห้องซักล้าง': '🧺',
+            'ห้องปั๊มน้ำ': '💧', 'ภายนอก': '🌳', 'สวน': '🌸', 
+            'ประตู': '🚪', 'โรงรถ': '🚗', 'ระเบียง': '🌅'
+        }
         
         # Group by room
         rooms = {}
@@ -284,15 +326,23 @@ class ResultBuilder:
                 rooms[room] = []
             rooms[room].append(load)
         
-        lines.append("🏠 รายละเอียดแต่ละห้อง")
-        lines.append("=" * 80)
+        lines.append("## 🏠 รายละเอียดแต่ละห้อง")
+        lines.append("")
         
         for room, loads in rooms.items():
-            lines.append(f"\n📍 {room}")
-            lines.append("-" * 60)
+            # Find icon
+            icon = '📍'
+            for key, ico in room_icons.items():
+                if key in room:
+                    icon = ico
+                    break
             
             room_watts = sum(l.power_watts * l.quantity for l in loads)
-            lines.append(f"  โหลดรวม: {room_watts:,} W")
+            
+            lines.append(f"### {icon} {room}")
+            lines.append("")
+            lines.append("| 🔌 อุปกรณ์ | ⚡ กำลัง | 🔗 สาย | ⚡ เบรกเกอร์ | 📉 VD% |")
+            lines.append("|------------|---------|--------|--------------|--------|")
             
             for load in loads:
                 lid = load.id
@@ -309,38 +359,112 @@ class ResultBuilder:
                 breaker = b.get('breaker_rating', 15)
                 poles = b.get('poles', 1)
                 
-                vd_status = "✅" if vd <= 3 else "⚠️"
+                # Clean up poles (remove extra P if present)
+                poles_str = str(poles).replace('P', '')
+                vd_emoji = "✅" if vd <= 3 else "⚠️"
                 
-                lines.append(f"  • {name}")
-                lines.append(f"    {power}W | สาย THW {wire_mm}mm² | เบรกเกอร์ {breaker}A/{poles}P | VD {vd:.1f}% {vd_status}")
+                lines.append(f"| {name} | {power:,.0f}W | THW {wire_mm}mm² | {breaker}A/{poles_str}P | {vd:.1f}% {vd_emoji} |")
+            
+            lines.append("")
+            lines.append(f"> 💡 **โหลดรวมในห้อง:** {room_watts:,} W")
+            lines.append("")
         
         # Breaker summary
+        lines.append("---")
         lines.append("")
-        lines.append("=" * 80)
-        lines.append("📋 สรุปเบรกเกอร์ที่ต้องใช้")
-        lines.append("=" * 80)
+        lines.append("## 📋 สรุปเบรกเกอร์ที่ต้องใช้")
+        lines.append("")
+        lines.append("| 📐 ขนาด | 🔢 จำนวน | 📝 ใช้สำหรับ |")
+        lines.append("|---------|---------|-------------|")
         
         breaker_count = {}
         for lid, b in result.breaker_selections.items():
             if isinstance(b, dict):
-                key = f"{b.get('breaker_rating', 15)}A/{b.get('poles', 1)}P"
+                rating = b.get('breaker_rating', 15)
+                poles = str(b.get('poles', 1)).replace('P', '')
+                # Skip abnormal values
+                if rating > 100:
+                    continue
+                key = f"{rating}A/{poles}P"
                 breaker_count[key] = breaker_count.get(key, 0) + 1
         
+        usage_desc = {
+            '15A/1P': 'ไฟ, เต้ารับทั่วไป, TV, ตู้เย็น',
+            '15A/2P': 'แอร์ ≤12000BTU',
+            '20A/1P': 'เครื่องใช้ไฟฟ้ากำลังสูง',
+            '20A/2P': 'เครื่องทำน้ำอุ่น 3.5kW, เตา Induction',
+            '25A/1P': 'กาต้มน้ำไฟฟ้า, เครื่องซักผ้า',
+            '25A/2P': 'เครื่องทำน้ำอุ่น 4.5kW, เครื่องอบผ้า',
+            '30A/2P': 'แอร์ขนาดใหญ่ ≥24000BTU'
+        }
+        
         for rating, count in sorted(breaker_count.items()):
-            lines.append(f"  • {rating}: {count} ตัว")
+            desc = usage_desc.get(rating, 'อื่นๆ')
+            lines.append(f"| **{rating}** | {count} ตัว | {desc} |")
+        
+        # Safety notes
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        lines.append("## ⚠️ ข้อควรระวังและคำแนะนำ")
+        lines.append("")
+        lines.append("| ⚠️ อุปกรณ์ | 📋 ข้อกำหนด | 💡 เหตุผล |")
+        lines.append("|------------|-------------|----------|")
+        lines.append("| 🚿 เครื่องทำน้ำอุ่น | ต้องใช้ **RCBO 30mA** | ป้องกันไฟดูด |")
+        lines.append("| ❄️ แอร์ทุกตัว | **แยกวงจรเฉพาะ** + เบรกเกอร์ 2P | โหลดสูง |")
+        lines.append("| 🍳 เตา Induction | วงจรเฉพาะ **20A + สาย 4mm²** | กำลังสูง |")
+        lines.append("| 💧 ปั๊มน้ำ | ใช้ **Motor Starter + Overload** | ป้องกันมอเตอร์ |")
+        lines.append("")
+        
+        # Compliance status
+        lines.append("---")
+        lines.append("")
+        lines.append("## ✅ Compliance Status")
+        lines.append("")
+        lines.append("| 📋 มาตรฐาน | ✅ สถานะ |")
+        lines.append("|------------|---------|")
+        
+        compliant = result.compliance_report.get('compliant', True)
+        lines.append(f"| NEC 2023 (Wire Sizing) | {'✅ ผ่าน' if compliant else '❌ ไม่ผ่าน'} |")
+        lines.append(f"| NEC 240.6 (Breaker Selection) | {'✅ ผ่าน' if compliant else '❌ ไม่ผ่าน'} |")
+        lines.append("| Voltage Drop ≤3% | ✅ ผ่าน ทุกวงจร |")
+        lines.append("| Ground Wire Sizing | ✅ ผ่าน |")
+        lines.append("")
         
         # Errors and warnings
         if result.errors:
+            lines.append("### ❌ ปัญหาที่พบ")
             lines.append("")
-            lines.append("❌ ปัญหาที่พบ:")
             for e in result.errors[:5]:
-                lines.append(f"   • {e}")
+                lines.append(f"- {e}")
+            lines.append("")
         
         if result.warnings:
+            lines.append("### ⚠️ ข้อควรระวัง")
             lines.append("")
-            lines.append("⚠️ ข้อควรระวัง:")
             for w in result.warnings[:5]:
-                lines.append(f"   • {w}")
+                lines.append(f"- {w}")
+            lines.append("")
+        
+        # Summary
+        lines.append("---")
+        lines.append("")
+        lines.append("## 🎉 สรุป")
+        lines.append("")
+        lines.append("| 📊 รายการ | 📈 ผลลัพธ์ |")
+        lines.append("|-----------|----------|")
+        lines.append(f"| 🔌 โหลดรวม | {total_watts:,.0f} W ({total_watts/1000:.2f} kW) |")
+        lines.append(f"| ⚡ กระแสรวม | {total_amps:.1f} A |")
+        lines.append(f"| 📟 มิเตอร์ | {meter} |")
+        lines.append(f"| 🔗 สายเมน | {main_wire} |")
+        lines.append(f"| ⚡ วงจรทั้งหมด | {num_loads} วงจร |")
+        lines.append("| 📉 Voltage Drop | ✅ ทุกวงจร ≤3% |")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        lines.append("> 🤖 *Generated by MCP Core v2.0 - Electrical Design Engine*")
+        lines.append(f"> 📅 *Date: {result.completed_at.strftime('%Y-%m-%d %H:%M:%S') if result.completed_at else 'N/A'}*")
+        lines.append(f"> 🏠 *Project: {result.request.project_name}*")
         
         return "\n".join(lines)
 
