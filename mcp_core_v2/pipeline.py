@@ -242,11 +242,39 @@ class DesignPipeline:
             voltage_val = int(panel.voltage.value.split('V')[0])
             phases = 3 if 'THREE_PHASE' in panel.voltage.value else 1
             
+            # Cap main breaker at panel's specified rating or utility service size
+            max_allowed = min(
+                panel.main_breaker_rating,
+                request.utility_service_size
+            )
+            
+            # If demand exceeds max allowed, use max and add warning
+            if demand_current > max_allowed:
+                logger.warning(
+                    f"Panel {panel.id}: Demand current {demand_current:.1f}A exceeds "
+                    f"max allowed {max_allowed}A. Using {max_allowed}A main breaker. "
+                    f"Consider upgrading service or reducing loads."
+                )
+                effective_demand = max_allowed * 0.8  # Use 80% of max for safety margin
+            else:
+                effective_demand = demand_current
+            
             main_breaker = self.breaker_selector.select_main_breaker(
-                service_load=demand_current,
+                service_load=effective_demand,
                 voltage=voltage_val,
                 phases=phases
             )
+            
+            # Override to respect panel's main breaker rating
+            if main_breaker.get('breaker_rating', 0) > max_allowed:
+                main_breaker['breaker_rating'] = panel.main_breaker_rating
+                main_breaker['capped'] = True
+                main_breaker['original_calculated'] = demand_current
+                main_breaker['warning'] = (
+                    f"Main breaker capped at {panel.main_breaker_rating}A. "
+                    f"Calculated demand was {demand_current:.1f}A. "
+                    f"Consider upgrading utility service."
+                )
             
             breaker_selections[f"{panel.id}_main"] = main_breaker
         
