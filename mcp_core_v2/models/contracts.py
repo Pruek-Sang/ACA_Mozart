@@ -1,9 +1,14 @@
 """Contract models for MCP Core v2."""
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from enum import Enum
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time with timezone info (Python 3.12+ compatible)."""
+    return datetime.now(timezone.utc)
 
 
 class VoltageType(str, Enum):
@@ -66,7 +71,7 @@ class DesignRequest(BaseModel):
     panels: List[PanelSpecification]
     service_voltage: VoltageType
     utility_service_size: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -80,6 +85,6 @@ class DesignResult(BaseModel):
     conduit_sizing: Dict[str, Any]
     compliance_report: Dict[str, Any]
     autolisp_code: Optional[str] = None
-    completed_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime = Field(default_factory=_utc_now)
     errors: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)

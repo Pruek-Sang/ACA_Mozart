@@ -2,7 +2,7 @@
 
 import os
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -13,10 +13,8 @@ load_dotenv(dotenv_path=load_env_path)
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # Supabase Configuration
-    supabase_url: str = ""
-    supabase_key: str = ""
-    db_schema: str = "public"
+    # Data Source Configuration (File-based, no external DB required)
+    catalog_csv_path: str = ""  # Auto-detected if empty
     
     # Application Settings
     environment: str = "development"
@@ -32,9 +30,10 @@ class Settings(BaseSettings):
     safety_factor: float = 1.25
     default_power_factor: float = 0.85
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
 
 
 # Global settings instance
