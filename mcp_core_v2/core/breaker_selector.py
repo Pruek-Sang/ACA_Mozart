@@ -157,6 +157,44 @@ class BreakerSelector:
             continuous_load=False
         )
     
+    def select_rcbo_breaker(
+        self,
+        load_current: float,
+        poles: BreakerPoles = BreakerPoles.DOUBLE,
+        trip_current_ma: int = 30
+    ) -> Dict[str, Any]:
+        """Select RCBO breaker for wet locations (water heater, outdoor, etc.).
+        
+        RCBO (Residual Current Breaker with Overcurrent) provides:
+        - Overcurrent protection (like standard breaker)
+        - Earth leakage protection (like RCD/ELCB)
+        
+        Thai Standard: ต้องใช้ RCBO 30mA สำหรับเครื่องใช้ไฟฟ้าที่มีน้ำ
+        
+        Args:
+            load_current: Load current in Amperes
+            poles: Number of poles (default 2P for water heater)
+            trip_current_ma: Earth leakage trip current (30mA standard, 10mA for high sensitivity)
+        
+        Returns:
+            Dict with breaker selection including RCBO specifics
+        """
+        result = self.select_breaker(
+            load_current=load_current,
+            poles=poles,
+            breaker_type=BreakerType.RCBO,
+            continuous_load=True  # Water heater is continuous load
+        )
+        
+        result['rcbo_details'] = {
+            'trip_current_ma': trip_current_ma,
+            'protection_type': 'AC/A',  # Type A for all waveforms
+            'application': 'wet_location',
+            'note': 'ต้องติดตั้ง RCBO 30mA สำหรับอุปกรณ์ในพื้นที่เปียก (มาตรฐาน วสท.)'
+        }
+        
+        return result
+    
     def verify_breaker_coordination(
         self,
         feeder_breaker_rating: int,
