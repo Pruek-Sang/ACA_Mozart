@@ -1,6 +1,6 @@
 """Result builder for aggregating design results."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from models.contracts import DesignRequest, DesignResult
 from datetime import datetime, timezone
 import logging
@@ -23,7 +23,8 @@ class ResultBuilder:
         breaker_selections: Dict[str, Any],
         conduit_sizing: Dict[str, Any],
         compliance_report: Dict[str, Any],
-        autolisp_code: str = None
+        autolisp_code: str = None,
+        grouped_circuits: List[Dict[str, Any]] = None
     ) -> DesignResult:
         """Build complete design result."""
         errors = []

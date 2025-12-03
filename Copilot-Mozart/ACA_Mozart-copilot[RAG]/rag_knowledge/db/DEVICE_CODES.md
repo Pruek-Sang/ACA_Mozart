@@ -39,3 +39,10 @@
 - `COMPUTER-300W` - Desktop Computer 300W
 - `WASHER-2000W` - Washing Machine 2000W
 - `DRYER-3000W` - Clothes Dryer 3000W
+
+## Pumps
+- `PUMP-750W` - Water Pump 750W
+- `PUMP-1500W` - Water Pump 1500W (heavy duty)
+
+## EV Charger
+- `EVCHARGER-7KW` - EV Charger 7kW (Level 2)

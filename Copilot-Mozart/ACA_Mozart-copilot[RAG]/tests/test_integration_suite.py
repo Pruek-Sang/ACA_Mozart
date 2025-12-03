@@ -85,8 +85,7 @@ class TestINT01_EndToEndFlow:
         data = response.json()
         assert "answer" in data
         assert len(data["answer"]) > 50, "Answer too short"
-        
-        return data
+        # Note: Don't return data - pytest warns about returning values from tests
     
     @pytest.mark.integration
     def test_int01_spec_endpoint_works(self, integration_spec_request):
@@ -100,8 +99,7 @@ class TestINT01_EndToEndFlow:
         
         data = response.json()
         assert "project_input" in data
-        
-        return data
+        # Note: Don't return data - pytest warns about returning values from tests
     
     @pytest.mark.integration
     def test_int01_full_flow_no_exception(self, integration_request, integration_spec_request):

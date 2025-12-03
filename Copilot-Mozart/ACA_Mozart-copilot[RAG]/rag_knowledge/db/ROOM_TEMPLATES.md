@@ -30,3 +30,5 @@
 - `ROOMT-GARAGE-STD` - Garage
 - `ROOMT-OFFICE-STD` - Home office
 - `ROOMT-BALCONY-STD` - Balcony
+- `ROOMT-EXTERIOR-STD` - Exterior area (front yard, garden, parking)
+- `ROOMT-CORRIDOR-STD` - Corridor/hallway

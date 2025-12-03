@@ -21,6 +21,17 @@ class Settings(BaseSettings):
     debug: bool = True
     log_level: str = "INFO"
     
+    # API Settings
+    api_host: str = "0.0.0.0"
+    api_port: int = 5001
+    
+    # Google API (optional)
+    google_api_key: str = ""
+    
+    # Thai Standard Settings
+    default_voltage: str = "230V_1PH"
+    default_frequency: str = "50Hz"
+    
     # NEC Standards
     nec_version: str = "2023"
     voltage_drop_limit: float = 0.03
@@ -32,7 +43,8 @@ class Settings(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra fields in .env
     )
 
 

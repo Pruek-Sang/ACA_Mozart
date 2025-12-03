@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     USE_GOOGLE_AI: bool = False  # Auto-detected if API key is present
     
     # === Model Configuration ===
-    MODEL_NAME_ANSWER: str = "gemini-2.5-pro-preview-05-06"
-    MODEL_NAME_JUDGE: str = "gemini-2.5-pro-preview-05-06"
+    MODEL_NAME_ANSWER: str = "gemini-2.5-flash-lite"
+    MODEL_NAME_JUDGE: str = "gemini-2.5-pro"
 
     
     # === Vector Database ===
@@ -78,6 +78,25 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8"
     )
+    
+    def model_post_init(self, __context) -> None:
+        """Post-init: Resolve all relative paths to absolute using BASE_DIR"""
+        def resolve_path(path_str: str) -> str:
+            from pathlib import Path
+            p = Path(path_str)
+            if not p.is_absolute():
+                return str((BASE_DIR / p).resolve())
+            return str(p.resolve())
+        
+        # Resolve all path settings
+        object.__setattr__(self, 'VECTOR_DB_PATH', resolve_path(self.VECTOR_DB_PATH))
+        object.__setattr__(self, 'KNOWLEDGE_ROOT', resolve_path(self.KNOWLEDGE_ROOT))
+        object.__setattr__(self, 'KNOWLEDGE_DIR_DB', resolve_path(self.KNOWLEDGE_ROOT + '/db'))
+        object.__setattr__(self, 'KNOWLEDGE_DIR_EXAMPLE', resolve_path(self.KNOWLEDGE_ROOT + '/example'))
+        object.__setattr__(self, 'KNOWLEDGE_DIR_MCP', resolve_path(self.KNOWLEDGE_ROOT + '/mcp'))
+        object.__setattr__(self, 'KNOWLEDGE_DIR_STANDARD', resolve_path(self.KNOWLEDGE_ROOT + '/standard'))
+        object.__setattr__(self, 'KNOWLEDGE_INDEX_PATH', resolve_path(self.KNOWLEDGE_ROOT + '/knowledge_index.json'))
+        object.__setattr__(self, 'TRUST_LOG_DIR', resolve_path(self.TRUST_LOG_DIR))
 
 
 # Global settings instance

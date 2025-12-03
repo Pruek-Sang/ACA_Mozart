@@ -115,6 +115,7 @@ class RoomInput(BaseModel):
     name: str = Field(..., description="Room name e.g., 'ห้องนอน 1'")
     type: str = Field(..., description="Room type e.g., 'bedroom', 'kitchen'")
     area_sqm: Optional[float] = Field(None, description="Area in square meters")
+    floor: int = Field(default=1, description="Floor number (1, 2, etc.)")
 
 
 class LoadInput(BaseModel):
@@ -123,6 +124,7 @@ class LoadInput(BaseModel):
     device: str = Field(..., description="Device name e.g., 'AC_12000BTU', 'OUTLET_16A'")
     quantity: int = Field(default=1, description="Number of devices")
     power_kw: Optional[float] = Field(None, description="Total power in kW if known")
+    floor: int = Field(default=1, description="Floor number for circuit grouping")
 
 
 class ProjectRequirements(BaseModel):
@@ -177,6 +179,7 @@ class LoadSpec(BaseModel):
     device_code: str = Field(..., description="Device code e.g., 'AC-12000BTU', 'SOCKET-16A'")
     qty: int = Field(default=1, description="Quantity")
     notes: Optional[str] = Field(None, description="Additional notes")
+    floor: int = Field(default=1, description="Floor number for circuit grouping")
 
 
 class Constraints(BaseModel):

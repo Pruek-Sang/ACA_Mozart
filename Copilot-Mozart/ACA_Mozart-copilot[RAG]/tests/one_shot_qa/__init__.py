@@ -87,8 +87,8 @@ from .layer2_judge import (
 )
 
 from .test_cases import (
-    TestCase,
-    TestCaseCategory,
+    QACase,
+    QACaseCategory,
     TEST_CASES,
     get_test_case_by_id,
     get_test_cases_by_category,
@@ -124,7 +124,7 @@ __all__ = [
     "Layer2Verdict", "Layer2Result", "SemanticEvaluation", "run_layer2", "mock_evaluate",
     
     # Test Cases
-    "TestCase", "TestCaseCategory", "TEST_CASES",
+    "QACase", "QACaseCategory", "TEST_CASES",
     "get_test_case_by_id", "get_test_cases_by_category", "get_all_test_case_ids",
     "GROUND_TRUTH_REFERENCE",
     
