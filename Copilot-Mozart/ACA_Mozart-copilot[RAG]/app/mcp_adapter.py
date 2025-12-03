@@ -173,6 +173,17 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     "FAN-CEILING-60W": (60, LoadType.OTHER, False),
     "FAN-STAND-50W": (50, LoadType.OTHER, False),
     
+    # Switches (Other, negligible power - control devices)
+    "SWITCH-1WAY": (0, LoadType.OTHER, False),
+    "SWITCH-2WAY": (0, LoadType.OTHER, False),
+    "SWITCH-3WAY": (0, LoadType.OTHER, False),
+    "SW-1WAY": (0, LoadType.OTHER, False),
+    "SW-2WAY": (0, LoadType.OTHER, False),
+    "COMP-SW-1WAY": (0, LoadType.OTHER, False),  # Catalog format
+    "COMP-SW-2WAY": (0, LoadType.OTHER, False),  # Catalog format
+    "DIMMER": (5, LoadType.OTHER, False),        # Dimmer has small standby
+    "COMP-DIMMER": (5, LoadType.OTHER, False),   # Catalog format
+    
     # Miscellaneous
     "TV-200W": (200, LoadType.RECEPTACLE, False),
     "COMPUTER-300W": (300, LoadType.RECEPTACLE, False),

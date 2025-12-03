@@ -1,7 +1,7 @@
 """Main pipeline orchestrator for electrical design."""
 
-from typing import Dict, Any, Optional
-from models.contracts import DesignRequest, DesignResult
+from typing import Dict, Any, Optional, List
+from models.contracts import DesignRequest, DesignResult, ElectricalLoad
 from core.template_resolver import get_template_resolver
 from core.load_calculator import get_load_calculator
 from core.wire_sizer import get_wire_sizer
@@ -10,7 +10,10 @@ from core.conduit_sizer import get_conduit_sizer
 from core.compliance_checker import get_compliance_checker
 from core.autolisp_generator import get_autolisp_generator
 from core.result_builder import get_result_builder
-from models.catalog_models import BreakerPoles, ConductorMaterial
+from core.circuit_grouper import get_circuit_grouper, GroupedCircuit
+from core.lighting_calculator import get_lighting_calculator
+from core.room_defaults import get_room_defaults_manager
+from models.catalog_models import BreakerPoles, ConductorMaterial, BreakerType
 from config import get_settings
 from exceptions import InvalidSpecError, UnsupportedProjectError
 import logging
@@ -32,6 +35,10 @@ class DesignPipeline:
         self.compliance_checker = get_compliance_checker()
         self.autolisp_generator = get_autolisp_generator()
         self.result_builder = get_result_builder()
+        # New modules for circuit grouping
+        self.circuit_grouper = get_circuit_grouper()
+        self.lighting_calculator = get_lighting_calculator()
+        self.room_defaults = get_room_defaults_manager()
     
     def _validate_request(self, request: DesignRequest):
         """Validate design request before processing.
@@ -71,7 +78,11 @@ class DesignPipeline:
             
             # Step 1: Resolve templates
             logger.info("Step 1: Resolving design templates")
-            templates = self._resolve_templates(request)
+            self._resolve_templates(request)
+            
+            # Step 1.5: Group circuits (NEW - consolidate loads into proper circuits)
+            logger.info("Step 1.5: Grouping circuits (lighting/receptacle by floor)")
+            grouped_circuits = self._group_circuits(request)
             
             # Step 2: Calculate loads
             logger.info("Step 2: Calculating electrical loads")
@@ -81,16 +92,16 @@ class DesignPipeline:
             logger.info("Step 3: Sizing conductors")
             wire_sizing = self._size_wires(request, calculations)
             
-            # Step 4: Select breakers
+            # Step 4: Select breakers (now with circuit grouping awareness)
             logger.info("Step 4: Selecting circuit breakers")
-            breaker_selections = self._select_breakers(request, calculations)
+            breaker_selections = self._select_breakers_v2(request, calculations, grouped_circuits)
             
             # Step 5: Size conduits
             logger.info("Step 5: Sizing conduits")
             conduit_sizing = self._size_conduits(request, wire_sizing, breaker_selections)
             
             # Step 6: Check compliance
-            logger.info("Step 6: Checking NEC compliance")
+            logger.info("Step 6: Checking NEC/EIT compliance")
             compliance_report = self._check_compliance(request)
             
             # Step 7: Generate AutoLISP
@@ -99,7 +110,8 @@ class DesignPipeline:
                 'calculations': calculations,
                 'wire_sizing': wire_sizing,
                 'breaker_selections': breaker_selections,
-                'conduit_sizing': conduit_sizing
+                'conduit_sizing': conduit_sizing,
+                'grouped_circuits': grouped_circuits  # Add grouped circuits to results
             }
             autolisp_code = self._generate_autolisp(request, design_results)
             
@@ -112,7 +124,8 @@ class DesignPipeline:
                 breaker_selections=breaker_selections,
                 conduit_sizing=conduit_sizing,
                 compliance_report=compliance_report,
-                autolisp_code=autolisp_code
+                autolisp_code=autolisp_code,
+                grouped_circuits=grouped_circuits  # Pass grouped circuits
             )
             
             logger.info(f"Design pipeline completed for session {request.session_id}")
@@ -125,6 +138,32 @@ class DesignPipeline:
     def _resolve_templates(self, request: DesignRequest) -> Dict[str, Any]:
         """Resolve design templates for all loads."""
         return self.template_resolver.resolve_circuit_requirements(request.loads)
+    
+    def _group_circuits(self, request: DesignRequest) -> List[Dict[str, Any]]:
+        """Group loads into logical circuits.
+        
+        This consolidates individual loads into proper residential circuits:
+        - Lighting: Grouped by floor (all bedroom lights on floor 1 → 1 circuit)
+        - Receptacles: Grouped by floor (excludes bathrooms)
+        - AC: Dedicated circuit per unit
+        - Water Heater: Dedicated RCBO circuit
+        - Kitchen high-power: Dedicated circuits
+        
+        Returns:
+            List of grouped circuit dictionaries
+        """
+        # Group loads into circuits
+        self.circuit_grouper.group_loads(request.loads)
+        
+        # Get summary which includes circuit list in dict format
+        summary = self.circuit_grouper.get_circuit_summary()
+        circuits = summary.get('circuits', [])
+        
+        logger.info(
+            f"Grouped {len(request.loads)} loads into {len(circuits)} circuits "
+            f"({summary.get('grouped_circuits', 0)} grouped + {summary.get('dedicated_circuits', 0)} dedicated)"
+        )
+        return circuits
     
     def _calculate_loads(self, request: DesignRequest) -> Dict[str, Any]:
         """Calculate loads for all panels."""
@@ -139,7 +178,7 @@ class DesignPipeline:
     def _size_wires(
         self,
         request: DesignRequest,
-        calculations: Dict[str, Any]
+        _calculations: Dict[str, Any]  # Prefix with _ to mark as intentionally unused
     ) -> Dict[str, Any]:
         """Size wires for all circuits."""
         wire_sizing = {}
@@ -212,7 +251,7 @@ class DesignPipeline:
         request: DesignRequest,
         calculations: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Select breakers for all circuits."""
+        """Select breakers for all circuits (legacy - 1 load = 1 circuit)."""
         breaker_selections = {}
         
         for load in request.loads:
@@ -283,18 +322,123 @@ class DesignPipeline:
         
         return breaker_selections
     
+    def _select_breakers_v2(
+        self,
+        request: DesignRequest,
+        calculations: Dict[str, Any],
+        grouped_circuits: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Select breakers for grouped circuits (NEW - proper residential grouping).
+        
+        This uses circuit grouping to select breakers:
+        - Lighting circuits: 16A/20A standard breaker
+        - Receptacle circuits: 16A/20A standard breaker  
+        - AC dedicated: 20A-32A based on BTU
+        - Water heater: RCBO 25A 30mA
+        - Kitchen: 20A dedicated
+        
+        Returns:
+            Dict with breaker selections keyed by circuit_id
+        """
+        breaker_selections = {}
+        
+        for circuit in grouped_circuits:
+            circuit_id = circuit['circuit_id']
+            circuit_type = circuit['circuit_type']
+            total_current = circuit['total_current']
+            requires_rcbo = circuit.get('rcbo', False)
+            
+            # Determine poles (Thai standard: 230V 1-phase = 1P, 400V 3-phase = 3P)
+            if circuit.get('voltage', 230) > 300:
+                poles = BreakerPoles.THREE
+            else:
+                poles = BreakerPoles.SINGLE
+            
+            # Select breaker type based on circuit type
+            if requires_rcbo:
+                # Water heater, outdoor, wet location - use RCBO
+                breaker_result = self.breaker_selector.select_rcbo_breaker(
+                    load_current=total_current,
+                    poles=BreakerPoles.DOUBLE,  # RCBO typically 2P
+                    trip_current_ma=30  # Standard 30mA
+                )
+            elif circuit_type == 'hvac':
+                # AC dedicated circuit - higher rating
+                breaker_result = self.breaker_selector.select_breaker(
+                    load_current=total_current,
+                    poles=poles,
+                    continuous_load=True  # AC is continuous
+                )
+            else:
+                # Standard breaker for lighting, receptacle, etc.
+                breaker_result = self.breaker_selector.select_breaker(
+                    load_current=total_current,
+                    poles=poles,
+                    continuous_load=False
+                )
+            
+            # Add circuit info to breaker result
+            breaker_result['circuit_info'] = {
+                'circuit_name': circuit['circuit_name'],
+                'circuit_type': circuit_type,
+                'floor': circuit.get('floor', 'unknown'),
+                'load_count': circuit.get('load_count', 1)
+            }
+            
+            breaker_selections[circuit_id] = breaker_result
+        
+        # Select main breakers for panels (same as before)
+        for panel in request.panels:
+            panel_calc = calculations.get(panel.id, {})
+            demand_current = panel_calc.get('demand_current', 0)
+            
+            voltage_val = int(panel.voltage.value.split('V')[0])
+            phases = 3 if 'THREE_PHASE' in panel.voltage.value else 1
+            
+            max_allowed = min(
+                panel.main_breaker_rating,
+                request.utility_service_size
+            )
+            
+            if demand_current > max_allowed:
+                logger.warning(
+                    f"Panel {panel.id}: Demand current {demand_current:.1f}A exceeds "
+                    f"max allowed {max_allowed}A. Using {max_allowed}A main breaker."
+                )
+                effective_demand = max_allowed * 0.8
+            else:
+                effective_demand = demand_current
+            
+            main_breaker = self.breaker_selector.select_main_breaker(
+                service_load=effective_demand,
+                voltage=voltage_val,
+                phases=phases
+            )
+            
+            if main_breaker.get('breaker_rating', 0) > max_allowed:
+                main_breaker['breaker_rating'] = panel.main_breaker_rating
+                main_breaker['capped'] = True
+                main_breaker['warning'] = (
+                    f"Main breaker capped at {panel.main_breaker_rating}A. "
+                    f"Calculated demand was {demand_current:.1f}A."
+                )
+            
+            breaker_selections[f"{panel.id}_main"] = main_breaker
+        
+        logger.info(f"Selected breakers for {len(grouped_circuits)} grouped circuits")
+        return breaker_selections
+    
     def _size_conduits(
         self,
         request: DesignRequest,
         wire_sizing: Dict[str, Any],
-        breaker_selections: Dict[str, Any]
+        _breaker_selections: Dict[str, Any]  # Reserved for future use
     ) -> Dict[str, Any]:
         """Size conduits for all circuits."""
         conduit_sizing = {}
         
         for load in request.loads:
             wire_data = wire_sizing.get(load.id, {})
-            breaker_data = breaker_selections.get(load.id, {})
             
             if 'wire_size' not in wire_data:
                 continue

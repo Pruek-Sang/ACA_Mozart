@@ -11,6 +11,7 @@ class BreakerType(str, Enum):
     GFCI = "gfci"
     AFCI = "afci"
     DUAL_FUNCTION = "dual_function"  # AFCI+GFCI
+    RCBO = "rcbo"  # Residual Current Breaker with Overcurrent (Thai: เซอร์กิตเบรกเกอร์ป้องกันไฟรั่ว)
     MAIN = "main"
 
 
