@@ -24,7 +24,7 @@ from .layer1_rules import run_layer1, Layer1Verdict, Layer1Result
 from .layer2_judge import run_layer2, Layer2Verdict, Layer2Result
 from .test_cases import (
     TEST_CASES, 
-    TestCase, 
+    QACase, 
     get_test_case_by_id, 
     check_should_refuse,
     check_asks_clarification,
@@ -84,7 +84,7 @@ def determine_final_verdict(
     l0: Layer0Result,
     l1: Optional[Layer1Result],
     l2: Optional[Layer2Result],
-    test_case: TestCase,
+    test_case: QACase,
     answer: str
 ) -> FinalVerdict:
     """
@@ -136,7 +136,7 @@ def determine_final_verdict(
 
 
 async def run_single_test(
-    test_case: TestCase,
+    test_case: QACase,
     api_url: str,
     use_mock_l2: bool = False,
     project_id: Optional[str] = None,

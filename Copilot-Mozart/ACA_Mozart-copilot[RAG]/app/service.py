@@ -50,7 +50,8 @@ from app.models import (
     QueryRequest, StandardResponse, SourceRef, AnswerMetadata,
     ProjectRequirements, McpSpecResponse, ProjectInputSpec,
     RawRetrieveRequest, RoomInput, LoadInput,
-    InsufficientDataError  # Phase 3: Error model
+    InsufficientDataError,  # Phase 3: Error model
+    RoomSpec, LoadSpec, ProjectInfo, ElectricalSystem, Constraints  # For direct conversion
 )
 from app.config import settings
 from app.knowledge_service import KnowledgeService
@@ -77,7 +78,9 @@ class RagService:
     
     def __init__(self):
         """Initialize RAG service with all components"""
-        self.db = VectorDatabase()
+        # Use vector adapter (FAISS by default, ChromaDB if VECTOR_DB_BACKEND=chroma)
+        from core.vector_adapter import get_vector_db
+        self.db = get_vector_db()
         self.privacy = PrivacyGuard()
         self.knowledge = KnowledgeService()
         self.use_google_ai: bool = False
@@ -149,20 +152,802 @@ class RagService:
             )
         return response.text
     
+    # =========================================================================
+    # Intent Detection & NLP Parsing (NEW - Option B)
+    # =========================================================================
+    
+    def _detect_design_intent(self, query: str) -> bool:
+        """
+        Detect if query is asking for electrical design.
+        
+        Design keywords: ออกแบบ, คำนวณระบบ, วางแผนไฟฟ้า, design, calculate
+        Returns True if query is a design request.
+        """
+        design_keywords_th = [
+            "ออกแบบ", "ออกแบบระบบ", "ออกแบบไฟฟ้า",
+            "คำนวณระบบ", "คำนวณไฟฟ้า", "วางแผนไฟฟ้า",
+            "วางระบบ", "ติดตั้งระบบ", "ต้องใช้สายขนาด",
+            "บ้าน.*ชั้น.*แอร์", "มีแอร์.*ตัว.*น้ำอุ่น",
+        ]
+        design_keywords_en = [
+            "design electrical", "design system", "calculate electrical",
+            "plan electrical", "wire sizing for", "breaker sizing for"
+        ]
+        
+        query_lower = query.lower()
+        
+        # Check Thai keywords
+        for kw in design_keywords_th:
+            if kw in query_lower:
+                return True
+        
+        # Check English keywords
+        for kw in design_keywords_en:
+            if kw in query_lower:
+                return True
+        
+        # Pattern: mentions multiple appliances (likely design request)
+        import re
+        appliance_pattern = r"(แอร์|น้ำอุ่น|ปั๊มน้ำ|เตา|ไฟ).*\d+.*(ตัว|เครื่อง|จุด)"
+        if re.search(appliance_pattern, query):
+            return True
+        
+        return False
+    
+    def _auto_fill_lighting(
+        self, 
+        raw_rooms: List[Dict], 
+        rooms: List[RoomInput]
+    ) -> List[LoadInput]:
+        """
+        Auto-fill lighting based on room area and type.
+        
+        Uses Lux calculation formula:
+        - Required Lumens = Area × Lux × MF / UF
+        - Number of Fixtures = Required Lumens / Lumens per Fixture
+        
+        Standards (วสท.):
+        - ห้องนอน: 100-200 lux → LED 12W 1-2 หลอด/25 ตร.ม.
+        - ห้องนั่งเล่น: 150-300 lux → LED 12W 2-4 หลอด/50 ตร.ม.
+        - ห้องครัว: 300-500 lux → LED 18W 2-3 หลอด
+        - ห้องน้ำ: 150-200 lux → LED 9W 1-2 หลอด
+        - ห้องเก็บของ: 50-100 lux → LED 9W 1 หลอด
+        - หน้าบ้าน/exterior: 50-100 lux → LED 9W 1-2 หลอด
+        """
+        lighting_loads = []
+        
+        # Lux requirements by room type (recommended)
+        LUX_REQ = {
+            "bedroom": 150,      # ห้องนอน
+            "living": 200,       # ห้องนั่งเล่น
+            "kitchen": 400,      # ห้องครัว
+            "bathroom": 200,     # ห้องน้ำ
+            "storage": 100,      # ห้องเก็บของ
+            "exterior": 75,      # หน้าบ้าน
+            "balcony": 100,      # ระเบียง
+            "garage": 150,       # โรงรถ
+        }
+        
+        # LED specs: 10W = 810 lumens, 20W = 1600 lumens (standard LED bulbs)
+        # Note: Device codes must match DEVICE_CODES.md exactly
+        LED_LUMENS = {"LIGHT-LED-10W": 810, "LIGHT-LED-20W": 1600}
+        
+        # Factors (typical residential)
+        MF = 0.8   # Maintenance factor
+        UF = 0.5   # Utilization factor
+        
+        for i, room in enumerate(rooms):
+            room_name = room.name
+            room_type = room.type if hasattr(room, 'type') else "bedroom"
+            
+            # Try to get area from raw_rooms
+            area = 25.0  # default 5x5
+            if i < len(raw_rooms):
+                raw = raw_rooms[i]
+                if raw.get("area_sqm"):
+                    area = float(raw.get("area_sqm", 25))
+                elif raw.get("width") and raw.get("length"):
+                    area = float(raw.get("width", 5)) * float(raw.get("length", 5))
+            
+            # Get required lux
+            lux = LUX_REQ.get(room_type, 150)
+            
+            # Calculate required lumens: Φ = E × A × MF / UF
+            required_lumens = (lux * area * MF) / UF
+            
+            # Select fixture based on room type (use valid device codes)
+            if room_type in ["kitchen", "living"]:
+                # Larger rooms need 20W
+                device = "LIGHT-LED-20W"
+                lumens = LED_LUMENS["LIGHT-LED-20W"]
+            else:
+                # Bedroom, bathroom, storage use 10W
+                device = "LIGHT-LED-10W"
+                lumens = LED_LUMENS["LIGHT-LED-10W"]
+            
+            # Calculate number of fixtures (round up)
+            import math
+            num_fixtures = max(1, math.ceil(required_lumens / lumens))
+            
+            # Cap at reasonable max
+            num_fixtures = min(num_fixtures, 8)
+            
+            # Get floor from room
+            floor = room.floor if hasattr(room, 'floor') else 1
+            
+            lighting_loads.append(LoadInput(
+                room_name=room_name,
+                device=device,
+                quantity=num_fixtures,
+                floor=floor
+            ))
+            
+            logger.info(f"💡 Auto-fill lighting: {room_name} (floor={floor}, {area}m²) → {num_fixtures}x {device}")
+        
+        return lighting_loads
+    
+    def _auto_fill_outlets(self, rooms: List[RoomInput]) -> List[LoadInput]:
+        """
+        Auto-fill outlets based on room type.
+        
+        มาตรฐาน วสท.:
+        - ห้องนอน: 2-3 จุด
+        - ห้องนั่งเล่น: 4-6 จุด
+        - ห้องครัว: 3-4 จุด (สำหรับเครื่องใช้ไฟฟ้า)
+        - ห้องน้ำ: 1 จุด
+        - ห้องเก็บของ: 1 จุด
+        """
+        outlet_loads = []
+        
+        OUTLET_COUNT = {
+            "bedroom": 2,
+            "living": 4,
+            "kitchen": 3,
+            "bathroom": 1,
+            "storage": 1,
+            "exterior": 1,
+            "balcony": 1,
+            "garage": 2,
+        }
+        
+        for room in rooms:
+            room_name = room.name
+            room_type = room.type if hasattr(room, 'type') else "bedroom"
+            floor = room.floor if hasattr(room, 'floor') else 1
+            
+            count = OUTLET_COUNT.get(room_type, 2)
+            
+            outlet_loads.append(LoadInput(
+                room_name=room_name,
+                device="SOCKET-16A",  # Use correct device code from DEVICE_CODES.md
+                quantity=count,
+                floor=floor
+            ))
+            
+            logger.info(f"🔌 Auto-fill outlets: {room_name} (floor={floor}) → {count}x SOCKET-16A")
+        
+        return outlet_loads
+    
+    def _normalize_typos(self, text: str) -> str:
+        """
+        Normalize common typos and similar words in Thai electrical terms.
+        
+        This ensures fuzzy matching for user input with typos.
+        """
+        # คำผิด/คำคล้ายที่พบบ่อย
+        typo_map = {
+            # แอร์
+            'แอ ': 'แอร์ ',
+            'แอ์': 'แอร์',
+            'เเอร์': 'แอร์',
+            'แอร': 'แอร์',
+            'เครื่องปรับอากาศ': 'แอร์',
+            'แอร์คอน': 'แอร์',
+            'aircon': 'แอร์',
+            'ac': 'แอร์',
+            
+            # น้ำอุ่น
+            'น้ำร้อน': 'น้ำอุ่น',
+            'เครื่องทำน้ำร้อน': 'เครื่องทำน้ำอุ่น',
+            'เครื่องน้ำอุ่น': 'เครื่องทำน้ำอุ่น',
+            'วอเตอร์ฮีทเตอร์': 'เครื่องทำน้ำอุ่น',
+            'water heater': 'เครื่องทำน้ำอุ่น',
+            'ฮีทเตอร์': 'เครื่องทำน้ำอุ่น',
+            
+            # ปั๊มน้ำ
+            'ปั้มน้ำ': 'ปั๊มน้ำ',
+            'ปั้ม': 'ปั๊มน้ำ',
+            'pump': 'ปั๊มน้ำ',
+            
+            # เตา
+            'เตาไฟฟ้า': 'เตาแม่เหล็กไฟฟ้า',
+            'เตาแม่เหล็ก': 'เตาแม่เหล็กไฟฟ้า',
+            'induction': 'เตาแม่เหล็กไฟฟ้า',
+            
+            # หน่วย
+            'วัตต์': 'W',
+            'วัตท์': 'W',
+            'watt': 'W',
+            'บีทียู': 'BTU',
+            'btu': 'BTU',
+        }
+        
+        result = text.lower()
+        for typo, correct in typo_map.items():
+            result = result.replace(typo.lower(), correct)
+        
+        return result
+
+    async def _extract_loads_from_text(self, query: str) -> Dict[str, Any]:
+        """
+        Use LLM to extract structured loads from natural language query.
+        
+        Returns dict with: project_name, rooms, loads, missing_info
+        """
+        # Pre-process: แก้คำผิด/คำคล้าย
+        normalized_query = self._normalize_typos(query)
+        logger.info(f"📝 Normalized query: {normalized_query[:100]}...")
+        
+        extraction_prompt = f'''คุณเป็น parser สำหรับแปลงคำขอออกแบบไฟฟ้าเป็น JSON
+
+จากข้อความ: "{normalized_query}"
+
+⚠️ คำที่ต้องระวัง (Fuzzy Matching):
+- "แอ", "แอ์", "เเอร์", "แอร", "ac", "เครื่องปรับอากาศ" → หมายถึง "แอร์"
+- "น้ำร้อน", "เครื่องทำน้ำร้อน", "ฮีทเตอร์", "water heater" → หมายถึง "น้ำอุ่น"
+- "ปั้มน้ำ", "ปั้ม", "pump" → หมายถึง "ปั๊มน้ำ"
+- "เตาไฟฟ้า", "เตาแม่เหล็ก", "induction" → หมายถึง "เตาแม่เหล็กไฟฟ้า"
+
+ให้ตอบเป็น JSON เท่านั้น (ไม่มีคำอธิบาย):
+{{
+  "project_name": "ชื่อโครงการ (ถ้าไม่ระบุให้ใส่ 'บ้านพักอาศัย')",
+  "building_type": "residential",
+  "voltage_system": "TH_1PH_230V",
+  "num_floors": จำนวนชั้น (ถ้าไม่ระบุให้ใส่ 1),
+  "rooms": [
+    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่ (1 หรือ 2)}}
+  ],
+  "loads": [
+    {{"room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", "device": "รหัสอุปกรณ์", "quantity": จำนวน}}
+  ],
+  "missing_info": ["รายการข้อมูลที่ยังขาด"]
+}}
+
+⚠️ กฎสำคัญ:
+1. ทุก room_name ใน loads ต้องตรงกับ name ใน rooms (ตัวอักษรเหมือนกันทุกประการ)
+2. ถ้ามี "หน้าบ้าน", "ข้างนอก", "สวน" ให้สร้างห้อง type="exterior"
+3. ถ้ามีปั๊มน้ำ ให้ใส่ใน room_name="พื้นที่ส่วนกลาง" หรือ "exterior"
+4. 🔴 แอร์ติดได้เฉพาะ "ห้องนอน" เท่านั้น! ห้องอื่น (ห้องนั่งเล่น/ห้องครัว/ห้องเก็บของ/ห้องน้ำ) ไม่มีแอร์
+5. ถ้าผู้ใช้บอก "แอร์ทุกห้อง" → หมายถึงแอร์เฉพาะห้องนอนทุกห้อง (ไม่รวมห้องอื่น)
+6. 🏠 บ้าน 2 ชั้น: ชั้น 1 = ห้องนั่งเล่น+ห้องครัว+ห้องน้ำ 1+ห้องเก็บของ, ชั้น 2 = ห้องนอน+ห้องน้ำ 2
+
+รหัสอุปกรณ์ที่ใช้ได้:
+- แอร์: AC-9000BTU, AC-12000BTU, AC-18000BTU, AC-24000BTU
+- น้ำอุ่น: HEATER-3500W, HEATER-4500W
+- ไฟ LED: LIGHT-LED-10W, LIGHT-LED-20W
+- เต้ารับ: SOCKET-16A
+- ปั๊มน้ำ: PUMP-750W, PUMP-1500W
+- เตา: INDUCTION-3000W
+
+ถ้าไม่ระบุห้อง ให้สร้างห้องมาตรฐาน (ห้องนั่งเล่น, ห้องนอน, ห้องครัว, ห้องน้ำ)
+ถ้าไม่ระบุ BTU ของแอร์ ให้ใช้ 12000BTU
+ถ้าไม่ระบุวัตต์น้ำอุ่น ให้ใช้ 4500W
+
+ตอบ JSON เท่านั้น:'''
+
+        try:
+            config = self._get_generation_config(temperature=0.1)
+            response = self._generate_content(extraction_prompt, config)
+            
+            # Parse JSON from response
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if json_match:
+                extracted = json.loads(json_match.group())
+                logger.info(f"Extracted loads: {len(extracted.get('loads', []))} items")
+                return extracted
+            else:
+                logger.warning("No JSON found in LLM response")
+                return {"error": "ไม่สามารถแปลงข้อมูลได้", "missing_info": ["รายละเอียดอุปกรณ์"]}
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse error: {e}")
+            return {"error": "รูปแบบข้อมูลไม่ถูกต้อง", "missing_info": ["รายละเอียดอุปกรณ์"]}
+        except Exception as e:
+            logger.error(f"Extraction failed: {e}")
+            return {"error": str(e), "missing_info": ["ข้อมูลทั้งหมด"]}
+    
+    async def _call_mcp_with_extracted_loads(self, extracted: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Call MCP Core with extracted loads and return design result.
+        """
+        from app.mcp_adapter import McpAdapter
+        from app.mcp_client import McpClient
+        
+        # Convert extracted data to ProjectRequirements format
+        rooms = [
+            RoomInput(name=r["name"], type=r["type"])
+            for r in extracted.get("rooms", [])
+        ]
+        
+        loads = [
+            LoadInput(
+                room_name=l["room_name"],
+                device=l["device"],
+                quantity=l.get("quantity", 1)
+            )
+            for l in extracted.get("loads", [])
+        ]
+        
+        # Create ProjectRequirements
+        req = ProjectRequirements(
+            project_name=extracted.get("project_name", "บ้านพักอาศัย"),
+            building_type=extracted.get("building_type", "residential"),
+            voltage_system=extracted.get("voltage_system", "TH_1PH_230V"),
+            rooms=rooms,
+            loads=loads
+        )
+        
+        # Generate MCP spec
+        try:
+            spec_response = await self.generate_mcp_spec(req)
+        except Exception as e:
+            logger.error(f"MCP spec generation failed: {e}")
+            return {"error": f"ไม่สามารถสร้าง spec ได้: {e}"}
+        
+        # Convert to MCP format and call MCP Core
+        adapter = McpAdapter()
+        mcp_request = adapter.convert(spec_response.project_input)
+        
+        mcp_client = McpClient()
+        
+        if not await mcp_client.health_check():
+            logger.warning("MCP Core not available")
+            return {
+                "status": "partial",
+                "message": "MCP Core ไม่พร้อมใช้งาน",
+                "spec": spec_response.model_dump()
+            }
+        
+        mcp_response = await mcp_client.design(mcp_request)
+        
+        if mcp_response.success:
+            return {
+                "status": "complete",
+                "design_result": mcp_response.to_dict(),
+                "spec": spec_response.model_dump()
+            }
+        else:
+            return {
+                "status": "partial",
+                "message": f"MCP calculation failed: {mcp_response.error_message}",
+                "spec": spec_response.model_dump()
+            }
+    
+    def _format_design_result_as_text(self, result: Dict[str, Any], language: str = "th") -> str:
+        """
+        Format MCP design result as human-readable text.
+        """
+        if result.get("error"):
+            return result["error"]
+        
+        if result.get("status") == "partial":
+            return result.get("message", "ไม่สามารถคำนวณได้")
+        
+        design = result.get("design_result", {})
+        breakers = design.get("breaker_selections", {})
+        
+        lines = []
+        if language == "th":
+            lines.append("🏠 ผลการออกแบบระบบไฟฟ้า:")
+            lines.append("")
+            lines.append("📋 สรุป Breaker ที่ต้องใช้:")
+            
+            for cid, b in breakers.items():
+                if isinstance(b, dict) and b.get("circuit_info"):
+                    name = b["circuit_info"].get("circuit_name", cid)
+                    rating = b.get("breaker_rating", "?")
+                    poles = b.get("poles", 1)
+                    btype = b.get("breaker_type", "standard")
+                    
+                    icon = "❄️" if "แอร์" in name else "🚿" if "น้ำอุ่น" in name else "💡" if "ไฟ" in name else "🔌"
+                    rcbo = " (RCBO)" if btype == "rcbo" else ""
+                    lines.append(f"  {icon} {name}: {rating}A/{poles}P{rcbo}")
+            
+            # Summary
+            total_circuits = len([b for b in breakers.values() if isinstance(b, dict)])
+            lines.append("")
+            lines.append(f"✅ รวม {total_circuits} วงจร ตามมาตรฐาน วสท.")
+        else:
+            lines.append("🏠 Electrical Design Result:")
+            lines.append("")
+            lines.append("📋 Breaker Summary:")
+            
+            for cid, b in breakers.items():
+                if isinstance(b, dict) and b.get("circuit_info"):
+                    name = b["circuit_info"].get("circuit_name", cid)
+                    rating = b.get("breaker_rating", "?")
+                    poles = b.get("poles", 1)
+                    lines.append(f"  • {name}: {rating}A/{poles}P")
+        
+        return "\n".join(lines)
+
+    def _convert_to_project_requirements(self, extracted: Dict[str, Any]) -> ProjectRequirements:
+        """
+        Convert extracted JSON data to ProjectRequirements model.
+        
+        Args:
+            extracted: Dict with rooms and loads from LLM extraction
+        
+        Returns:
+            ProjectRequirements ready for MCP chain
+        """
+        # Get number of floors
+        num_floors = extracted.get("num_floors", 1)
+        
+        # Build rooms with floor info
+        rooms = []
+        room_names = set()
+        room_floor_map = {}  # Track which floor each room is on
+        
+        for r in extracted.get("rooms", []):
+            name = r.get("name", "ห้อง")
+            floor = r.get("floor", 1)
+            rooms.append(RoomInput(
+                name=name,
+                type=r.get("type", "bedroom"),
+                floor=floor
+            ))
+            room_names.add(name)
+            room_floor_map[name] = floor
+        
+        # Default rooms if none specified (2-story layout)
+        if not rooms:
+            if num_floors >= 2:
+                # ชั้น 1
+                rooms.append(RoomInput(name="ห้องนั่งเล่น", type="living", floor=1))
+                rooms.append(RoomInput(name="ห้องครัว", type="kitchen", floor=1))
+                rooms.append(RoomInput(name="ห้องน้ำ 1", type="bathroom", floor=1))
+                # ชั้น 2
+                rooms.append(RoomInput(name="ห้องนอน", type="bedroom", floor=2))
+                rooms.append(RoomInput(name="ห้องน้ำ 2", type="bathroom", floor=2))
+                room_floor_map = {"ห้องนั่งเล่น": 1, "ห้องครัว": 1, "ห้องน้ำ 1": 1, "ห้องนอน": 2, "ห้องน้ำ 2": 2}
+            else:
+                rooms = [
+                    RoomInput(name="ห้องนั่งเล่น", type="living", floor=1),
+                    RoomInput(name="ห้องนอน", type="bedroom", floor=1),
+                    RoomInput(name="ห้องครัว", type="kitchen", floor=1),
+                    RoomInput(name="ห้องน้ำ", type="bathroom", floor=1)
+                ]
+                room_floor_map = {"ห้องนั่งเล่น": 1, "ห้องนอน": 1, "ห้องครัว": 1, "ห้องน้ำ": 1}
+            room_names = set(room_floor_map.keys())
+        
+        # Build loads and auto-add missing rooms
+        loads = []
+        room_type_map = {
+            "หน้าบ้าน": "exterior",
+            "สวน": "exterior", 
+            "นอกบ้าน": "exterior",
+            "ข้างนอก": "exterior",
+            "พื้นที่ส่วนกลาง": "exterior",
+            "ระเบียง": "balcony",
+            "โรงรถ": "garage",
+        }
+        for l in extracted.get("loads", []):
+            room_name = l.get("room_name", "ห้องนั่งเล่น")
+            
+            # Auto-add room if load references non-existent room
+            if room_name not in room_names:
+                # Guess room type from name
+                room_type = "bedroom"  # default
+                floor = 1  # default floor
+                for keyword, rtype in room_type_map.items():
+                    if keyword in room_name:
+                        room_type = rtype
+                        break
+                rooms.append(RoomInput(name=room_name, type=room_type, floor=floor))
+                room_names.add(room_name)
+                room_floor_map[room_name] = floor
+                logger.info(f"Auto-added room: {room_name} (type={room_type}, floor={floor})")
+            
+            # Get floor from room
+            floor = room_floor_map.get(room_name, 1)
+            
+            loads.append(LoadInput(
+                room_name=room_name,
+                device=l.get("device", "OUTLET_16A"),
+                quantity=l.get("quantity", 1),
+                floor=floor
+            ))
+        
+        # ============================================
+        # AUTO-FILL: Lighting, Outlets, Pump
+        # ตามมาตรฐาน วสท. สำหรับบ้านพักอาศัย
+        # ============================================
+        
+        # 1. Auto-fill Lighting per room (ถ้ายังไม่มี LED)
+        has_lighting = any(
+            "LED" in l.get("device", "") 
+            for l in extracted.get("loads", [])
+        )
+        if not has_lighting:
+            loads.extend(self._auto_fill_lighting(extracted.get("rooms", []), rooms))
+        
+        # 2. Auto-fill Outlets per room (ถ้ายังไม่มี)
+        has_outlets = any(
+            "OUTLET" in l.get("device", "") 
+            for l in extracted.get("loads", [])
+        )
+        if not has_outlets:
+            loads.extend(self._auto_fill_outlets(rooms))
+        
+        # 3. Auto-fill Pump (บ้านมาตรฐานควรมีปั๊มน้ำ)
+        has_pump = any(
+            "PUMP" in l.get("device", "") 
+            for l in extracted.get("loads", [])
+        )
+        if not has_pump:
+            loads.append(LoadInput(
+                room_name="พื้นที่ส่วนกลาง",
+                device="PUMP-750W",  # Use correct device code from DEVICE_CODES.md
+                quantity=1,
+                floor=1
+            ))
+            # เพิ่มห้องถ้ายังไม่มี
+            if "พื้นที่ส่วนกลาง" not in room_names:
+                rooms.append(RoomInput(name="พื้นที่ส่วนกลาง", type="exterior"))
+                room_names.add("พื้นที่ส่วนกลาง")
+            logger.info("🔧 Auto-added: ปั๊มน้ำ 750W")
+        
+        return ProjectRequirements(
+            project_name=extracted.get("project_name", "บ้านพักอาศัย"),
+            building_type=extracted.get("building_type", "residential"),
+            voltage_system=extracted.get("voltage_system", "TH_1PH_230V"),
+            rooms=rooms,
+            loads=loads
+        )
+
+    def _convert_req_to_spec(self, req: ProjectRequirements) -> ProjectInputSpec:
+        """
+        Convert ProjectRequirements to ProjectInputSpec directly (no LLM).
+        
+        This is used for one-shot design requests where we already have
+        complete room/load data with floor information.
+        """
+        from datetime import datetime, timezone
+        
+        # Build RoomSpec list
+        room_specs = []
+        room_id_map = {}  # name → room_id
+        for i, room in enumerate(req.rooms):
+            room_id = f"R{i+1}"
+            room_id_map[room.name] = room_id
+            
+            # Map room type to template code
+            template_map = {
+                "living": "ROOMT-LIVING-STD",
+                "bedroom": "ROOMT-BEDROOM-STD",
+                "kitchen": "ROOMT-KITCHEN-STD",
+                "bathroom": "ROOMT-BATHROOM-STD",
+                "storage": "ROOMT-STORAGE-STD",
+                "exterior": "ROOMT-EXTERIOR-STD",
+                "balcony": "ROOMT-BALCONY-STD",
+                "garage": "ROOMT-GARAGE-STD",
+            }
+            template_code = template_map.get(room.type, "ROOMT-BEDROOM-STD")
+            
+            room_specs.append(RoomSpec(
+                room_id=room_id,
+                name=room.name,
+                room_type=room.type.upper(),
+                template_code=template_code,
+                area_sqm=room.area_sqm
+            ))
+        
+        # Build LoadSpec list with floor
+        load_specs = []
+        for i, load in enumerate(req.loads):
+            load_id = f"L{i+1}"
+            room_id = room_id_map.get(load.room_name, "R1")
+            
+            # Map device names to standard codes
+            device_code = load.device
+            if device_code.startswith("LIGHT-LED"):
+                device_code = device_code  # Already correct
+            elif device_code == "SOCKET-16A":
+                device_code = "SOCKET-16A"
+            elif device_code == "PUMP-750W":
+                device_code = "PUMP-750W"
+            
+            load_specs.append(LoadSpec(
+                load_id=load_id,
+                room_id=room_id,
+                device_code=device_code,
+                qty=load.quantity,
+                floor=load.floor
+            ))
+        
+        # Build ProjectInputSpec
+        spec = ProjectInputSpec(
+            project_info=ProjectInfo(
+                project_name=req.project_name,
+                building_type=req.building_type.upper(),
+                spec_version="2.0"
+            ),
+            electrical_system=ElectricalSystem(
+                voltage_system=req.voltage_system,
+                earthing="TT"
+            ),
+            rooms=room_specs,
+            loads=load_specs,
+            constraints=Constraints(
+                rule_profile_id="TH_RESIDENTIAL_LV",
+                user_constraints=req.user_constraints
+            )
+        )
+        
+        return spec
+
+    async def _build_design_response(self, req: ProjectRequirements, language: str = "th") -> StandardResponse:
+        """
+        Build design response by chaining to MCP Core.
+        
+        Uses direct conversion (no LLM) to preserve floor information.
+        
+        Args:
+            req: ProjectRequirements with rooms and loads (including floor)
+            language: Response language (th/en)
+        
+        Returns:
+            StandardResponse with design result in answer field
+        """
+        from app.mcp_adapter import McpAdapter
+        from app.mcp_client import McpClient
+        
+        try:
+            # Direct conversion to ProjectInputSpec (no LLM, preserves floor)
+            project_input = self._convert_req_to_spec(req)
+            logger.info(f"📦 Direct conversion: {len(project_input.rooms)} rooms, {len(project_input.loads)} loads")
+            
+            # Log floor info
+            floor_counts = {}
+            for load in project_input.loads:
+                f = load.floor
+                floor_counts[f] = floor_counts.get(f, 0) + 1
+            logger.info(f"📊 Loads by floor: {floor_counts}")
+            
+            # Convert to MCP format
+            adapter = McpAdapter()
+            mcp_request = adapter.convert(project_input)
+            
+            # Call MCP Core
+            mcp_client = McpClient()
+            
+            if not await mcp_client.health_check():
+                logger.warning("MCP Core not available")
+                return StandardResponse(
+                    answer="⚠️ MCP Core ไม่พร้อมใช้งาน กรุณาเปิด MCP Core ที่ port 5001",
+                    sources=[],
+                    confidence="Low",
+                    grounding_status="MCP_UNAVAILABLE",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=[],
+                        retrieval_group="mcp"
+                    )
+                )
+            
+            mcp_response = await mcp_client.design(mcp_request)
+            
+            if mcp_response.success:
+                # Format as human-readable text
+                result = mcp_response.to_dict()
+                formatted_text = self._format_design_result_as_text(
+                    {"status": "complete", "design_result": result},
+                    language
+                )
+                
+                return StandardResponse(
+                    answer=formatted_text,
+                    sources=[SourceRef(
+                        file="MCP Core Calculation",
+                        section="design_result",
+                        score=1.0,
+                        content=f"Session: {result.get('session_id', 'N/A')}"
+                    )],
+                    confidence="High",
+                    grounding_status="CALCULATED",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=["mcp_calculation"],
+                        retrieval_group="mcp"
+                    )
+                )
+            else:
+                return StandardResponse(
+                    answer=f"❌ การคำนวณล้มเหลว: {mcp_response.error_message}",
+                    sources=[],
+                    confidence="Low",
+                    grounding_status="MCP_ERROR",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=[],
+                        retrieval_group="mcp"
+                    )
+                )
+                
+        except Exception as e:
+            logger.error(f"Design response build failed: {e}")
+            return StandardResponse(
+                answer=f"❌ ไม่สามารถคำนวณได้: {str(e)}",
+                sources=[],
+                confidence="Low",
+                grounding_status="ERROR",
+                metadata=AnswerMetadata(
+                    llm_model=settings.MODEL_NAME_ANSWER,
+                    retrieved_docs=[],
+                    retrieval_group="mcp"
+                )
+            )
+
     async def process_ask(self, req: QueryRequest) -> StandardResponse:
         """
-        Process a general QA question
+        Process a general QA question - now with smart intent detection!
+        
+        If query looks like a design request (e.g., "ออกแบบบ้าน 2 ชั้น มีแอร์ 3 ตัว"),
+        automatically extracts loads and chains to MCP Core for calculations.
         
         Args:
             req: Query request with context_hint and language
         
         Returns:
             Standard response with answer, sources, and metadata
+            OR MCP design result if design intent detected
         
         Raises:
             HTTPException: 503 if retrieval fails, 504 if LLM times out
         """
         from fastapi import HTTPException
+        
+        # =====================================================================
+        # PHASE 0: DESIGN INTENT DETECTION (NEW FEATURE!)
+        # =====================================================================
+        # Check if user is asking for electrical design calculation
+        # e.g., "ออกแบบบ้าน 2 ชั้น มีแอร์ 3 ตัว น้ำอุ่น 1 ตัว"
+        # =====================================================================
+        if self._detect_design_intent(req.query):
+            logger.info(f"🎯 Design intent detected: {req.query[:50]}...")
+            
+            try:
+                # Extract loads from natural language
+                loads = await self._extract_loads_from_text(req.query)
+                
+                if loads:
+                    logger.info(f"📦 Extracted: {json.dumps(loads.get('rooms', []), ensure_ascii=False)[:200]}")
+                    
+                    # Convert to structured ProjectRequirements
+                    project_req = self._convert_to_project_requirements(loads)
+                    
+                    # Debug: log floors
+                    floor_info = {r.name: r.floor for r in project_req.rooms}
+                    logger.info(f"🏠 Room floors: {floor_info}")
+                    
+                    # Chain to MCP Core for calculations
+                    result = await self._build_design_response(project_req, req.language)
+                    
+                    logger.info("✅ Design response built successfully via NLP→MCP chain")
+                    return result
+                else:
+                    # Could not extract loads, fall back to Q&A
+                    logger.warning("⚠️ Design intent detected but no loads extracted, falling back to Q&A")
+                    
+            except Exception as e:
+                logger.error(f"❌ Design chain failed: {e}, falling back to Q&A")
+                # Continue to regular Q&A flow
+        
+        # =====================================================================
+        # PHASE 1: REGULAR Q&A FLOW (Original logic)
+        # =====================================================================
         
         # 1. Anonymize Query
         safe_query = self.privacy.anonymize(req.query)
@@ -238,45 +1023,26 @@ class RagService:
         # 4. Generate Answer with language instruction
         # 4. Generate Answer with language instruction
         if req.language == "th":
-            lang_instruction = """คุณเป็นผู้เชี่ยวชาญไฟฟ้า
+            lang_instruction = """คุณเป็นผู้เชี่ยวชาญไฟฟ้า ตอบสั้นกระชับ 1-2 ประโยค
 กฎ:
-- ตอบเป็นภาษาไทย
-- ให้คิดทีละขั้นตอน (Let's think step by step) เพื่อหาคำตอบจาก Context
-- ต้องระบุชื่อเอกสารและตารางที่ใช้อ้างอิงเสมอ (เช่น: (Source: KEY_TABLES.md))
-- พยายามค้นหาคำตอบจาก Context ให้ดีที่สุด โดยเฉพาะส่วนท้ายของเอกสาร
+- ตอบเป็นภาษาไทย ตรงประเด็น ไม่อธิบายยืดยาว
+- ตอบตัวเลข/ค่าที่ต้องการก่อน แล้วค่อยอธิบายเหตุผลสั้นๆ
 - สำหรับการเลือกเบรกเกอร์:
-  * ห้ามตอบโดยดูแค่ว่า "เบรกเกอร์ > โหลด"
-  * ขั้นตอนที่ 1: คำนวณ Load × 1.25
-  * ขั้นตอนที่ 2: ค้นหา standard size ที่มากกว่าค่าที่คำนวณได้
+  * ขั้นตอน: Load × 1.25 → เลือก standard size ที่ใหญ่กว่า
   * Standard sizes: 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125 A
-  * ตัวอย่าง:
-    - 7A × 1.25 = 8.75 → เลือก 10A
-    - 14A × 1.25 = 17.5 → เลือก 20A (ไม่ใช่ 16A)
-    - 18A × 1.25 = 22.5 → เลือก 25A (ไม่ใช่ 20A หรือ 22A)
-    - 21A × 1.25 = 26.25 → เลือก 32A (ไม่ใช่ 25A)
   * ❗ ห้ามตอบขนาดที่ไม่อยู่ใน standard sizes (เช่น 22, 28, 35)
-- ถ้าข้อมูลไม่ครบ (เช่น ขาดขนาดสาย, ขาดแรงดัน) ต้องถามให้ชัดเจนว่า "กรุณาระบุ [ข้อมูลที่ขาด]"
-- ถ้าคำถามไม่เกี่ยวกับระบบไฟฟ้า ตอบสั้นๆ ว่า "ไม่มีข้อมูลในระบบ"
+- ถ้าข้อมูลไม่ครบ บอกว่า "กรุณาระบุ [ข้อมูลที่ขาด]"
+- ถ้าไม่เกี่ยวกับไฟฟ้า ตอบว่า "ไม่มีข้อมูลในระบบ"
+- ❗ จำกัดคำตอบไม่เกิน 3 ประโยค
 """
         else:
-            lang_instruction = """You are an electrical expert. Answer concisely.
+            lang_instruction = """You are an electrical expert. Answer in 1-2 sentences max.
 Rules:
-- Answer directly, no lengthy explanations
-- If there are numbers, state them first
-- For breaker selection:
-  * Do NOT think "breaker > load = OK"
-  * Step 1: Calculate Load × 1.25
-  * Step 2: Find standard size greater than calculated value
-  * Standard sizes: 6, 10, 16, 20, 25, 32, 40, 50, 63, 80, 100, 125 A
-  * Examples:
-    - 7A × 1.25 = 8.75 → select 10A
-    - 14A × 1.25 = 17.5 → select 20A (NOT 16A)
-    - 18A × 1.25 = 22.5 → select 25A (NOT 20A or 22A)
-    - 21A × 1.25 = 26.25 → select 32A (NOT 25A)
-  * ❗ Do NOT answer non-standard sizes (e.g. 22, 28, 35)
-- If missing data (e.g. wire size, voltage), ask clearly: "Please specify [missing data]"
-- If question is not about electrical systems, answer briefly: "No data in system"
-- Limit to 3 sentences max"""
+- Answer directly with numbers first, then brief explanation
+- For breaker: Load × 1.25 → next standard size (6,10,16,20,25,32,40,50,63,80,100,125A)
+- If missing data, say "Please specify [missing data]"
+- If not electrical, say "No data in system"
+- ❗ Limit to 3 sentences max"""
         
         prompt = f"{lang_instruction}\n\nContext:\n{context_str}\n\nQuestion: {safe_query}\n\nAnswer:"
         
@@ -593,8 +1359,65 @@ Rules:
                 )
                 raw_llm_output = self._generate_content(prompt, config)
                 
-                # Try to parse
-                spec_response = McpSpecResponse.parse_raw(raw_llm_output)
+                # Parse LLM output - may be partial (missing standards_profile, llm_metadata)
+                # We'll fill in defaults for missing fields
+                try:
+                    spec_response = McpSpecResponse.model_validate_json(raw_llm_output)
+                except ValidationError:
+                    # Try to parse partial JSON and fill in missing fields
+                    import re
+                    json_match = re.search(r'\{[\s\S]*\}', raw_llm_output)
+                    if json_match:
+                        partial_data = json.loads(json_match.group())
+                        
+                        # Check if project_input exists (minimum requirement)
+                        if 'project_input' in partial_data:
+                            logger.info(f"[{request_id}] Partial JSON found, adding defaults...")
+                            
+                            # Ensure project_input.constraints exists with correct schema
+                            if 'constraints' not in partial_data['project_input']:
+                                partial_data['project_input']['constraints'] = {
+                                    "rule_profile_id": "TH_RESIDENTIAL_LV",
+                                    "user_constraints": []
+                                }
+                            elif isinstance(partial_data['project_input']['constraints'], list):
+                                # If LLM returned empty list, convert to proper object
+                                partial_data['project_input']['constraints'] = {
+                                    "rule_profile_id": "TH_RESIDENTIAL_LV",
+                                    "user_constraints": partial_data['project_input']['constraints']
+                                }
+                            
+                            # Add default standards_profile if missing (correct schema)
+                            if 'standards_profile' not in partial_data:
+                                partial_data['standards_profile'] = {
+                                    "rule_profile_id": "EIT_2021_RESIDENTIAL",
+                                    "notes": "มาตรฐาน วสท. 2021 สำหรับบ้านพักอาศัย"
+                                }
+                            
+                            # Add default llm_metadata if missing
+                            if 'llm_metadata' not in partial_data:
+                                from datetime import datetime, timezone
+                                partial_data['llm_metadata'] = {
+                                    "model": settings.MODEL_NAME_ANSWER,
+                                    "retrieved_docs": retrieved_doc_ids[:5],
+                                    "temperature": settings.GENERATION_TEMPERATURE,
+                                    "timestamp": datetime.now(timezone.utc).isoformat()
+                                }
+                            
+                            # Fix common LLM field name variations
+                            if 'loads' in partial_data['project_input']:
+                                for load in partial_data['project_input']['loads']:
+                                    # LLM may use 'quantity' instead of 'qty'
+                                    if 'quantity' in load and 'qty' not in load:
+                                        load['qty'] = load.pop('quantity')
+                                    # LLM may use 'power_kw' instead of 'notes'
+                                    if 'power_kw' in load:
+                                        load.pop('power_kw', None)  # Remove, not needed
+                            
+                            # Try to validate with filled-in data
+                            spec_response = McpSpecResponse.model_validate(partial_data)
+                        else:
+                            raise ValidationError.from_exception_data("Missing project_input", [])
                 
                 # Success!
                 parse_success = True
@@ -681,6 +1504,8 @@ CRITICAL RULES:
 8. Use template codes from plan (ROOMT-LIVING-STD, ROOMT-KITCHEN-HEAVY, etc.)
 9. Map devices according to rag_knowledge/db/DEVICE_CODES.md
 10. Use rule_profile_id as planned
+11. **IMPORTANT: PRESERVE FLOOR FROM INPUT** - ถ้า rooms มี floor ให้ใส่ใน output ด้วย
+12. **IMPORTANT: LOADS MUST HAVE FLOOR** - ทุก load ต้องมี floor ตาม room ที่อ้างอิง
 
 {examples}
 
@@ -696,7 +1521,10 @@ OUTPUT JSON (McpSpecResponse):
     "project_info": {{"project_name": "...", "building_type": "RESIDENTIAL", "spec_version": "2.0"}},
     "electrical_system": {{"voltage_system": "...", "earthing": "TT"}},
     "rooms": [...],
-    "loads": [...],
+    "loads": [
+      {{"load_id": "L1", "room_id": "R1", "device_code": "...", "qty": 1, "floor": 1}},
+      ...
+    ],
     "constraints": {{"rule_profile_id": "TH_RESIDENTIAL_LV", "user_constraints": [...]}}
   }},
   "standards_profile": {{"rule_profile_id": "TH_RESIDENTIAL_LV", "notes": "..."}},
@@ -801,6 +1629,37 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
     
     # === Validation Functions (Phase 2: NO DB ACCESS) ===
     
+    def _normalize_device_code(self, code: str) -> str:
+        """
+        Normalize device code for comparison
+        
+        Handles variations like:
+        - AC-12000BTU vs AC_12000BTU
+        - HEATER-3500W vs WATER_HEATER_3500W
+        - SOCKET-16A vs OUTLET_16A
+        
+        Returns:
+            Normalized code (uppercase, underscores replaced with dashes)
+        """
+        if not code:
+            return ""
+        
+        # Basic normalization: uppercase and replace underscore with dash
+        normalized = code.upper().replace("_", "-")
+        
+        # Common synonyms mapping
+        synonyms = {
+            "WATER-HEATER": "HEATER",
+            "OUTLET": "SOCKET",
+            "INDUCTION-COOKER": "INDUCTION",
+        }
+        
+        for old, new in synonyms.items():
+            if old in normalized:
+                normalized = normalized.replace(old, new)
+        
+        return normalized
+    
     def _get_valid_device_codes(self) -> set[str]:
         """
         Load valid device codes from rag_knowledge/db/DEVICE_CODES.md
@@ -814,7 +1673,7 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         - Run scripts/build_device_codes_snapshot.py manually
         
         Returns:
-            Set of valid device codes
+            Set of normalized valid device codes
         """
         db_docs = self.knowledge.list_docs(folder="db")
         
@@ -830,8 +1689,11 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         content = self.knowledge.load_doc_content(device_codes_doc)
         codes = self._parse_device_codes(content)
         
-        logger.debug(f"Loaded {len(codes)} valid device codes from snapshot")
-        return set(codes)
+        # Normalize all codes for flexible matching
+        normalized_codes = {self._normalize_device_code(c) for c in codes}
+        
+        logger.debug(f"Loaded {len(normalized_codes)} valid device codes from snapshot")
+        return normalized_codes
     
     def _parse_device_codes(self, content: str) -> List[str]:
         """
@@ -908,13 +1770,16 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         issues = []
         
         # Rule 1: Check device codes against rag_knowledge/db/DEVICE_CODES.md
+        # Use normalized comparison to handle variations (AC-12000BTU vs AC_12000BTU)
         valid_codes = self._get_valid_device_codes()
         for load in spec.project_input.loads:
-            if load.device_code and load.device_code not in valid_codes:
-                issues.append(
-                    f"Invalid device_code '{load.device_code}' "
-                    f"(not in rag_knowledge/db/DEVICE_CODES.md)"
-                )
+            if load.device_code:
+                normalized_load_code = self._normalize_device_code(load.device_code)
+                if normalized_load_code not in valid_codes:
+                    issues.append(
+                        f"Invalid device_code '{load.device_code}' "
+                        f"(not in rag_knowledge/db/DEVICE_CODES.md)"
+                    )
         
         # Rule 2: Check room templates against rag_knowledge/db/ROOM_TEMPLATES.md
         valid_templates = self._get_valid_room_templates()

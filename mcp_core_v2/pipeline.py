@@ -343,9 +343,9 @@ class DesignPipeline:
         breaker_selections = {}
         
         for circuit in grouped_circuits:
-            circuit_id = circuit['circuit_id']
-            circuit_type = circuit['circuit_type']
-            total_current = circuit['total_current']
+            circuit_id = circuit.get('circuit_id', circuit.get('id'))
+            circuit_type = circuit.get('circuit_type', circuit.get('type', 'other'))
+            total_current = circuit.get('total_current', circuit.get('current', 0))
             requires_rcbo = circuit.get('rcbo', False)
             
             # Determine poles (Thai standard: 230V 1-phase = 1P, 400V 3-phase = 3P)
@@ -379,10 +379,10 @@ class DesignPipeline:
             
             # Add circuit info to breaker result
             breaker_result['circuit_info'] = {
-                'circuit_name': circuit['circuit_name'],
+                'circuit_name': circuit.get('name', circuit.get('circuit_name', 'Unknown')),
                 'circuit_type': circuit_type,
                 'floor': circuit.get('floor', 'unknown'),
-                'load_count': circuit.get('load_count', 1)
+                'load_count': circuit.get('loads', circuit.get('load_count', 1))
             }
             
             breaker_selections[circuit_id] = breaker_result

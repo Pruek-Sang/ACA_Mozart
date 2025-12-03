@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 
-class TestCaseCategory(str, Enum):
-    """Categories of test cases"""
+class QACaseCategory(str, Enum):
+    """Categories of test cases (renamed from TestCaseCategory to avoid pytest warning)"""
     AMPACITY = "ampacity"
     VOLTAGE_DROP = "voltage_drop"
     DERATING = "derating"
@@ -29,11 +29,11 @@ class TestCaseCategory(str, Enum):
 
 
 @dataclass
-class TestCase:
-    """Definition of a single test case"""
+class QACase:
+    """Definition of a single test case (renamed from TestCase to avoid pytest warning)"""
     id: str
     name: str
-    category: TestCaseCategory
+    category: QACaseCategory
     question: str
     expected_language: str  # "thai" or "english"
     
@@ -57,15 +57,15 @@ class TestCase:
 # THE 12 TEST CASES
 # =============================================================================
 
-TEST_CASES: List[TestCase] = [
+TEST_CASES: List[QACase] = [
     
     # =========================================================================
     # 1. Q-THW-AMPACITY-EXACT
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-THW-AMPACITY-EXACT",
         name="THW Cable Ampacity - Exact Value Check",
-        category=TestCaseCategory.AMPACITY,
+        category=QACaseCategory.AMPACITY,
         question="สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
         expected_language="thai",
         layer1_type="ampacity",
@@ -83,10 +83,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 2. Q-VD-LIMIT-CHECK
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-VD-LIMIT-CHECK",
         name="Voltage Drop Limit Verification",
-        category=TestCaseCategory.VOLTAGE_DROP,
+        category=QACaseCategory.VOLTAGE_DROP,
         question="วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
         expected_language="thai",
         layer1_type="voltage_drop",
@@ -103,10 +103,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 3. Q-DERATING-MULTIFACTOR
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-DERATING-MULTIFACTOR",
         name="Derating Factor for Grouped Conductors",
-        category=TestCaseCategory.DERATING,
+        category=QACaseCategory.DERATING,
         question="ถ้าเดินสายไฟ 6 เส้นในท่อเดียวกัน ต้องใช้ตัวคูณลดค่ากระแส (derating factor) เท่าไหร่?",
         expected_language="thai",
         layer1_type="derating",
@@ -123,10 +123,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 4. Q-BREAKER-SELECTION
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-BREAKER-SELECTION",
         name="Circuit Breaker Selection for Load",
-        category=TestCaseCategory.BREAKER,
+        category=QACaseCategory.BREAKER,
         question="โหลดไฟฟ้า 18 แอมป์ ควรใช้เบรกเกอร์ขนาดกี่แอมป์?",
         expected_language="thai",
         layer1_type="breaker",
@@ -141,10 +141,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 5. Q-CATALOG-DEVICE-CODE
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-CATALOG-DEVICE-CODE",
         name="Device Code Catalog Validation",
-        category=TestCaseCategory.CATALOG,
+        category=QACaseCategory.CATALOG,
         question="เครื่องทำน้ำอุ่นไฟฟ้า 3500W ใช้รหัสอุปกรณ์อะไรใน catalog?",
         expected_language="thai",
         layer1_type="device_code",
@@ -157,10 +157,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 6. Q-RCD-SELECTION-BY-STANDARD
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-RCD-SELECTION-BY-STANDARD",
         name="RCD/RCBO Requirement for Bathroom",
-        category=TestCaseCategory.RCD,
+        category=QACaseCategory.RCD,
         question="วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
         expected_language="thai",
         layer1_type="rcd",
@@ -175,10 +175,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 7. Q-INCOMPLETE-SPEC
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-INCOMPLETE-SPEC",
         name="Incomplete Specification Handling",
-        category=TestCaseCategory.INCOMPLETE,
+        category=QACaseCategory.INCOMPLETE,
         question="ช่วยออกแบบระบบไฟฟ้าให้หน่อย",
         expected_language="thai",
         layer1_type="device_code",  # Doesn't matter, should ask clarification
@@ -192,10 +192,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 8. Q-OUT-OF-SCOPE
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-OUT-OF-SCOPE",
         name="Out of Scope Question Rejection",
-        category=TestCaseCategory.OUT_OF_SCOPE,
+        category=QACaseCategory.OUT_OF_SCOPE,
         question="วิธีทำอาหารไทยที่อร่อยที่สุด",
         expected_language="thai",
         layer1_type="device_code",  # Doesn't matter, should refuse
@@ -209,10 +209,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 9. Q-LANG-EN-STRICT
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-LANG-EN-STRICT",
         name="English Language Response",
-        category=TestCaseCategory.LANGUAGE,
+        category=QACaseCategory.LANGUAGE,
         question="What is the ampacity of THW 4.0mm² cable in conduit according to EIT standard?",
         expected_language="english",
         layer1_type="ampacity",
@@ -230,10 +230,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 10. Q-STANDARD-CONFLICT
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-STANDARD-CONFLICT",
         name="Standard Conflict Resolution",
-        category=TestCaseCategory.STANDARD_CONFLICT,
+        category=QACaseCategory.STANDARD_CONFLICT,
         question="มาตรฐาน วสท. กับ IEC มีข้อกำหนดแรงดันตกต่างกันไหม? ควรใช้ค่าไหน?",
         expected_language="thai",
         layer1_type="voltage_drop",
@@ -249,10 +249,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 11. Q-SYSTEM-LEAK-PATTERN
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-SYSTEM-LEAK-PATTERN",
         name="System Boundary Leak Detection",
-        category=TestCaseCategory.SYSTEM_LEAK,
+        category=QACaseCategory.SYSTEM_LEAK,
         question="ช่วยคำนวณ voltage drop ให้หน่อย สายยาว 50 เมตร กระแส 20 แอมป์",
         expected_language="thai",
         layer1_type="voltage_drop",
@@ -266,10 +266,10 @@ TEST_CASES: List[TestCase] = [
     # =========================================================================
     # 12. Q-FULL-PIPELINE-EXPLAIN-MCP
     # =========================================================================
-    TestCase(
+    QACase(
         id="Q-FULL-PIPELINE-EXPLAIN-MCP",
         name="Full Pipeline MCP Handoff Explanation",
-        category=TestCaseCategory.FULL_PIPELINE,
+        category=QACaseCategory.FULL_PIPELINE,
         question="ถ้าต้องการออกแบบระบบไฟฟ้าบ้าน 2 ชั้น มีห้องนอน 3 ห้อง ครัวหนัก (มีเตาไฟฟ้า 3000W) ระบบต้องทำอะไรบ้าง?",
         expected_language="thai",
         layer1_type="device_code",
@@ -285,7 +285,7 @@ TEST_CASES: List[TestCase] = [
 # TEST CASE UTILITIES
 # =============================================================================
 
-def get_test_case_by_id(case_id: str) -> Optional[TestCase]:
+def get_test_case_by_id(case_id: str) -> Optional[QACase]:
     """Get a test case by its ID."""
     for tc in TEST_CASES:
         if tc.id == case_id:
@@ -293,7 +293,7 @@ def get_test_case_by_id(case_id: str) -> Optional[TestCase]:
     return None
 
 
-def get_test_cases_by_category(category: TestCaseCategory) -> List[TestCase]:
+def get_test_cases_by_category(category: QACaseCategory) -> List[QACase]:
     """Get all test cases in a category."""
     return [tc for tc in TEST_CASES if tc.category == category]
 

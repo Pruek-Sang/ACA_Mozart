@@ -40,30 +40,35 @@ def _get_embedding_function():
     Get Embedding Function
     
     Priority:
-    1. Gemini Embedding API (ไม่กิน RAM!) - ต้องมี GOOGLE_API_KEY
-    2. None (ใช้ keyword search แทน) - ถ้า API key ไม่มี
+    1. Local embedding (all-MiniLM-L6-v2) - เร็วกว่า API 10x!
+    2. Gemini Embedding API - ถ้า USE_GEMINI_EMBEDDING=true
     
-    WARNING: ไม่ใช้ local embedding (all-MiniLM) เพราะกิน RAM มาก!
+    NOTE: ใช้ local embedding เป็น default เพราะเร็วกว่ามาก (0.5s vs 5s per call)
     """
     global _embedding_function
     if _embedding_function is None:
+        use_gemini = os.getenv("USE_GEMINI_EMBEDDING", "false").lower() == "true"
         api_key = os.getenv("GOOGLE_API_KEY")
         
-        if not api_key:
-            logger.warning("GOOGLE_API_KEY not set - embedding disabled, will use keyword search")
-            return None
+        if use_gemini and api_key:
+            try:
+                from chromadb.utils import embedding_functions
+                _embedding_function = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
+                    api_key=api_key,
+                    model_name="models/text-embedding-004"
+                )
+                logger.info("Using Gemini Embedding API (text-embedding-004)")
+                return _embedding_function
+            except Exception as e:
+                logger.warning(f"Gemini Embedding failed: {e}, falling back to local")
         
+        # Default: Use local embedding (fast!)
         try:
             from chromadb.utils import embedding_functions
-            # Use Gemini Embedding API - ไม่ต้องโหลด model local!
-            _embedding_function = embedding_functions.GoogleGenerativeAiEmbeddingFunction(
-                api_key=api_key,
-                model_name="models/text-embedding-004"  # Gemini embedding model
-            )
-            logger.info("Using Gemini Embedding API (text-embedding-004)")
+            _embedding_function = embedding_functions.DefaultEmbeddingFunction()
+            logger.info("Using local embedding (all-MiniLM-L6-v2) - fast mode!")
         except Exception as e:
-            # ⚠️ ไม่ใช้ DefaultEmbeddingFunction เพราะกิน RAM!
-            logger.error(f"Gemini Embedding failed: {e}")
+            logger.error(f"Local embedding failed: {e}")
             logger.warning("Embedding disabled - will use keyword search as fallback")
             return None
     

@@ -19,12 +19,12 @@ from .layer1_rules import run_layer1, Layer1Verdict
 from .layer2_judge import run_layer2, mock_evaluate, Layer2Verdict
 from .test_cases import (
     TEST_CASES,
-    TestCase,
+    QACase,
     get_test_case_by_id,
     check_should_refuse,
     check_asks_clarification,
     check_language_match,
-    TestCaseCategory,
+    QACaseCategory,
     GROUND_TRUTH_REFERENCE
 )
 from .ground_truth import (
@@ -39,47 +39,8 @@ from .ground_truth import (
 
 
 # =============================================================================
-# PYTEST FIXTURES
+# PYTEST FIXTURES - Note: pytest_addoption is in tests/conftest.py
 # =============================================================================
-
-def pytest_addoption(parser):
-    """Add custom command line options"""
-    parser.addoption(
-        "--api-url",
-        action="store",
-        default="http://localhost:8080/api/v1/ask",
-        help="URL of the /api/v1/ask endpoint"
-    )
-    parser.addoption(
-        "--use-mock-l2",
-        action="store_true",
-        default=False,
-        help="Use mock evaluation for Layer 2"
-    )
-    parser.addoption(
-        "--project-id",
-        action="store",
-        default=os.environ.get("PROJECT_ID"),
-        help="GCP Project ID for Gemini"
-    )
-
-
-@pytest.fixture(scope="session")
-def api_url(request):
-    """Get API URL from command line or default"""
-    return request.config.getoption("--api-url")
-
-
-@pytest.fixture(scope="session")
-def use_mock_l2(request):
-    """Get mock L2 flag from command line"""
-    return request.config.getoption("--use-mock-l2")
-
-
-@pytest.fixture(scope="session")
-def project_id(request):
-    """Get GCP project ID from command line or env"""
-    return request.config.getoption("--project-id")
 
 
 # =============================================================================
@@ -165,12 +126,12 @@ class TestLayer0:
         """Test Layer 0 passes for valid response"""
         valid_response = {
             "answer": "THW 2.5mm² มีพิกัดกระแส 24 แอมป์",
-            "sources": [{"content": "Source text", "metadata": {}}],
+            "sources": [{"file": "source.md", "section": "1.1", "content": "Source text"}],
             "confidence": "High",
             "grounding_status": "grounded",
             "metadata": {
-                "llm_model": "gemini-2.0-flash-exp",
-                "retrieved_docs": 3
+                "llm_model": "gemini-2.5-flash-lite",
+                "retrieved_docs": ["doc1", "doc2", "doc3"]
             }
         }
         result = validate_response_dict(valid_response)
@@ -381,12 +342,12 @@ class TestTestCaseUtils:
     def test_all_test_cases_have_ground_truth(self):
         """Verify all engineering test cases have ground truth reference"""
         engineering_categories = {
-            TestCaseCategory.AMPACITY,
-            TestCaseCategory.VOLTAGE_DROP,
-            TestCaseCategory.DERATING,
-            TestCaseCategory.BREAKER,
-            TestCaseCategory.CATALOG,
-            TestCaseCategory.RCD,
+            QACaseCategory.AMPACITY,
+            QACaseCategory.VOLTAGE_DROP,
+            QACaseCategory.DERATING,
+            QACaseCategory.BREAKER,
+            QACaseCategory.CATALOG,
+            QACaseCategory.RCD,
         }
         
         for tc in TEST_CASES:

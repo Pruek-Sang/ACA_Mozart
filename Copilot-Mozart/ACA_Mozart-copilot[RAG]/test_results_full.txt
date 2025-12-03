@@ -1,0 +1,201 @@
+[1m============================= test session starts ==============================[0m
+platform linux -- Python 3.12.1, pytest-9.0.1, pluggy-1.6.0 -- /home/codespace/.python/current/bin/python
+cachedir: .pytest_cache
+rootdir: /workspaces/ACA_Mozart/Copilot-Mozart/ACA_Mozart-copilot[RAG]
+configfile: pytest.ini
+plugins: anyio-4.11.0, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+[1mcollecting ... [0mcollected 130 items
+
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_thw_cable_specs_exist [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_thw_2_5mm_ampacity [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_validate_ampacity_correct [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_validate_ampacity_with_tolerance [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_validate_ampacity_wrong [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_breaker_selection_80_percent [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_derating_factor_grouping [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_device_code_validation [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestGroundTruth::test_standard_limits [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer0::test_valid_response [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer0::test_missing_sources [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer0::test_invalid_confidence [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer0::test_empty_answer [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer1::test_parse_ampacity_thai [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer1::test_parse_ampacity_english [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer1::test_parse_voltage_drop [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer1::test_parse_breaker_rating [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer1::test_layer1_ampacity_correct [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer1::test_layer1_ampacity_wrong [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer2Mock::test_mock_good_answer [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer2Mock::test_mock_short_answer [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestLayer2Mock::test_mock_language_mismatch [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestTestCaseUtils::test_check_should_refuse [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestTestCaseUtils::test_check_asks_clarification [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestTestCaseUtils::test_check_language_thai [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestTestCaseUtils::test_check_language_english [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestTestCaseUtils::test_all_test_cases_have_ground_truth [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestIntegration::test_api_connectivity [33mSKIPPED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestIntegration::test_thw_ampacity_query [32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-THW-AMPACITY-EXACT] 
+Q-THW-AMPACITY-EXACT: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-VD-LIMIT-CHECK] 
+Q-VD-LIMIT-CHECK: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-DERATING-MULTIFACTOR] 
+Q-DERATING-MULTIFACTOR: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-BREAKER-SELECTION] 
+Q-BREAKER-SELECTION: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-CATALOG-DEVICE-CODE] 
+Q-CATALOG-DEVICE-CODE: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-RCD-SELECTION-BY-STANDARD] 
+Q-RCD-SELECTION-BY-STANDARD: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-INCOMPLETE-SPEC] 
+Q-INCOMPLETE-SPEC: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-OUT-OF-SCOPE] 
+Q-OUT-OF-SCOPE: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-LANG-EN-STRICT] 
+Q-LANG-EN-STRICT: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-STANDARD-CONFLICT] 
+Q-STANDARD-CONFLICT: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-SYSTEM-LEAK-PATTERN] 
+Q-SYSTEM-LEAK-PATTERN: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/one_shot_qa/test_one_shot_qa.py::TestAllCases::test_case[Q-FULL-PIPELINE-EXPLAIN-MCP] 
+Q-FULL-PIPELINE-EXPLAIN-MCP: HARD-FAIL
+  Error: Connection error: All connection attempts failed
+[32mPASSED[0m
+tests/test_e2e_integration.py::TestAdapterConversion::test_convert_spec_to_mcp_request [32mPASSED[0m
+tests/test_e2e_integration.py::TestAdapterConversion::test_voltage_mapping [32mPASSED[0m
+tests/test_e2e_integration.py::TestAdapterConversion::test_device_mapping_uses_catalog [32mPASSED[0m
+tests/test_e2e_integration.py::TestMcpClientWithMock::test_design_success [32mPASSED[0m
+tests/test_e2e_integration.py::TestMcpClientWithMock::test_design_timeout [32mPASSED[0m
+tests/test_e2e_integration.py::TestMcpClientWithMock::test_design_connection_error [32mPASSED[0m
+tests/test_e2e_integration.py::TestFullE2EFlow::test_full_flow_mock [32mPASSED[0m
+tests/test_e2e_integration.py::TestLiveIntegration::test_health_check_live [33mSKIPPED[0m
+tests/test_e2e_integration.py::TestLiveIntegration::test_design_live [33mSKIPPED[0m
+tests/test_folder_based.py::TestKnowledgeService::test_scan_all_folders [32mPASSED[0m
+tests/test_folder_based.py::TestKnowledgeService::test_folder_filtering [32mPASSED[0m
+tests/test_folder_based.py::TestKnowledgeService::test_priority_ordering [32mPASSED[0m
+tests/test_folder_based.py::TestValidationSources::test_get_valid_device_codes [32mPASSED[0m
+tests/test_folder_based.py::TestValidationSources::test_get_valid_room_templates [32mPASSED[0m
+tests/test_folder_based.py::TestMcpSpecGeneration::test_basic_house_spec [32mPASSED[0m
+tests/test_folder_based.py::TestMcpSpecGeneration::test_heavy_kitchen_template_selection [32mPASSED[0m
+tests/test_folder_based.py::TestQualityCheck::test_qc_detects_invalid_device_code [32mPASSED[0m
+tests/test_integration_suite.py::TestINT01_EndToEndFlow::test_int01_ask_endpoint_works [32mPASSED[0m
+tests/test_integration_suite.py::TestINT01_EndToEndFlow::test_int01_spec_endpoint_works [32mPASSED[0m
+tests/test_integration_suite.py::TestINT01_EndToEndFlow::test_int01_full_flow_no_exception [32mPASSED[0m
+tests/test_integration_suite.py::TestINT01_EndToEndFlow::test_int01_answer_mentions_breaker_range ✓ Answer mentions breaker in expected range
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT01_EndToEndFlow::test_int01_spec_circuit_count_reasonable [32mPASSED[0m
+tests/test_integration_suite.py::TestINT02_CatalogAndStandardConsistency::test_int02_ask_and_spec_use_same_standard ✓ Both Ask and Spec consistently use Thai/EIT standard
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT02_CatalogAndStandardConsistency::test_int02_device_codes_consistent ⚠ Device code may not be from catalog: HEATER-3500W
+⚠ Device code may not be from catalog: HEATER-3500W
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT03_RegressionGuard::test_int03_response_uses_knowledge ✓ Retrieved 5 documents from knowledge base
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT03_RegressionGuard::test_int03_multiple_calls_similar_structure ✓ Multiple calls produce consistent structure (confidence: Medium, Medium)
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT03_RegressionGuard::test_int03_spec_reproducible ✓ Spec generation is reproducible
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT03_RegressionGuard::test_int03_snapshot_helper 
+=== Regression Snapshot ===
+Hash: 6a98e911
+Data: {'ask_answer_length': 9535, 'ask_confidence': 'Medium', 'ask_sources_count': 5, 'spec_rooms_count': 6, 'spec_loads_count': 6, 'spec_voltage': 'TH_1PH_230V'}
+===========================
+
+[32mPASSED[0m
+tests/test_integration_suite.py::TestINT_HealthChecks::test_both_endpoints_accessible [32mPASSED[0m
+tests/test_integration_suite.py::TestINT_HealthChecks::test_knowledge_groups_accessible [32mPASSED[0m
+tests/test_mcp_adapter.py::TestDeviceMapping::test_ac_12000btu_mapping [32mPASSED[0m
+tests/test_mcp_adapter.py::TestDeviceMapping::test_socket_16a_mapping [32mPASSED[0m
+tests/test_mcp_adapter.py::TestDeviceMapping::test_heater_3500w_mapping [32mPASSED[0m
+tests/test_mcp_adapter.py::TestDeviceMapping::test_unknown_device_returns_default [32mPASSED[0m
+tests/test_mcp_adapter.py::TestDeviceMapping::test_all_documented_devices_exist [32mPASSED[0m
+tests/test_mcp_adapter.py::TestVoltageMapping::test_thai_1ph_230v_maps_to_240v [32mPASSED[0m
+tests/test_mcp_adapter.py::TestVoltageMapping::test_thai_3ph_380v_maps_to_208v [32mPASSED[0m
+tests/test_mcp_adapter.py::TestVoltageMapping::test_unknown_voltage_uses_default [32mPASSED[0m
+tests/test_mcp_adapter.py::TestFullConversion::test_basic_conversion [32mPASSED[0m
+tests/test_mcp_adapter.py::TestFullConversion::test_loads_have_correct_power [32mPASSED[0m
+tests/test_mcp_adapter.py::TestFullConversion::test_room_names_in_load_locations [32mPASSED[0m
+tests/test_mcp_adapter.py::TestFullConversion::test_panel_has_all_load_ids [32mPASSED[0m
+tests/test_mcp_adapter.py::TestFullConversion::test_to_dict_serializable [32mPASSED[0m
+tests/test_mcp_adapter.py::TestFullConversion::test_unknown_device_tracked [32mPASSED[0m
+tests/test_mcp_adapter.py::TestEdgeCases::test_empty_loads [32mPASSED[0m
+tests/test_mcp_adapter.py::TestEdgeCases::test_missing_room_reference [32mPASSED[0m
+tests/test_mcp_adapter.py::TestEdgeCases::test_high_load_increases_panel_size [32mPASSED[0m
+tests/test_mcp_adapter.py::TestConvenienceFunctions::test_convert_to_mcp_function [32mPASSED[0m
+tests/test_mcp_adapter.py::TestConvenienceFunctions::test_list_known_devices [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestHealthEndpoints::test_root [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestHealthEndpoints::test_mcp_manifest [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestMcpSpecCaseA::test_basic_house_success [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestMcpSpecCaseB::test_heavy_kitchen_constraints [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestMcpSpecCaseC::test_incomplete_data_returns_400 [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestKnowledgeEndpoints::test_list_groups [32mPASSED[0m
+tests/test_mcp_spec_cases.py::TestKnowledgeEndpoints::test_list_example_docs [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP01_SpecValidation::test_mcp01_spec_generation_success [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP01_SpecValidation::test_mcp01_project_info_structure [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP01_SpecValidation::test_mcp01_electrical_system_structure [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP01_SpecValidation::test_mcp01_rooms_mapping [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP01_SpecValidation::test_mcp01_loads_mapping [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP02_LoadAggregationDemand::test_mcp02_spec_has_load_data [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP02_LoadAggregationDemand::test_mcp02_constraints_preserved [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP03_WireSizingBreakerSelection::test_mcp03_spec_supports_heavy_loads [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP04_VoltageDropCheck::test_mcp04_spec_has_voltage_system [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP05_DeratingFactors::test_mcp05_standards_profile_present [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP06_ErrorHandling::test_mcp06_invalid_voltage_returns_error [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP06_ErrorHandling::test_mcp06_missing_rooms_returns_error [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP06_ErrorHandling::test_mcp06_malformed_json_returns_error [32mPASSED[0m
+tests/test_mcp_suite.py::TestMCP06_ErrorHandling::test_mcp06_load_without_room_returns_error [32mPASSED[0m
+tests/test_models.py::test_room_input_basic [32mPASSED[0m
+tests/test_models.py::test_load_input_basic [32mPASSED[0m
+tests/test_models.py::test_project_requirements_structured [32mPASSED[0m
+tests/test_models.py::test_project_input_spec_complete [32mPASSED[0m
+tests/test_models.py::test_mcp_spec_response_with_metadata [32mPASSED[0m
+tests/test_models.py::test_json_serialization [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG01_HardcaseResidentialMultiStandard::test_rag01_response_structure [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG01_HardcaseResidentialMultiStandard::test_rag01_content_main_breaker [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG01_HardcaseResidentialMultiStandard::test_rag01_content_eit_iec_standard [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG01_HardcaseResidentialMultiStandard::test_rag01_content_nec_status [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG01_HardcaseResidentialMultiStandard::test_rag01_content_limitations [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG02_KnowledgeFolderCoverage::test_rag02_retrieves_multiple_groups [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG02_KnowledgeFolderCoverage::test_rag02_knowledge_groups_endpoint [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG03_CatalogBindingGuard::test_rag03_device_codes_in_catalog [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG04_LanguageAndMetadataContract::test_rag04_thai_language [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG04_LanguageAndMetadataContract::test_rag04_metadata_llm_model [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG05_FailurePath::test_rag05_invalid_query_handling [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG05_FailurePath::test_rag05_missing_context_hint [32mPASSED[0m
+tests/test_rag_suite.py::TestRAG05_FailurePath::test_rag05_graceful_error_format [32mPASSED[0m
+
+[33m=============================== warnings summary ===============================[0m
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+
+<frozen importlib._bootstrap>:488
+  <frozen importlib._bootstrap>:488: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+[33m============ [32m127 passed[0m, [33m[1m3 skipped[0m, [33m[1m3 warnings[0m[33m in 619.67s (0:10:19)[0m[33m ============[0m

@@ -30,10 +30,10 @@ def basic_house_request():
             RoomInput(name="ห้องน้ำ", type="bathroom", area_sqm=5.0)
         ],
         loads=[
-            LoadInput(room_name="ห้องนั่งเล่น", device="AC_12000BTU", quantity=1),
-            LoadInput(room_name="ห้องนั่งเล่น", device="OUTLET_16A", quantity=4),
-            LoadInput(room_name="ห้องนอน", device="OUTLET_16A", quantity=3),
-            LoadInput(room_name="ห้องน้ำ", device="WATER_HEATER_3500W", quantity=1)
+            LoadInput(room_name="ห้องนั่งเล่น", device="AC-12000BTU", quantity=1),
+            LoadInput(room_name="ห้องนั่งเล่น", device="SOCKET-16A", quantity=4),
+            LoadInput(room_name="ห้องนอน", device="SOCKET-16A", quantity=3),
+            LoadInput(room_name="ห้องน้ำ", device="HEATER-3500W", quantity=1)
         ],
         user_constraints=["rcd_for_all_outlets"]
     )
@@ -53,11 +53,11 @@ def heavy_kitchen_request():
             RoomInput(name="ห้องนอน 2F", type="bedroom", area_sqm=18.0)
         ],
         loads=[
-            LoadInput(room_name="ห้องนั่งเล่น 1F", device="AC_18000BTU", quantity=1),
-            LoadInput(room_name="ครัว 1F", device="INDUCTION_COOKER_3000W", quantity=1),
-            LoadInput(room_name="ครัว 1F", device="MICROWAVE_1500W", quantity=1),
-            LoadInput(room_name="ครัว 1F", device="OUTLET_16A", quantity=8),
-            LoadInput(room_name="ห้องนอน 2F", device="AC_12000BTU", quantity=1)
+            LoadInput(room_name="ห้องนั่งเล่น 1F", device="AC-18000BTU", quantity=1),
+            LoadInput(room_name="ครัว 1F", device="INDUCTION-3000W", quantity=1),
+            LoadInput(room_name="ครัว 1F", device="MICROWAVE-1500W", quantity=1),
+            LoadInput(room_name="ครัว 1F", device="SOCKET-16A", quantity=8),
+            LoadInput(room_name="ห้องนอน 2F", device="AC-12000BTU", quantity=1)
         ],
         user_constraints=["split_kitchen_circuit", "rcd_for_all_outlets"]
     )
@@ -75,7 +75,7 @@ def incomplete_request():
             {"name": "ห้องนอน"}  # Missing type
         ],
         "loads": [
-            {"room_name": "ห้องนั่งเล่น", "device": "AC_12000BTU", "quantity": 1}
+            {"room_name": "ห้องนั่งเล่น", "device": "AC-12000BTU", "quantity": 1}
         ]
     }
 

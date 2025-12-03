@@ -41,12 +41,16 @@ class LoadCalculator:
         voltage = voltage_map.get(load.voltage, 230)  # Default to Thai 230V
         
         # Calculate current based on voltage type
-        if load.voltage in [VoltageType.SINGLE_PHASE_120V, VoltageType.SINGLE_PHASE_240V]:
+        # Thai 230V 1-phase and US 120V/240V 1-phase use single-phase formula
+        if load.voltage in [VoltageType.SINGLE_PHASE_230V, VoltageType.SINGLE_PHASE_120V, VoltageType.SINGLE_PHASE_240V]:
             # Single phase: I = P / (V × PF)
             current = power_watts / (voltage * pf)
-        else:
+        elif load.voltage in [VoltageType.THREE_PHASE_400V, VoltageType.THREE_PHASE_208V, VoltageType.THREE_PHASE_480V]:
             # Three phase: I = P / (√3 × V × PF)
             current = power_watts / (math.sqrt(3) * voltage * pf)
+        else:
+            # Default to single phase 230V (Thai residential)
+            current = power_watts / (230.0 * pf)
         
         # Apply continuous load factor if applicable
         if load.is_continuous:

@@ -120,6 +120,21 @@ class PrivacyGuard:
                     "max_output_tokens": 10
                 }
             )
+            
+            # Check finish_reason before accessing text
+            # finish_reason: 1=STOP (success), 2=MAX_TOKENS, 3=SAFETY, 4=RECITATION, etc.
+            if hasattr(resp, 'candidates') and resp.candidates:
+                candidate = resp.candidates[0]
+                finish_reason = getattr(candidate, 'finish_reason', None)
+                
+                # Convert enum to int if needed
+                if hasattr(finish_reason, 'value'):
+                    finish_reason = finish_reason.value
+                
+                if finish_reason and finish_reason != 1:  # 1 = STOP (normal completion)
+                    logger.debug(f"Grounding check skipped: finish_reason={finish_reason}")
+                    return True, "CHECK_SKIPPED_CONTENT_FILTER"
+            
             res_text = resp.text.strip().upper()
             
             if "UNSUPPORTED" in res_text:
@@ -129,5 +144,9 @@ class PrivacyGuard:
             return True, "SUPPORTED"
             
         except Exception as e:
-            logger.error(f"Grounding check failed: {e}")
+            # Don't log as ERROR for content filter issues (they're expected)
+            if "finish_reason" in str(e).lower() or "blocked" in str(e).lower():
+                logger.debug(f"Grounding check skipped due to content filter: {e}")
+                return True, "CHECK_SKIPPED_CONTENT_FILTER"
+            logger.warning(f"Grounding check skipped: {e}")
             return True, "CHECK_SKIPPED"

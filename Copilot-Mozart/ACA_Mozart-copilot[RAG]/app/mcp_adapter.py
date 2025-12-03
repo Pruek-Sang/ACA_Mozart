@@ -189,6 +189,10 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     "COMPUTER-300W": (300, LoadType.RECEPTACLE, False),
     "WASHER-2000W": (2000, LoadType.APPLIANCE, False),
     "DRYER-3000W": (3000, LoadType.APPLIANCE, False),
+    
+    # Pumps (Motor type)
+    "PUMP-750W": (750, LoadType.MOTOR, False),
+    "PUMP-1500W": (1500, LoadType.MOTOR, False),
 }
 
 # Default for unknown devices
@@ -302,6 +306,9 @@ class McpAdapter:
             room = room_lookup.get(load.room_id)
             room_name = room.name if room else "Unknown Room"
             
+            # Get floor from LoadSpec (new: floor support)
+            floor = str(getattr(load, 'floor', 1)) if hasattr(load, 'floor') else "1"
+            
             # Create MCP load
             mcp_load = McpElectricalLoad(
                 id=load.load_id,
@@ -310,7 +317,7 @@ class McpAdapter:
                 voltage=service_voltage,  # Inherit from service
                 power_watts=power_watts,
                 quantity=load.qty,
-                location=McpLocation(room=room_name),
+                location=McpLocation(room=room_name, floor=floor),
                 is_continuous=is_continuous,
                 notes=load.notes
             )

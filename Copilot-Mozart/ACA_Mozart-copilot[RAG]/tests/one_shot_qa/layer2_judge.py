@@ -153,7 +153,7 @@ async def evaluate_with_gemini(
     answer: str,
     sources: List[Dict[str, Any]],
     expected_language: str = "thai",
-    model_name: str = "gemini-2.0-flash-exp",
+    model_name: str = "gemini-2.5-pro",
     project_id: Optional[str] = None,
     location: str = "us-central1"
 ) -> Layer2Result:
@@ -281,7 +281,7 @@ def evaluate_with_gemini_sync(
     answer: str,
     sources: List[Dict[str, Any]],
     expected_language: str = "thai",
-    model_name: str = "gemini-2.0-flash-exp",
+    model_name: str = "gemini-2.5-pro",
     project_id: Optional[str] = None,
     location: str = "us-central1"
 ) -> Layer2Result:
@@ -435,7 +435,7 @@ async def run_layer2(
     sources: List[Dict[str, Any]],
     expected_language: str = "thai",
     use_mock: bool = False,
-    model_name: str = "gemini-2.0-flash-exp",
+    model_name: str = "gemini-2.5-pro",
     project_id: Optional[str] = None,
     location: str = "us-central1"
 ) -> Layer2Result:
@@ -475,7 +475,7 @@ def run_layer2_sync(
     sources: List[Dict[str, Any]],
     expected_language: str = "thai",
     use_mock: bool = False,
-    model_name: str = "gemini-2.0-flash-exp",
+    model_name: str = "gemini-2.5-pro",
     project_id: Optional[str] = None,
     location: str = "us-central1"
 ) -> Layer2Result:
