@@ -232,9 +232,11 @@ class RagService:
             room_name = room.name
             room_type = room.type if hasattr(room, 'type') else "bedroom"
             
-            # Try to get area from raw_rooms
+            # Try to get area: first from room.area_sqm, then from raw_rooms
             area = 25.0  # default 5x5
-            if i < len(raw_rooms):
+            if hasattr(room, 'area_sqm') and room.area_sqm is not None:
+                area = float(room.area_sqm)
+            elif i < len(raw_rooms):
                 raw = raw_rooms[i]
                 if raw.get("area_sqm"):
                     area = float(raw.get("area_sqm", 25))
@@ -394,7 +396,7 @@ class RagService:
   "voltage_system": "TH_1PH_230V",
   "num_floors": จำนวนชั้น (ถ้าไม่ระบุให้ใส่ 1),
   "rooms": [
-    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่ (1 หรือ 2)}}
+    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่ (1 หรือ 2), "area_sqm": พื้นที่ตร.ม. (ถ้าระบุ เช่น "5x5" ให้คำนวณ = 25, ถ้าไม่ระบุให้ใส่ null)}}
   ],
   "loads": [
     {{"room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", "device": "รหัสอุปกรณ์", "quantity": จำนวน}}
@@ -424,9 +426,13 @@ class RagService:
 - ปั๊มน้ำ: PUMP-750W, PUMP-1500W
 - เตา: INDUCTION-3000W
 
-ถ้าไม่ระบุห้อง ให้สร้างห้องมาตรฐาน (ห้องนั่งเล่น, ห้องนอน, ห้องครัว, ห้องน้ำ)
-ถ้าไม่ระบุ BTU ของแอร์ ให้ใช้ 12000BTU
-ถ้าไม่ระบุวัตต์น้ำอุ่น ให้ใช้ 4500W
+🔥 กฎ Auto-fill (One-Shot Mode):
+- ถ้าไม่ระบุห้อง ให้สร้างห้องมาตรฐาน (ห้องนั่งเล่น, ห้องนอน, ห้องครัว, ห้องน้ำ)
+- ถ้าไม่ระบุ BTU ของแอร์ ให้ใช้ 12000BTU
+- ถ้าไม่ระบุวัตต์น้ำอุ่น ให้ใช้ 4500W
+- ถ้าบอกว่ามี "น้ำอุ่น" หรือ "เครื่องทำน้ำอุ่น" ให้ใส่ HEATER-4500W ในห้องน้ำทุกห้อง
+- ถ้าบอกว่ามี "โคมไฟหน้าบ้าน" หรือ "ไฟหน้าบ้าน" ให้สร้างห้อง type="exterior" name="หน้าบ้าน" และใส่ LIGHT-LED-10W
+- ❗ ใส่ missing_info: [] (ว่าง) เสมอ - ห้ามถามกลับ ต้อง auto-fill ให้ครบ
 
 ตอบ JSON เท่านั้น:'''
 
@@ -439,6 +445,8 @@ class RagService:
             json_match = re.search(r'\{[\s\S]*\}', response)
             if json_match:
                 extracted = json.loads(json_match.group())
+                # เก็บ original query ไว้สำหรับ auto-fill checks
+                extracted["original_query"] = normalized_query
                 logger.info(f"Extracted loads: {len(extracted.get('loads', []))} items")
                 return extracted
             else:
@@ -461,7 +469,12 @@ class RagService:
         
         # Convert extracted data to ProjectRequirements format
         rooms = [
-            RoomInput(name=r["name"], type=r["type"])
+            RoomInput(
+                name=r["name"], 
+                type=r["type"],
+                area_sqm=r.get("area_sqm"),  # Pass area if LLM extracted it
+                floor=r.get("floor") or 1   # Use 1 if floor is None or missing
+            )
             for r in extracted.get("rooms", [])
         ]
         
@@ -469,7 +482,7 @@ class RagService:
             LoadInput(
                 room_name=l["room_name"],
                 device=l["device"],
-                quantity=l.get("quantity", 1)
+                quantity=l.get("quantity") or 1  # Handle None from LLM
             )
             for l in extracted.get("loads", [])
         ]
@@ -541,6 +554,10 @@ class RagService:
         
         design = result.get("design_result", {})
         breakers = design.get("breaker_selections", {})
+        wire_sizing = design.get("wire_sizing", {})
+        conduit_sizing = design.get("conduit_sizing", {})
+        compliance = design.get("compliance_report", {})
+        calculations = design.get("calculations", {})
         
         # Group loads by floor and type for details
         lighting_by_floor = {}  # floor -> [(room, device, qty)]
@@ -564,9 +581,28 @@ class RagService:
         
         lines = []
         if language == "th":
-            lines.append("🏠 ผลการออกแบบระบบไฟฟ้า:")
+            lines.append("🏠 ผลการออกแบบระบบไฟฟ้า")
+            lines.append("═" * 40)
+            
+            # ═══════════════════════════════════════════
+            # Section 1: Breaker Summary
+            # ═══════════════════════════════════════════
             lines.append("")
             lines.append("📋 สรุป Breaker ที่ต้องใช้:")
+            lines.append("─" * 40)
+            
+            # Room order priority for consistent display
+            ROOM_ORDER = {
+                "ห้องนั่งเล่น": 1, "ห้องครัว": 2, "ห้องน้ำ 1": 3, "ห้องน้ำ": 3,
+                "ห้องเก็บของ": 4, "หน้าบ้าน": 5, "ข้างบ้าน": 6, "หลังบ้าน": 7,
+                "โรงรถ": 8, "สวน": 9, "พื้นที่ส่วนกลาง": 10,
+                "ห้องนอน 1": 11, "ห้องนอน 2": 12, "ห้องนอน 3": 13,
+                "ห้องน้ำ 2": 14, "ห้องนอน": 15
+            }
+            
+            def room_sort_key(item):
+                room = item[0]
+                return ROOM_ORDER.get(room, 99)
             
             for cid, b in breakers.items():
                 if isinstance(b, dict) and b.get("circuit_info"):
@@ -581,13 +617,13 @@ class RagService:
                     
                     # Add details for lighting circuits
                     if "ไฟแสงสว่าง" in name:
-                        # Extract floor number from circuit name
                         import re
                         floor_match = re.search(r'ชั้น\s*(\d+)', name)
                         if floor_match:
                             floor = int(floor_match.group(1))
                             if floor in lighting_by_floor:
-                                for room, device, qty in lighting_by_floor[floor]:
+                                sorted_rooms = sorted(lighting_by_floor[floor], key=room_sort_key)
+                                for room, device, qty in sorted_rooms:
                                     watt = "20W" if "20W" in device else "10W"
                                     lines.append(f"      • {room}: LED {watt} x {qty} ดวง")
                     
@@ -598,15 +634,109 @@ class RagService:
                         if floor_match:
                             floor = int(floor_match.group(1))
                             if floor in outlets_by_floor:
-                                for room, qty in outlets_by_floor[floor]:
+                                sorted_rooms = sorted(outlets_by_floor[floor], key=room_sort_key)
+                                for room, qty in sorted_rooms:
                                     outlet_type = "เต้าคู่" if qty >= 2 else "เต้าเดี่ยว"
                                     lines.append(f"      • {room}: {outlet_type} x {qty} จุด")
             
-            # Summary
-            total_circuits = len([b for b in breakers.values() if isinstance(b, dict) and b.get("circuit_info")])
+            # ═══════════════════════════════════════════
+            # Section 2: Wire & Conduit Summary (Compact Table)
+            # ═══════════════════════════════════════════
             lines.append("")
+            lines.append("📐 สรุปสายไฟและท่อร้อยสาย:")
+            lines.append("─" * 40)
+            
+            if wire_sizing:
+                # Group by wire size for compact display
+                wire_summary = {}  # size -> {count, max_vdrop, ampacity}
+                for load_id, wire in wire_sizing.items():
+                    if isinstance(wire, dict):
+                        size = wire.get("wire_size", "?")
+                        if size not in wire_summary:
+                            wire_summary[size] = {
+                                "count": 0, "max_vdrop": 0, 
+                                "ampacity": wire.get("ampacity", 0),
+                            }
+                        wire_summary[size]["count"] += 1
+                        wire_summary[size]["max_vdrop"] = max(
+                            wire_summary[size]["max_vdrop"],
+                            wire.get("voltage_drop_percent", 0)
+                        )
+                
+                # Single line per wire size
+                for size in sorted(wire_summary.keys(), key=lambda x: int(x) if x.isdigit() else 99):
+                    info = wire_summary[size]
+                    lines.append(f"  🔌 สาย {size} AWG: {info['count']} วงจร (Ampacity {info['ampacity']}A, Vdrop {info['max_vdrop']:.1f}%)")
+            
+            if conduit_sizing:
+                # Group by conduit size
+                conduit_summary = {}
+                for load_id, conduit in conduit_sizing.items():
+                    if isinstance(conduit, dict):
+                        size = conduit.get("conduit_size", "?")
+                        fill = conduit.get("fill_percentage", 0)
+                        if size not in conduit_summary:
+                            conduit_summary[size] = {"count": 0, "max_fill": 0}
+                        conduit_summary[size]["count"] += 1
+                        conduit_summary[size]["max_fill"] = max(conduit_summary[size]["max_fill"], fill)
+                
+                for size, info in conduit_summary.items():
+                    fill_status = "✅" if info["max_fill"] < 30 else "⚠️" if info["max_fill"] < 40 else "❌"
+                    lines.append(f"  📏 ท่อ {size}\": {info['count']} วงจร (Fill {info['max_fill']:.0f}%) {fill_status}")
+            
+            # ═══════════════════════════════════════════
+            # Section 3: Load & Compliance (Combined)
+            # ═══════════════════════════════════════════
+            lines.append("")
+            lines.append("⚡ สรุปโหลดและมาตรฐาน:")
+            lines.append("─" * 40)
+            
+            if calculations:
+                # MCP returns calculations per panel: {"MDP": {"total_va": 5700, "total_current": 29.41}}
+                # Sum up all panels
+                total_load = 0
+                total_current = 0
+                for panel_id, panel_calc in calculations.items():
+                    if isinstance(panel_calc, dict):
+                        total_load += panel_calc.get("total_va", 0)
+                        total_current += panel_calc.get("demand_current", panel_calc.get("total_current", 0))
+                
+                if total_load:
+                    lines.append(f"  📊 โหลดรวม: {total_load:,.0f} W ({total_load/1000:.1f} kW) | กระแส: {total_current:.1f} A")
+            
+            if compliance:
+                is_compliant = compliance.get("compliant", False)
+                nec_version = compliance.get("nec_version", "2023")
+                if is_compliant:
+                    lines.append(f"  ✅ ผ่านมาตรฐาน NEC {nec_version} + วสท.")
+                else:
+                    lines.append(f"  ❌ ไม่ผ่านมาตรฐาน NEC {nec_version}")
+                
+                # Show only critical warnings (max 3)
+                warnings = compliance.get("warnings", [])
+                if warnings:
+                    lines.append("")
+                    lines.append("  ⚠️ คำแนะนำ:")
+                    for warn in warnings[:3]:
+                        if isinstance(warn, dict):
+                            msg = warn.get("message", str(warn))
+                        else:
+                            msg = str(warn)
+                        # Shorten message
+                        if len(msg) > 60:
+                            msg = msg[:57] + "..."
+                        lines.append(f"      • {msg}")
+            
+            # ═══════════════════════════════════════════
+            # Summary Footer
+            # ═══════════════════════════════════════════
+            lines.append("")
+            lines.append("═" * 40)
+            total_circuits = len([b for b in breakers.values() if isinstance(b, dict) and b.get("circuit_info")])
             lines.append(f"✅ รวม {total_circuits} วงจร ตามมาตรฐาน วสท.")
+            
         else:
+            # English version (simplified)
             lines.append("🏠 Electrical Design Result:")
             lines.append("")
             lines.append("📋 Breaker Summary:")
@@ -640,10 +770,11 @@ class RagService:
         
         for r in extracted.get("rooms", []):
             name = r.get("name", "ห้อง")
-            floor = r.get("floor", 1)
+            floor = r.get("floor") or 1  # Handle None from LLM
             rooms.append(RoomInput(
                 name=name,
                 type=r.get("type", "bedroom"),
+                area_sqm=r.get("area_sqm"),  # Pass area if LLM extracted it
                 floor=floor
             ))
             room_names.add(name)
@@ -725,7 +856,7 @@ class RagService:
             loads.append(LoadInput(
                 room_name=room_name,
                 device=l.get("device", "OUTLET_16A"),
-                quantity=l.get("quantity", 1),
+                quantity=l.get("quantity") or 1,  # Handle None from LLM
                 floor=floor
             ))
         
@@ -777,6 +908,42 @@ class RagService:
                 rooms.append(RoomInput(name="พื้นที่ส่วนกลาง", type="exterior"))
                 room_names.add("พื้นที่ส่วนกลาง")
             logger.info("🔧 Auto-added: ปั๊มน้ำ 750W")
+        
+        # 4. Auto-fill Water Heater (ถ้าบอกว่ามีน้ำอุ่นแต่ LLM ไม่ได้ extract ครบ)
+        # ตรวจสอบว่ามี heater ในห้องน้ำหรือยัง
+        has_heater = any(
+            "HEATER" in l.get("device", "") 
+            for l in extracted.get("loads", [])
+        )
+        bathroom_rooms = [r for r in rooms if r.type == "bathroom"]
+        if not has_heater and len(bathroom_rooms) > 0:
+            # เช็คว่า query มีคำว่าน้ำอุ่นหรือไม่
+            original_query = extracted.get("original_query", "").lower()
+            if any(kw in original_query for kw in ["น้ำอุ่น", "น้ำร้อน", "heater", "ฮีทเตอร์"]):
+                for br in bathroom_rooms:
+                    loads.append(LoadInput(
+                        room_name=br.name,
+                        device="HEATER-4500W",
+                        quantity=1,
+                        floor=br.floor if hasattr(br, 'floor') else 1
+                    ))
+                    logger.info(f"🔧 Auto-added: น้ำอุ่น 4500W ใน {br.name}")
+        
+        # 5. Auto-fill Exterior Lighting (ถ้าบอกว่ามีโคมไฟหน้าบ้าน)
+        exterior_rooms = [r for r in rooms if r.type == "exterior"]
+        has_exterior_light = any(
+            "LIGHT" in l.get("device", "") and l.get("room_name", "") in [r.name for r in exterior_rooms]
+            for l in extracted.get("loads", [])
+        )
+        if not has_exterior_light and len(exterior_rooms) > 0:
+            for er in exterior_rooms:
+                loads.append(LoadInput(
+                    room_name=er.name,
+                    device="LIGHT-LED-10W",
+                    quantity=2,  # 2 ดวงสำหรับหน้าบ้าน
+                    floor=1
+                ))
+                logger.info(f"🔧 Auto-added: ไฟ LED หน้าบ้าน 10W x 2 ใน {er.name}")
         
         return ProjectRequirements(
             project_name=extracted.get("project_name", "บ้านพักอาศัย"),
@@ -933,7 +1100,7 @@ class RagService:
                         file="MCP Core Calculation",
                         section="design_result",
                         score=1.0,
-                        content=f"Session: {result.get('session_id', 'N/A')}"
+                        content="คำนวณตามมาตรฐาน วสท."
                     )],
                     confidence="High",
                     grounding_status="CALCULATED",
