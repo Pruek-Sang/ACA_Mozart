@@ -202,39 +202,31 @@ class RagService:
         """
         Auto-fill lighting based on room area and type.
         
-        Uses Lux calculation formula:
-        - Required Lumens = Area × Lux × MF / UF
-        - Number of Fixtures = Required Lumens / Lumens per Fixture
-        
-        Standards (วสท.):
-        - ห้องนอน: 100-200 lux → LED 12W 1-2 หลอด/25 ตร.ม.
-        - ห้องนั่งเล่น: 150-300 lux → LED 12W 2-4 หลอด/50 ตร.ม.
-        - ห้องครัว: 300-500 lux → LED 18W 2-3 หลอด
-        - ห้องน้ำ: 150-200 lux → LED 9W 1-2 หลอด
-        - ห้องเก็บของ: 50-100 lux → LED 9W 1 หลอด
-        - หน้าบ้าน/exterior: 50-100 lux → LED 9W 1-2 หลอด
+        ใช้ Rule of Thumb ตามมาตรฐาน วสท. สำหรับบ้านพักอาศัย:
+        - ห้องนอน (100-150 lux): LED 10W ต่อ 8-10 ตร.ม. → ห้อง 25 ตร.ม. ใช้ 2-3 ดวง
+        - ห้องนั่งเล่น (150-200 lux): LED 20W ต่อ 10-12 ตร.ม. → ห้อง 50 ตร.ม. ใช้ 4-5 ดวง
+        - ห้องครัว (300-500 lux): LED 20W ต่อ 6-8 ตร.ม. → ห้อง 15 ตร.ม. ใช้ 2-3 ดวง
+        - ห้องน้ำ (150-200 lux): LED 10W ต่อ 4-5 ตร.ม. → ห้อง 6 ตร.ม. ใช้ 1-2 ดวง
+        - ห้องเก็บของ (50-100 lux): LED 10W ต่อ 15-20 ตร.ม. → 1-2 ดวง
+        - หน้าบ้าน/exterior (50-75 lux): LED 10W 1-2 ดวง
         """
         lighting_loads = []
         
-        # Lux requirements by room type (recommended)
-        LUX_REQ = {
-            "bedroom": 150,      # ห้องนอน
-            "living": 200,       # ห้องนั่งเล่น
-            "kitchen": 400,      # ห้องครัว
-            "bathroom": 200,     # ห้องน้ำ
-            "storage": 100,      # ห้องเก็บของ
-            "exterior": 75,      # หน้าบ้าน
-            "balcony": 100,      # ระเบียง
-            "garage": 150,       # โรงรถ
+        # Area per fixture (ตร.ม. ต่อ 1 หลอด) - based on วสท. residential standards
+        # ค่านี้คือพื้นที่ที่หลอด 1 ดวงครอบคลุมได้อย่างเหมาะสม
+        AREA_PER_FIXTURE = {
+            "bedroom": 10,      # ห้องนอน: 1 หลอด LED 10W ต่อ 10 ตร.ม.
+            "living": 12,       # ห้องนั่งเล่น: 1 หลอด LED 20W ต่อ 12 ตร.ม.
+            "kitchen": 6,       # ห้องครัว: 1 หลอด LED 20W ต่อ 6 ตร.ม. (ต้องการความสว่างมาก)
+            "bathroom": 5,      # ห้องน้ำ: 1 หลอด LED 10W ต่อ 5 ตร.ม.
+            "storage": 15,      # ห้องเก็บของ: 1 หลอด LED 10W ต่อ 15 ตร.ม.
+            "exterior": 20,     # หน้าบ้าน: 1 หลอด LED 10W ต่อ 20 ตร.ม.
+            "balcony": 10,      # ระเบียง: 1 หลอด LED 10W ต่อ 10 ตร.ม.
+            "garage": 12,       # โรงรถ: 1 หลอด LED 10W ต่อ 12 ตร.ม.
         }
         
-        # LED specs: 10W = 810 lumens, 20W = 1600 lumens (standard LED bulbs)
-        # Note: Device codes must match DEVICE_CODES.md exactly
+        # LED specs
         LED_LUMENS = {"LIGHT-LED-10W": 810, "LIGHT-LED-20W": 1600}
-        
-        # Factors (typical residential)
-        MF = 0.8   # Maintenance factor
-        UF = 0.5   # Utilization factor
         
         for i, room in enumerate(rooms):
             room_name = room.name
@@ -249,28 +241,25 @@ class RagService:
                 elif raw.get("width") and raw.get("length"):
                     area = float(raw.get("width", 5)) * float(raw.get("length", 5))
             
-            # Get required lux
-            lux = LUX_REQ.get(room_type, 150)
-            
-            # Calculate required lumens: Φ = E × A × MF / UF
-            required_lumens = (lux * area * MF) / UF
-            
-            # Select fixture based on room type (use valid device codes)
+            # Select fixture based on room type
             if room_type in ["kitchen", "living"]:
-                # Larger rooms need 20W
                 device = "LIGHT-LED-20W"
-                lumens = LED_LUMENS["LIGHT-LED-20W"]
             else:
-                # Bedroom, bathroom, storage use 10W
                 device = "LIGHT-LED-10W"
-                lumens = LED_LUMENS["LIGHT-LED-10W"]
             
-            # Calculate number of fixtures (round up)
+            # Calculate number of fixtures using simple rule of thumb
+            area_per_fixture = AREA_PER_FIXTURE.get(room_type, 10)
             import math
-            num_fixtures = max(1, math.ceil(required_lumens / lumens))
             
-            # Cap at reasonable max
-            num_fixtures = min(num_fixtures, 8)
+            # ห้องน้ำ และ ห้องนอน: lock เป็น 1 ดวงเสมอ
+            if room_type in ["bathroom", "bedroom"]:
+                num_fixtures = 1
+            else:
+                num_fixtures = max(1, math.ceil(area / area_per_fixture))
+            
+            # Cap at reasonable max (8 for large rooms, 4 for small rooms)
+            max_fixtures = 8 if area > 50 else 6 if area > 30 else 4
+            num_fixtures = min(num_fixtures, max_fixtures)
             
             # Get floor from room
             floor = room.floor if hasattr(room, 'floor') else 1
@@ -420,6 +409,12 @@ class RagService:
 4. 🔴 แอร์ติดได้เฉพาะ "ห้องนอน" เท่านั้น! ห้องอื่น (ห้องนั่งเล่น/ห้องครัว/ห้องเก็บของ/ห้องน้ำ) ไม่มีแอร์
 5. ถ้าผู้ใช้บอก "แอร์ทุกห้อง" → หมายถึงแอร์เฉพาะห้องนอนทุกห้อง (ไม่รวมห้องอื่น)
 6. 🏠 บ้าน 2 ชั้น: ชั้น 1 = ห้องนั่งเล่น+ห้องครัว+ห้องน้ำ 1+ห้องเก็บของ, ชั้น 2 = ห้องนอน+ห้องน้ำ 2
+7. 🚗 พื้นที่ภายนอก (ใช้ type="exterior" หรือ "garage"):
+   - โรงรถ/garage/carport → name="โรงรถ", type="garage"
+   - หน้าบ้าน/front yard/ไฟหน้าบ้าน → name="หน้าบ้าน", type="exterior"
+   - ข้างบ้าน/side yard/ไฟข้างบ้าน → name="ข้างบ้าน", type="exterior"
+   - หลังบ้าน/backyard/ไฟหลังบ้าน → name="หลังบ้าน", type="exterior"
+   - สวน/garden → name="สวน", type="exterior"
 
 รหัสอุปกรณ์ที่ใช้ได้:
 - แอร์: AC-9000BTU, AC-12000BTU, AC-18000BTU, AC-24000BTU
@@ -524,9 +519,19 @@ class RagService:
                 "spec": spec_response.model_dump()
             }
     
-    def _format_design_result_as_text(self, result: Dict[str, Any], language: str = "th") -> str:
+    def _format_design_result_as_text(
+        self, 
+        result: Dict[str, Any], 
+        language: str = "th",
+        project_req: 'ProjectRequirements' = None
+    ) -> str:
         """
         Format MCP design result as human-readable text.
+        
+        Args:
+            result: MCP calculation result
+            language: Output language (th/en)
+            project_req: Original project requirements (for load details)
         """
         if result.get("error"):
             return result["error"]
@@ -536,6 +541,26 @@ class RagService:
         
         design = result.get("design_result", {})
         breakers = design.get("breaker_selections", {})
+        
+        # Group loads by floor and type for details
+        lighting_by_floor = {}  # floor -> [(room, device, qty)]
+        outlets_by_floor = {}   # floor -> [(room, qty)]
+        
+        if project_req:
+            for load in project_req.loads:
+                floor = load.floor
+                room = load.room_name
+                device = load.device
+                qty = load.quantity
+                
+                if "LED" in device or "LIGHT" in device:
+                    if floor not in lighting_by_floor:
+                        lighting_by_floor[floor] = []
+                    lighting_by_floor[floor].append((room, device, qty))
+                elif "SOCKET" in device or "OUTLET" in device:
+                    if floor not in outlets_by_floor:
+                        outlets_by_floor[floor] = []
+                    outlets_by_floor[floor].append((room, qty))
         
         lines = []
         if language == "th":
@@ -550,12 +575,35 @@ class RagService:
                     poles = b.get("poles", 1)
                     btype = b.get("breaker_type", "standard")
                     
-                    icon = "❄️" if "แอร์" in name else "🚿" if "น้ำอุ่น" in name else "💡" if "ไฟ" in name else "🔌"
+                    icon = "❄️" if "แอร์" in name or "AC" in name else "🚿" if "น้ำอุ่น" in name or "HEATER" in name else "💡" if "ไฟ" in name else "🔌"
                     rcbo = " (RCBO)" if btype == "rcbo" else ""
                     lines.append(f"  {icon} {name}: {rating}A/{poles}P{rcbo}")
+                    
+                    # Add details for lighting circuits
+                    if "ไฟแสงสว่าง" in name:
+                        # Extract floor number from circuit name
+                        import re
+                        floor_match = re.search(r'ชั้น\s*(\d+)', name)
+                        if floor_match:
+                            floor = int(floor_match.group(1))
+                            if floor in lighting_by_floor:
+                                for room, device, qty in lighting_by_floor[floor]:
+                                    watt = "20W" if "20W" in device else "10W"
+                                    lines.append(f"      • {room}: LED {watt} x {qty} ดวง")
+                    
+                    # Add details for outlet circuits
+                    if "เต้ารับ" in name:
+                        import re
+                        floor_match = re.search(r'ชั้น\s*(\d+)', name)
+                        if floor_match:
+                            floor = int(floor_match.group(1))
+                            if floor in outlets_by_floor:
+                                for room, qty in outlets_by_floor[floor]:
+                                    outlet_type = "เต้าคู่" if qty >= 2 else "เต้าเดี่ยว"
+                                    lines.append(f"      • {room}: {outlet_type} x {qty} จุด")
             
             # Summary
-            total_circuits = len([b for b in breakers.values() if isinstance(b, dict)])
+            total_circuits = len([b for b in breakers.values() if isinstance(b, dict) and b.get("circuit_info")])
             lines.append("")
             lines.append(f"✅ รวม {total_circuits} วงจร ตามมาตรฐาน วสท.")
         else:
@@ -625,13 +673,34 @@ class RagService:
         # Build loads and auto-add missing rooms
         loads = []
         room_type_map = {
+            # Exterior - Thai
             "หน้าบ้าน": "exterior",
+            "ไฟหน้าบ้าน": "exterior",
+            "ข้างบ้าน": "exterior",
+            "ไฟข้างบ้าน": "exterior",
+            "หลังบ้าน": "exterior",
+            "ไฟหลังบ้าน": "exterior",
             "สวน": "exterior", 
             "นอกบ้าน": "exterior",
             "ข้างนอก": "exterior",
             "พื้นที่ส่วนกลาง": "exterior",
+            # Exterior - English
+            "front": "exterior",
+            "front yard": "exterior",
+            "side": "exterior",
+            "side yard": "exterior",
+            "back": "exterior",
+            "backyard": "exterior",
+            "garden": "exterior",
+            "outdoor": "exterior",
+            # Balcony
             "ระเบียง": "balcony",
+            "balcony": "balcony",
+            # Garage - Thai + English
             "โรงรถ": "garage",
+            "garage": "garage",
+            "carport": "garage",
+            "ที่จอดรถ": "garage",
         }
         for l in extracted.get("loads", []):
             room_name = l.get("room_name", "ห้องนั่งเล่น")
@@ -665,21 +734,31 @@ class RagService:
         # ตามมาตรฐาน วสท. สำหรับบ้านพักอาศัย
         # ============================================
         
-        # 1. Auto-fill Lighting per room (ถ้ายังไม่มี LED)
-        has_lighting = any(
-            "LED" in l.get("device", "") 
-            for l in extracted.get("loads", [])
-        )
-        if not has_lighting:
-            loads.extend(self._auto_fill_lighting(extracted.get("rooms", []), rooms))
+        # 1. Auto-fill Lighting per room (เฉพาะห้องที่ยังไม่มี LED)
+        # หาว่าห้องไหนมี lighting แล้ว
+        rooms_with_lighting = set()
+        for l in extracted.get("loads", []):
+            if "LED" in l.get("device", "") or "LIGHT" in l.get("device", ""):
+                rooms_with_lighting.add(l.get("room_name", ""))
         
-        # 2. Auto-fill Outlets per room (ถ้ายังไม่มี)
-        has_outlets = any(
-            "OUTLET" in l.get("device", "") 
-            for l in extracted.get("loads", [])
-        )
-        if not has_outlets:
-            loads.extend(self._auto_fill_outlets(rooms))
+        # Auto-fill เฉพาะห้องที่ยังไม่มี
+        rooms_needing_lighting = [r for r in rooms if r.name not in rooms_with_lighting]
+        raw_rooms_filtered = [
+            raw for raw in extracted.get("rooms", []) 
+            if raw.get("name") not in rooms_with_lighting
+        ]
+        if rooms_needing_lighting:
+            loads.extend(self._auto_fill_lighting(raw_rooms_filtered, rooms_needing_lighting))
+        
+        # 2. Auto-fill Outlets per room (เฉพาะห้องที่ยังไม่มี)
+        rooms_with_outlets = set()
+        for l in extracted.get("loads", []):
+            if "OUTLET" in l.get("device", "") or "SOCKET" in l.get("device", ""):
+                rooms_with_outlets.add(l.get("room_name", ""))
+        
+        rooms_needing_outlets = [r for r in rooms if r.name not in rooms_with_outlets]
+        if rooms_needing_outlets:
+            loads.extend(self._auto_fill_outlets(rooms_needing_outlets))
         
         # 3. Auto-fill Pump (บ้านมาตรฐานควรมีปั๊มน้ำ)
         has_pump = any(
@@ -840,11 +919,12 @@ class RagService:
             mcp_response = await mcp_client.design(mcp_request)
             
             if mcp_response.success:
-                # Format as human-readable text
+                # Format as human-readable text with load details
                 result = mcp_response.to_dict()
                 formatted_text = self._format_design_result_as_text(
                     {"status": "complete", "design_result": result},
-                    language
+                    language,
+                    project_req=req  # Pass project requirements for details
                 )
                 
                 return StandardResponse(
