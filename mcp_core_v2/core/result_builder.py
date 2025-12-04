@@ -229,7 +229,7 @@ class ResultBuilder:
     def create_readable_report(self, result: DesignResult) -> str:
         """Create human-readable report in Thai/English with full Markdown layout.
         
-        Uses values from Panel (sent by RAG) instead of recalculating.
+        Uses values from Panel and calculations (sent by RAG) instead of recalculating.
         This ensures consistency between answer (Chat) and readable_report (Export).
         """
         lines = []
@@ -239,20 +239,33 @@ class ResultBuilder:
             load.power_watts * load.quantity 
             for load in result.request.loads
         )
-        total_amps = total_watts / 230  # Thai standard 230V
         num_loads = len(result.request.loads)
         
-        # === USE VALUES FROM PANEL (sent by RAG) ===
-        # RAG already calculated main_breaker_rating with ×1.25 factor
-        # We should use that value instead of recalculating
+        # === USE demand_current FROM CALCULATIONS (sent by RAG) ===
+        # RAG already calculated demand_current with proper power factor
+        # Use that value instead of simple total_watts/230
+        total_amps = 0.0
+        demand_current = 0.0
+        if result.calculations:
+            for panel_id, panel_calc in result.calculations.items():
+                if isinstance(panel_calc, dict):
+                    # Use demand_current if available, else total_current
+                    demand_current += panel_calc.get('demand_current', panel_calc.get('total_current', 0))
+                    total_amps += panel_calc.get('total_current', 0)
         
-        # Get main_breaker_rating from first panel (Main Panel)
+        # Fallback to simple calculation if no calculations available
+        if demand_current == 0:
+            demand_current = total_watts / 230
+            total_amps = demand_current
+        
+        # === USE main_breaker_rating FROM PANEL (sent by RAG) ===
+        # RAG already calculated main_breaker_rating with ×1.25 factor
         panel_main_breaker = 100  # Default
         if result.request.panels:
             panel_main_breaker = result.request.panels[0].main_breaker_rating
         
-        # Design current = load × 1.25 (NEC 215.3 / วสท.)
-        design_current = total_amps * 1.25
+        # Design current = demand_current × 1.25 (NEC 215.3 / วสท.)
+        design_current = demand_current * 1.25
         
         # Use panel's main_breaker_rating to determine meter and wire
         # This ensures consistency with RAG's calculation
@@ -313,7 +326,8 @@ class ResultBuilder:
         lines.append("| 🔢 รายการ | 📈 ค่า |")
         lines.append("|-----------|--------|")
         lines.append(f"| ⚡ กำลังไฟฟ้ารวม | **{total_watts:,.0f} W** ({total_watts/1000:.2f} kW) |")
-        lines.append(f"| 🔌 กระแสโหลดรวม | **{total_amps:.1f} A** |")
+        lines.append(f"| 🔌 กระแสโหลดรวม | **{demand_current:.1f} A** |")
+        lines.append(f"| 📐 Design Current (×1.25) | **{design_current:.1f} A** |")
         lines.append(f"| 📦 จำนวนวงจร | **{num_loads} วงจร** |")
         lines.append("")
         lines.append("---")
@@ -480,7 +494,8 @@ class ResultBuilder:
         lines.append("| 📊 รายการ | 📈 ผลลัพธ์ |")
         lines.append("|-----------|----------|")
         lines.append(f"| 🔌 โหลดรวม | {total_watts:,.0f} W ({total_watts/1000:.2f} kW) |")
-        lines.append(f"| ⚡ กระแสรวม | {total_amps:.1f} A |")
+        lines.append(f"| ⚡ กระแสรวม | {demand_current:.1f} A |")
+        lines.append(f"| 📐 Design Current | {design_current:.1f} A (×1.25) |")
         lines.append(f"| 📟 มิเตอร์ | {meter} |")
         lines.append(f"| 🔗 สายเมน | {main_wire} |")
         lines.append(f"| ⚡ วงจรทั้งหมด | {num_loads} วงจร |")
