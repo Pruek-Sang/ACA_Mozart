@@ -1133,7 +1133,10 @@ class RagService:
                     metadata=AnswerMetadata(
                         llm_model=settings.MODEL_NAME_ANSWER,
                         retrieved_docs=["mcp_calculation"],
-                        retrieval_group="mcp"
+                        retrieval_group="mcp",
+                        autolisp_code=mcp_response.autolisp_code,
+                        readable_report=mcp_response.readable_report,
+                        standards_markdown=mcp_response.standards_markdown
                     )
                 )
             else:

@@ -95,6 +95,10 @@ class AnswerMetadata(BaseModel):
     llm_model: str = Field(..., description="LLM model used")
     retrieved_docs: List[str] = Field(default_factory=list, description="Document IDs retrieved")
     retrieval_group: Optional[str] = Field(None, description="Knowledge groups searched")
+    # MCP outputs (for design requests)
+    autolisp_code: Optional[str] = Field(None, description="Generated AutoLISP code for AutoCAD")
+    readable_report: Optional[str] = Field(None, description="Human-readable report from MCP (Markdown)")
+    standards_markdown: Optional[str] = Field(None, description="Design standards summary")
 
 
 class StandardResponse(BaseModel):
