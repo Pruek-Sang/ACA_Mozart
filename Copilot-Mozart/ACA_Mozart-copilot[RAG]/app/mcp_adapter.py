@@ -350,13 +350,16 @@ class McpAdapter:
         # Estimate main breaker from total load
         total_va = sum(load.power_watts * load.quantity for load in loads)
         
-        # Add 25% safety margin, convert to amps
-        # For 240V: amps = VA / 240
-        if voltage in [VoltageType.SINGLE_PHASE_240V]:
-            amps = total_va / 240
+        # Convert to amps based on voltage system
+        # Thai standard: 230V single-phase, 400V three-phase
+        if voltage in [VoltageType.THREE_PHASE_208V, VoltageType.THREE_PHASE_480V]:
+            amps = total_va / (400 * 1.732)  # 3-phase (Thai 400V)
+        elif voltage in [VoltageType.SINGLE_PHASE_240V]:
+            amps = total_va / 240  # US 240V or Thai 230V
         else:
-            amps = total_va / 120
+            amps = total_va / 230  # Thai standard 230V
         
+        # Add 25% safety margin for continuous load (NEC 215.3 / วสท.)
         amps_with_margin = amps * 1.25
         
         # Round up to standard breaker sizes
