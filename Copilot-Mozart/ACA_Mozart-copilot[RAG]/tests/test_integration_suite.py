@@ -47,12 +47,14 @@ def integration_spec_request():
         voltage_system="TH_1PH_230V",
         location="Bangkok",
         rooms=[
-            RoomInput(name="ห้องนั่งเล่น 1F", type="living_room", area_sqm=35.0),
-            RoomInput(name="ครัว 1F", type="kitchen", area_sqm=20.0),
-            RoomInput(name="ห้องน้ำ 1F", type="bathroom", area_sqm=6.0),
-            RoomInput(name="ห้องนอนใหญ่ 2F", type="bedroom", area_sqm=25.0),
-            RoomInput(name="ห้องนอนเล็ก 2F", type="bedroom", area_sqm=18.0),
-            RoomInput(name="ห้องน้ำ 2F", type="bathroom", area_sqm=5.0),
+            # ชั้น 1
+            RoomInput(name="ห้องนั่งเล่น 1F", type="living_room", area_sqm=35.0, floor=1),
+            RoomInput(name="ครัว 1F", type="kitchen", area_sqm=20.0, floor=1),
+            RoomInput(name="ห้องน้ำ 1F", type="bathroom", area_sqm=6.0, floor=1),
+            # ชั้น 2
+            RoomInput(name="ห้องนอนใหญ่ 2F", type="bedroom", area_sqm=25.0, floor=2),
+            RoomInput(name="ห้องนอนเล็ก 2F", type="bedroom", area_sqm=18.0, floor=2),
+            RoomInput(name="ห้องน้ำ 2F", type="bathroom", area_sqm=5.0, floor=2),
         ],
         loads=[
             # Device codes per DEVICE_CODES.md
