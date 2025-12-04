@@ -264,8 +264,9 @@ class RagService:
             area_per_fixture = AREA_PER_FIXTURE.get(room_type, 10)
             import math
             
-            # ห้องน้ำ และ ห้องนอน: lock เป็น 1 ดวงเสมอ
-            if room_type in ["bathroom", "bedroom"]:
+            # ห้องน้ำ: lock เป็น 1 ดวงเสมอ (พื้นที่เล็ก หลอดเดียวพอ)
+            # ห้องนอน: คำนวณตามพื้นที่ปกติ (ผู้ใช้อาจติดหลอดสว่างมากได้)
+            if room_type == "bathroom":
                 num_fixtures = 1
             else:
                 num_fixtures = max(1, math.ceil(area / area_per_fixture))
