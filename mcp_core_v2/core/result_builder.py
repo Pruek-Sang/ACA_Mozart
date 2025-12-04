@@ -235,30 +235,41 @@ class ResultBuilder:
             load.power_watts * load.quantity 
             for load in result.request.loads
         )
-        total_amps = total_watts / 240  # Assuming 240V
+        total_amps = total_watts / 230  # Thai standard 230V
         num_loads = len(result.request.loads)
         
-        # Meter recommendation
-        if total_amps <= 15:
+        # Main Breaker sizing: NEC 215.3 / วสท. = Load × 1.25 for continuous load
+        design_current = total_amps * 1.25
+        
+        # Meter recommendation based on design_current (with 1.25 factor)
+        if design_current <= 15:
+            meter = "5(15)A"
+            main_wire = "THW 4 mm²"
+            main_breaker = "16A 2P"
+        elif design_current <= 30:
             meter = "15(45)A"
             main_wire = "THW 6 mm²"
-            main_breaker = "20A 2P"
-        elif total_amps <= 30:
+            main_breaker = "32A 2P"
+        elif design_current <= 50:
             meter = "30(100)A"
             main_wire = "THW 10 mm²"
-            main_breaker = "40A 2P"
-        elif total_amps <= 50:
-            meter = "50(150)A"
+            main_breaker = "50A 2P"
+        elif design_current <= 63:
+            meter = "30(100)A"
             main_wire = "THW 16 mm²"
-            main_breaker = "60A 2P"
-        elif total_amps <= 80:
-            meter = "80(200)A"
+            main_breaker = "63A 2P"
+        elif design_current <= 100:
+            meter = "30(100)A"
             main_wire = "THW 25 mm²"
-            main_breaker = "80A 2P"
-        else:
-            meter = "100(200)A หรือ CT"
-            main_wire = "THW 35 mm²"
             main_breaker = "100A 2P"
+        elif design_current <= 125:
+            meter = "50(150)A"
+            main_wire = "THW 35 mm²"
+            main_breaker = "125A 2P"
+        else:
+            meter = "50(150)A หรือ CT"
+            main_wire = "THW 50 mm²"
+            main_breaker = "150A 2P"
         
         # Header
         lines.append(f"# 🏠✨ รายงานการออกแบบระบบไฟฟ้า - {result.request.project_name}")
