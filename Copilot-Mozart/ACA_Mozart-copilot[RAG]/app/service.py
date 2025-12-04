@@ -601,6 +601,49 @@ class RagService:
             lines.append("═" * 40)
             
             # ═══════════════════════════════════════════
+            # Section 0: Meter & Main Service (NEW!)
+            # ═══════════════════════════════════════════
+            if calculations:
+                total_load = 0
+                total_current = 0
+                for panel_id, panel_calc in calculations.items():
+                    if isinstance(panel_calc, dict):
+                        total_load += panel_calc.get("total_va", 0)
+                        total_current += panel_calc.get("demand_current", panel_calc.get("total_current", 0))
+                
+                if total_current > 0:
+                    lines.append("")
+                    lines.append("📟 มิเตอร์และสายเมน:")
+                    lines.append("─" * 40)
+                    
+                    # Determine meter size (Thai standard: 5(15), 15(45), 30(100), 50(150))
+                    if total_current <= 15:
+                        meter_size = "5(15)A"
+                        main_wire = "THW 4 mm²"
+                        main_breaker = "16A 2P"
+                    elif total_current <= 45:
+                        meter_size = "15(45)A"
+                        main_wire = "THW 6 mm²"
+                        main_breaker = "32A 2P"
+                    elif total_current <= 100:
+                        meter_size = "30(100)A"
+                        main_wire = "THW 16 mm²"
+                        main_breaker = "63A 2P"
+                    else:
+                        meter_size = "50(150)A"
+                        main_wire = "THW 25 mm²"
+                        main_breaker = "100A 2P"
+                    
+                    # Ground wire (วสท.: same as phase for ≤16mm², 50% for larger)
+                    ground_wire = main_wire.replace("THW", "THW-G")
+                    
+                    lines.append(f"  📟 มิเตอร์ไฟฟ้า: {meter_size}")
+                    lines.append(f"  🔌 สายเมนเข้าบ้าน: {main_wire} (L-N-E)")
+                    lines.append(f"  ⚡ Main Breaker: {main_breaker}")
+                    lines.append(f"  🌍 สายดิน: {ground_wire} (สีเขียว/เหลือง)")
+                    lines.append(f"  🔩 หลักดิน: 5/8\" x 8 ฟุต (ค่าดิน ≤5Ω)")
+            
+            # ═══════════════════════════════════════════
             # Section 1: Breaker Summary
             # ═══════════════════════════════════════════
             lines.append("")
@@ -664,33 +707,115 @@ class RagService:
                                     lines.append(f"      • {room}: {outlet_type} x {qty} จุด")
             
             # ═══════════════════════════════════════════
-            # Section 2: Wire & Conduit Summary (Compact Table)
+            # Section 2: Wire & Conduit Summary (Enhanced with circuit types)
             # ═══════════════════════════════════════════
             lines.append("")
             lines.append("📐 สรุปสายไฟและท่อร้อยสาย:")
             lines.append("─" * 40)
             
             if wire_sizing:
-                # Group by wire size for compact display
-                wire_summary = {}  # size -> {count, max_vdrop, ampacity}
+                # Build load type map from project_req (has device names)
+                load_type_map = {}  # load_id -> circuit_type
+                if project_req:
+                    for i, load in enumerate(project_req.loads):
+                        load_id = f"L{i+1}"  # MCP uses L1, L2, L3...
+                        device = load.device.upper() if load.device else ""
+                        
+                        if "AC" in device or "BTU" in device:
+                            load_type_map[load_id] = "hvac"
+                        elif "HEATER" in device or "WATER" in device:
+                            load_type_map[load_id] = "water_heater"
+                        elif "LED" in device or "LIGHT" in device:
+                            load_type_map[load_id] = "lighting"
+                        elif "SOCKET" in device or "OUTLET" in device:
+                            load_type_map[load_id] = "receptacle"
+                        elif "PUMP" in device:
+                            load_type_map[load_id] = "pump"
+                        else:
+                            load_type_map[load_id] = "other"
+                
+                # Also build from breaker_selections circuit_info
+                for cid, breaker in breakers.items():
+                    if isinstance(breaker, dict) and breaker.get("circuit_info"):
+                        ctype = breaker["circuit_info"].get("circuit_type", "other")
+                        cname = breaker["circuit_info"].get("circuit_name", "")
+                        # Detect from name
+                        if "AC" in cname or "แอร์" in cname:
+                            circuit_type_map_name = "hvac"
+                        elif "HEATER" in cname or "น้ำอุ่น" in cname:
+                            circuit_type_map_name = "water_heater"
+                        elif "ไฟ" in cname or "แสงสว่าง" in cname:
+                            circuit_type_map_name = "lighting"
+                        elif "เต้ารับ" in cname:
+                            circuit_type_map_name = "receptacle"
+                        elif "PUMP" in cname or "ปั๊ม" in cname:
+                            circuit_type_map_name = "pump"
+                        else:
+                            circuit_type_map_name = ctype if ctype else "other"
+                        load_type_map[cid] = circuit_type_map_name
+                
+                # Group by wire size AND circuit type
+                wire_by_type = {
+                    "hvac": [],           # แอร์
+                    "water_heater": [],   # เครื่องทำน้ำอุ่น
+                    "lighting": [],       # ไฟแสงสว่าง
+                    "receptacle": [],     # เต้ารับ
+                    "pump": [],           # ปั๊มน้ำ
+                    "other": []           # อื่นๆ
+                }
+                
                 for load_id, wire in wire_sizing.items():
                     if isinstance(wire, dict):
                         size = wire.get("wire_size", "?")
-                        if size not in wire_summary:
-                            wire_summary[size] = {
-                                "count": 0, "max_vdrop": 0, 
-                                "ampacity": wire.get("ampacity", 0),
-                            }
-                        wire_summary[size]["count"] += 1
-                        wire_summary[size]["max_vdrop"] = max(
-                            wire_summary[size]["max_vdrop"],
-                            wire.get("voltage_drop_percent", 0)
-                        )
+                        ground = wire.get("ground_size", "12")
+                        vdrop = wire.get("voltage_drop_percent", 0)
+                        ampacity = wire.get("ampacity", 0)
+                        
+                        # Get circuit type from load_type_map
+                        ctype = load_type_map.get(load_id, "other")
+                        
+                        if ctype in wire_by_type:
+                            wire_by_type[ctype].append((size, ground, vdrop, ampacity))
+                        else:
+                            wire_by_type["other"].append((size, ground, vdrop, ampacity))
+                        ampacity = wire.get("ampacity", 0)
+                        
+                        # Determine circuit type from load_id or breaker info
+                        load_id_lower = load_id.lower()
+                        if "ac" in load_id_lower or "hvac" in load_id_lower:
+                            wire_by_type["hvac"].append((size, ground, vdrop, ampacity))
+                        elif "heater" in load_id_lower or "water" in load_id_lower:
+                            wire_by_type["heater"].append((size, ground, vdrop, ampacity))
+                        elif "light" in load_id_lower or "led" in load_id_lower or load_id.startswith("LT"):
+                            wire_by_type["lighting"].append((size, ground, vdrop, ampacity))
+                        elif "outlet" in load_id_lower or "socket" in load_id_lower or load_id.startswith("RC"):
+                            wire_by_type["outlet"].append((size, ground, vdrop, ampacity))
+                        else:
+                            wire_by_type["other"].append((size, ground, vdrop, ampacity))
                 
-                # Single line per wire size
-                for size in sorted(wire_summary.keys(), key=lambda x: int(x) if x.isdigit() else 99):
-                    info = wire_summary[size]
-                    lines.append(f"  🔌 สาย {size} AWG: {info['count']} วงจร (Ampacity {info['ampacity']}A, Vdrop {info['max_vdrop']:.1f}%)")
+                # Display by circuit type with Thai names
+                type_names = {
+                    "hvac": ("❄️ วงจรแอร์", "สายแอร์"),
+                    "water_heater": ("🚿 วงจรน้ำอุ่น", "สายน้ำอุ่น"),
+                    "lighting": ("💡 วงจรแสงสว่าง", "สายไฟ"),
+                    "receptacle": ("🔌 วงจรเต้ารับ", "สายเต้ารับ"),
+                    "pump": ("💧 วงจรปั๊มน้ำ", "สายปั๊ม"),
+                    "other": ("⚡ วงจรอื่นๆ", "สาย")
+                }
+                
+                for ctype, circuits in wire_by_type.items():
+                    if circuits:
+                        # Group same wire sizes
+                        size_groups = {}
+                        for size, ground, vdrop, ampacity in circuits:
+                            if size not in size_groups:
+                                size_groups[size] = {"count": 0, "ground": ground, "max_vdrop": 0, "ampacity": ampacity}
+                            size_groups[size]["count"] += 1
+                            size_groups[size]["max_vdrop"] = max(size_groups[size]["max_vdrop"], vdrop)
+                        
+                        icon, label = type_names[ctype]
+                        for size, info in size_groups.items():
+                            lines.append(f"  {icon} {label} {size} AWG: {info['count']} วงจร (สายดิน {info['ground']} AWG, Vdrop {info['max_vdrop']:.1f}%)")
             
             if conduit_sizing:
                 # Group by conduit size
@@ -742,20 +867,56 @@ class RagService:
                 else:
                     lines.append(f"  ❌ ไม่ผ่านมาตรฐาน NEC {nec_version}")
                 
-                # Show only critical warnings (max 3)
+                # Show warnings translated to Thai (no truncation)
                 warnings = compliance.get("warnings", [])
                 if warnings:
                     lines.append("")
                     lines.append("  ⚠️ คำแนะนำ:")
-                    for warn in warnings[:3]:
+                    
+                    # Translate common warnings to Thai
+                    warning_translations = {
+                        "typically requires dedicated circuit": "ควรแยกวงจรเฉพาะ",
+                        "HVAC load": "โหลดแอร์",
+                        "may require GFCI protection": "ควรติดตั้ง RCBO 30mA",
+                        "may require AFCI protection": "ควรติดตั้ง AFCI",
+                        "in dwelling units": "ในบ้านพักอาศัย",
+                        "based on location": "ตามตำแหน่งติดตั้ง",
+                        "Panel": "ตู้ไฟ",
+                        "has no loads assigned": "ยังไม่มีโหลดกำหนด",
+                        "Load": "โหลด"
+                    }
+                    
+                    shown_warnings = set()  # Avoid duplicates
+                    for warn in warnings[:5]:  # Show up to 5 warnings
                         if isinstance(warn, dict):
                             msg = warn.get("message", str(warn))
                         else:
                             msg = str(warn)
-                        # Shorten message
-                        if len(msg) > 60:
-                            msg = msg[:57] + "..."
-                        lines.append(f"      • {msg}")
+                        
+                        # Translate to Thai
+                        thai_msg = msg
+                        for eng, thai in warning_translations.items():
+                            thai_msg = thai_msg.replace(eng, thai)
+                        
+                        # Simplify AC warnings (don't repeat for each AC)
+                        if "แอร์" in thai_msg and "แยกวงจร" in thai_msg:
+                            simplified = "❄️ แอร์ทุกตัวควรแยกวงจรเฉพาะ + เบรกเกอร์ 2P"
+                            if simplified not in shown_warnings:
+                                lines.append(f"      • {simplified}")
+                                shown_warnings.add(simplified)
+                        elif "RCBO" in thai_msg or "GFCI" in thai_msg:
+                            simplified = "🚿 เครื่องทำน้ำอุ่นต้องใช้ RCBO 30mA ป้องกันไฟดูด"
+                            if simplified not in shown_warnings:
+                                lines.append(f"      • {simplified}")
+                                shown_warnings.add(simplified)
+                        elif "AFCI" in thai_msg:
+                            simplified = "🔌 เต้ารับในห้องนอนควรติดตั้ง AFCI ป้องกันไฟลัดวงจร (NEC 210.12)"
+                            if simplified not in shown_warnings:
+                                lines.append(f"      • {simplified}")
+                                shown_warnings.add(simplified)
+                        elif thai_msg not in shown_warnings:
+                            lines.append(f"      • {thai_msg}")
+                            shown_warnings.add(thai_msg)
             
             # ═══════════════════════════════════════════
             # Summary Footer
