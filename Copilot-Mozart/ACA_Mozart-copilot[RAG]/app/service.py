@@ -759,15 +759,18 @@ class RagService:
                             if floor in lighting_by_floor:
                                 sorted_rooms = sorted(lighting_by_floor[floor], key=room_sort_key)
                                 total_watts = 0
+                                total_fixtures = 0
                                 for room, device, qty in sorted_rooms:
                                     watt_per_bulb = 20 if "20W" in device else 10
                                     total_w = watt_per_bulb * qty
                                     total_watts += total_w
+                                    total_fixtures += qty
                                     # Fixed width: room details fit in column 2 (24 chars)
-                                    detail_text = f"  └─ {room}: {watt_per_bulb}W×{qty}"
+                                    # แสดงจำนวนดวงในแต่ละห้อง
+                                    detail_text = f"  └─ {room}: {qty}ดวง"
                                     lines.append(f"│     │ {detail_text:<24}│        │       │               │")
                                 total_amps = total_watts / 230
-                                summary_text = f"  📊 รวม: {total_watts}W ({total_amps:.1f}A)"
+                                summary_text = f"  📊 รวม: {total_fixtures}ดวง ({total_amps:.1f}A)"
                                 lines.append(f"│     │ {summary_text:<24}│        │       │               │")
                     
                     # Add sub-details for outlet circuits
