@@ -763,9 +763,12 @@ class RagService:
                                     watt_per_bulb = 20 if "20W" in device else 10
                                     total_w = watt_per_bulb * qty
                                     total_watts += total_w
-                                    lines.append(f"│     │   └─ {room}: LED {watt_per_bulb}W×{qty}={total_w}W       │        │       │               │")
+                                    # Fixed width: room details fit in column 2 (24 chars)
+                                    detail_text = f"  └─ {room}: {watt_per_bulb}W×{qty}"
+                                    lines.append(f"│     │ {detail_text:<24}│        │       │               │")
                                 total_amps = total_watts / 230
-                                lines.append(f"│     │   📊 รวม: {total_watts}W = {total_amps:.2f}A ✅          │        │       │               │")
+                                summary_text = f"  📊 รวม: {total_watts}W ({total_amps:.1f}A)"
+                                lines.append(f"│     │ {summary_text:<24}│        │       │               │")
                     
                     # Add sub-details for outlet circuits
                     if "เต้ารับ" in name:
@@ -778,13 +781,14 @@ class RagService:
                                 total_outlets = 0
                                 for room, qty in sorted_rooms:
                                     outlet_type = "คู่" if qty >= 2 else "เดี่ยว"
-                                    watts_per_outlet = 180
-                                    total_w = watts_per_outlet * qty
                                     total_outlets += qty
-                                    lines.append(f"│     │   └─ {room}: {outlet_type}×{qty} ({total_w}W)        │        │       │               │")
+                                    # Fixed width: room details fit in column 2 (24 chars)
+                                    detail_text = f"  └─ {room}: {outlet_type}×{qty}"
+                                    lines.append(f"│     │ {detail_text:<24}│        │       │               │")
                                 total_watts = total_outlets * 180
                                 total_amps = total_watts / 230
-                                lines.append(f"│     │   📊 รวม: {total_outlets}จุด = {total_watts}W ({total_amps:.1f}A)    │        │       │               │")
+                                summary_text = f"  📊 รวม: {total_outlets}จุด ({total_amps:.1f}A)"
+                                lines.append(f"│     │ {summary_text:<24}│        │       │               │")
             
             # Add spare circuits row
             lines.append(f"│ {circuit_num:>3} │ 🔲 Spare (สำรอง)          │    -   │ MCB 15A│ 2.5mm²/½\"     │")
