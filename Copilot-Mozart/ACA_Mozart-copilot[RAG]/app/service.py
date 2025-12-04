@@ -616,23 +616,39 @@ class RagService:
                     lines.append("📟 มิเตอร์และสายเมน:")
                     lines.append("─" * 40)
                     
+                    # Main Breaker sizing: NEC 215.3 / วสท. = Load × 1.25 for continuous load
+                    design_current = total_current * 1.25
+                    
                     # Determine meter size (Thai standard: 5(15), 15(45), 30(100), 50(150))
-                    if total_current <= 15:
+                    # Main breaker must be >= design_current (with 1.25 factor)
+                    if design_current <= 15:
                         meter_size = "5(15)A"
                         main_wire = "THW 4 mm²"
                         main_breaker = "16A 2P"
-                    elif total_current <= 45:
+                    elif design_current <= 30:
                         meter_size = "15(45)A"
                         main_wire = "THW 6 mm²"
                         main_breaker = "32A 2P"
-                    elif total_current <= 100:
+                    elif design_current <= 50:
+                        meter_size = "30(100)A"
+                        main_wire = "THW 10 mm²"
+                        main_breaker = "50A 2P"
+                    elif design_current <= 63:
                         meter_size = "30(100)A"
                         main_wire = "THW 16 mm²"
                         main_breaker = "63A 2P"
-                    else:
-                        meter_size = "50(150)A"
+                    elif design_current <= 100:
+                        meter_size = "30(100)A"
                         main_wire = "THW 25 mm²"
                         main_breaker = "100A 2P"
+                    elif design_current <= 125:
+                        meter_size = "50(150)A"
+                        main_wire = "THW 35 mm²"
+                        main_breaker = "125A 2P"
+                    else:
+                        meter_size = "50(150)A"
+                        main_wire = "THW 50 mm²"
+                        main_breaker = "150A 2P"
                     
                     # Ground wire (วสท.: same as phase for ≤16mm², 50% for larger)
                     ground_wire = main_wire.replace("THW", "THW-G")
