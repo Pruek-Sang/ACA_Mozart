@@ -1,41 +1,89 @@
 # ═══════════════════════════════════════════════════════════════════
-# Mozart RAG - Environment Variables (EXAMPLE)
-# ═══════════════════════════════════════════════════════════════════
-# Copy this file to .env and fill in your actual values
-# DO NOT commit .env to git!
+# ACA Mozart - Git Ignore
 # ═══════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════
-# LLM Provider Configuration - Google AI
+# Environment Files (SECURITY - Contains API Keys!)
 # ═══════════════════════════════════════════════════════════════════
-GOOGLE_API_KEY=your_google_api_key_here
+.env
+.env.local
+.env.*.local
+**/.env
+!.env.example
 
 # ═══════════════════════════════════════════════════════════════════
-# Model Configuration
+# Python
 # ═══════════════════════════════════════════════════════════════════
-MODEL_NAME_ANSWER=gemini-2.5-flash-lite
-MODEL_NAME_JUDGE=gemini-2.5-pro
-EMBEDDING_MODEL=embedding-gecko-001
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
 
 # ═══════════════════════════════════════════════════════════════════
-# Vector Database Configuration
+# IDE
 # ═══════════════════════════════════════════════════════════════════
-VECTOR_DB_PATH=./vector_db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
 # ═══════════════════════════════════════════════════════════════════
-# Knowledge Base Configuration
+# Logs & Temporary Files
 # ═══════════════════════════════════════════════════════════════════
-KNOWLEDGE_ROOT=./rag_knowledge
-KNOWLEDGE_INDEX_PATH=./rag_knowledge/knowledge_index.json
+*.log
+logs/
+*.tmp
+*.temp
+.cache/
 
 # ═══════════════════════════════════════════════════════════════════
-# MCP Core Connection
+# Database & Vector DB
 # ═══════════════════════════════════════════════════════════════════
-MCP_CORE_URL=http://localhost:5001
+*.db
+*.sqlite3
+vector_db/
+chroma_db/
+*.faiss
 
 # ═══════════════════════════════════════════════════════════════════
-# Server Configuration
+# Test & Coverage
 # ═══════════════════════════════════════════════════════════════════
-HOST=0.0.0.0
-PORT=8080
-DEBUG=false
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ═══════════════════════════════════════════════════════════════════
+# Docker
+# ═══════════════════════════════════════════════════════════════════
+.docker/
+
+# ═══════════════════════════════════════════════════════════════════
+# OS Files
+# ═══════════════════════════════════════════════════════════════════
+.DS_Store
+Thumbs.db

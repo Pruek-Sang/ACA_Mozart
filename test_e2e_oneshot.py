@@ -22,12 +22,21 @@ Expected:
 import httpx
 import json
 import asyncio
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ==================== CONFIG ====================
-RAG_URL = "http://localhost:8080"
-MCP_URL = "http://localhost:5001"
-API_KEY = "AIzaSyCklv8Stb8E3MmGdMyrzKsyg_O-iLjADLA"
+RAG_URL = os.getenv("RAG_URL", "http://localhost:8080")
+MCP_URL = os.getenv("MCP_URL", "http://localhost:5001")
+API_KEY = os.getenv("GOOGLE_API_KEY", "")
+
+# Validate API key is set
+if not API_KEY:
+    raise ValueError("GOOGLE_API_KEY environment variable is not set. Please set it in .env file.")
 
 # ==================== TEST INPUT ====================
 # Realistic Thai house specification
