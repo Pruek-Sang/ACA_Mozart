@@ -61,6 +61,20 @@ from core.privacy import PrivacyGuard
 
 logger = logging.getLogger("Aura.Service")
 
+# =============================================================================
+# Constants for duplicated string literals (SonarQube compliance)
+# =============================================================================
+ROOM_LIVING = "ห้องนั่งเล่น"
+ROOM_KITCHEN = "ห้องครัว"
+ROOM_BEDROOM = "ห้องนอน"
+ROOM_BATHROOM_1 = "ห้องน้ำ 1"
+ROOM_BATHROOM_2 = "ห้องน้ำ 2"
+ROOM_BATHROOM = "ห้องน้ำ"
+ROOM_COMMON = "พื้นที่ส่วนกลาง"
+DEVICE_WATER_HEATER = "เครื่องทำน้ำอุ่น"
+DEVICE_PUMP = "ปั๊มน้ำ"
+DEVICE_INDUCTION = "เตาแม่เหล็กไฟฟ้า"
+
 
 class RagService:
     """
@@ -225,9 +239,6 @@ class RagService:
             "garage": 12,       # โรงรถ: 1 หลอด LED 10W ต่อ 12 ตร.ม.
         }
         
-        # LED specs
-        LED_LUMENS = {"LIGHT-LED-10W": 810, "LIGHT-LED-20W": 1600}
-        
         for i, room in enumerate(rooms):
             room_name = room.name
             room_type = room.type if hasattr(room, 'type') else "bedroom"
@@ -260,7 +271,12 @@ class RagService:
                 num_fixtures = max(1, math.ceil(area / area_per_fixture))
             
             # Cap at reasonable max (8 for large rooms, 4 for small rooms)
-            max_fixtures = 8 if area > 50 else 6 if area > 30 else 4
+            if area > 50:
+                max_fixtures = 8
+            elif area > 30:
+                max_fixtures = 6
+            else:
+                max_fixtures = 4
             num_fixtures = min(num_fixtures, max_fixtures)
             
             # Get floor from room
@@ -339,21 +355,21 @@ class RagService:
             
             # น้ำอุ่น
             'น้ำร้อน': 'น้ำอุ่น',
-            'เครื่องทำน้ำร้อน': 'เครื่องทำน้ำอุ่น',
-            'เครื่องน้ำอุ่น': 'เครื่องทำน้ำอุ่น',
-            'วอเตอร์ฮีทเตอร์': 'เครื่องทำน้ำอุ่น',
-            'water heater': 'เครื่องทำน้ำอุ่น',
-            'ฮีทเตอร์': 'เครื่องทำน้ำอุ่น',
+            'เครื่องทำน้ำร้อน': DEVICE_WATER_HEATER,
+            'เครื่องน้ำอุ่น': DEVICE_WATER_HEATER,
+            'วอเตอร์ฮีทเตอร์': DEVICE_WATER_HEATER,
+            'water heater': DEVICE_WATER_HEATER,
+            'ฮีทเตอร์': DEVICE_WATER_HEATER,
             
             # ปั๊มน้ำ
-            'ปั้มน้ำ': 'ปั๊มน้ำ',
-            'ปั้ม': 'ปั๊มน้ำ',
-            'pump': 'ปั๊มน้ำ',
+            'ปั้มน้ำ': DEVICE_PUMP,
+            'ปั้ม': DEVICE_PUMP,
+            'pump': DEVICE_PUMP,
             
             # เตา
-            'เตาไฟฟ้า': 'เตาแม่เหล็กไฟฟ้า',
-            'เตาแม่เหล็ก': 'เตาแม่เหล็กไฟฟ้า',
-            'induction': 'เตาแม่เหล็กไฟฟ้า',
+            'เตาไฟฟ้า': DEVICE_INDUCTION,
+            'เตาแม่เหล็ก': DEVICE_INDUCTION,
+            'induction': DEVICE_INDUCTION,
             
             # หน่วย
             'วัตต์': 'W',
@@ -369,7 +385,7 @@ class RagService:
         
         return result
 
-    async def _extract_loads_from_text(self, query: str) -> Dict[str, Any]:
+    def _extract_loads_from_text(self, query: str) -> Dict[str, Any]:
         """
         Use LLM to extract structured loads from natural language query.
         
@@ -611,7 +627,15 @@ class RagService:
                     poles = b.get("poles", 1)
                     btype = b.get("breaker_type", "standard")
                     
-                    icon = "❄️" if "แอร์" in name or "AC" in name else "🚿" if "น้ำอุ่น" in name or "HEATER" in name else "💡" if "ไฟ" in name else "🔌"
+                    # Determine icon based on circuit type
+                    if "แอร์" in name or "AC" in name:
+                        icon = "❄️"
+                    elif "น้ำอุ่น" in name or "HEATER" in name:
+                        icon = "🚿"
+                    elif "ไฟ" in name:
+                        icon = "💡"
+                    else:
+                        icon = "🔌"
                     rcbo = " (RCBO)" if btype == "rcbo" else ""
                     lines.append(f"  {icon} {name}: {rating}A/{poles}P{rcbo}")
                     
@@ -681,7 +705,13 @@ class RagService:
                         conduit_summary[size]["max_fill"] = max(conduit_summary[size]["max_fill"], fill)
                 
                 for size, info in conduit_summary.items():
-                    fill_status = "✅" if info["max_fill"] < 30 else "⚠️" if info["max_fill"] < 40 else "❌"
+                    # Determine fill status
+                    if info["max_fill"] < 30:
+                        fill_status = "✅"
+                    elif info["max_fill"] < 40:
+                        fill_status = "⚠️"
+                    else:
+                        fill_status = "❌"
                     lines.append(f"  📏 ท่อ {size}\": {info['count']} วงจร (Fill {info['max_fill']:.0f}%) {fill_status}")
             
             # ═══════════════════════════════════════════
@@ -998,12 +1028,8 @@ class RagService:
             
             # Map device names to standard codes
             device_code = load.device
-            if device_code.startswith("LIGHT-LED"):
-                device_code = device_code  # Already correct
-            elif device_code == "SOCKET-16A":
-                device_code = "SOCKET-16A"
-            elif device_code == "PUMP-750W":
-                device_code = "PUMP-750W"
+            # Note: device codes are already normalized by this point
+            # No transformation needed for LIGHT-LED*, SOCKET-16A, PUMP-750W
             
             load_specs.append(LoadSpec(
                 load_id=load_id,
@@ -1167,7 +1193,7 @@ class RagService:
             
             try:
                 # Extract loads from natural language
-                loads = await self._extract_loads_from_text(req.query)
+                loads = self._extract_loads_from_text(req.query)
                 
                 if loads:
                     logger.info(f"📦 Extracted: {json.dumps(loads.get('rooms', []), ensure_ascii=False)[:200]}")
@@ -1423,7 +1449,7 @@ Rules:
         
         return missing
     
-    async def _generate_clarifying_questions(
+    def _generate_clarifying_questions(
         self,
         req: ProjectRequirements,
         missing_fields: List[str]
@@ -1509,7 +1535,7 @@ Rules:
             logger.warning(f"[{request_id}] Critical fields missing: {missing_critical}")
             
             # Generate clarifying questions
-            questions = await self._generate_clarifying_questions(req, missing_critical)
+            questions = self._generate_clarifying_questions(req, missing_critical)
             
             # Throw HTTP 422 with questions (NOT a response type)
             raise HTTPException(
@@ -1575,7 +1601,7 @@ Rules:
         
         # PHASE 4: STAGE 1 - Generate Human-Readable Plan
         logger.info(f"[{request_id}] STAGE 1: Generating plan...")
-        plan_text = await self._generate_spec_plan(req, context_str, examples_str)
+        plan_text = self._generate_spec_plan(req, context_str, examples_str)
         logger.info(f"[{request_id}] Plan generated ({len(plan_text)} chars)")
 
         
@@ -1797,7 +1823,7 @@ VALIDATION ERRORS:
 Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecResponse schema exactly:
 """
     
-    async def retrieve_raw(self, req: RawRetrieveRequest) -> List[Dict[str, Any]]:
+    def retrieve_raw(self, req: RawRetrieveRequest) -> List[Dict[str, Any]]:
         """
         Raw retrieval for debugging
         
@@ -1812,7 +1838,7 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
     
     # === Phase 4: Plan Generation ===
     
-    async def _generate_spec_plan(
+    def _generate_spec_plan(
         self,
         req: ProjectRequirements,
         context: str,
@@ -2045,7 +2071,7 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
             issues.append("No loads in spec")
         
         # Rule 4: LLM semantic judge
-        llm_issues = await self._llm_semantic_check(spec, original_req)
+        llm_issues = self._llm_semantic_check(spec, original_req)
         issues.extend(llm_issues)
         
         # Classify severity
@@ -2056,7 +2082,7 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
         else:
             return "FAIL", issues
     
-    async def _llm_semantic_check(
+    def _llm_semantic_check(
         self,
         spec: McpSpecResponse,
         req: ProjectRequirements
