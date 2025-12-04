@@ -48,6 +48,7 @@ class McpDesignResponse:
     conduit_sizing: Optional[Dict[str, Any]] = None
     compliance_report: Optional[Dict[str, Any]] = None
     autolisp_code: Optional[str] = None
+    readable_report: Optional[str] = None  # MCP human-readable report (Markdown)
     standards_markdown: Optional[str] = None  # Design standards summary
     
     # Errors/warnings from MCP
@@ -75,6 +76,7 @@ class McpDesignResponse:
             "conduit_sizing": self.conduit_sizing,
             "compliance_report": self.compliance_report,
             "autolisp_code": self.autolisp_code,
+            "readable_report": self.readable_report,
             "standards_markdown": self.standards_markdown,
             "errors": self.errors,
             "warnings": self.warnings,
@@ -154,6 +156,7 @@ class McpClient:
                         conduit_sizing=data.get("conduit_sizing"),
                         compliance_report=data.get("compliance_report"),
                         autolisp_code=data.get("autolisp_code"),
+                        readable_report=data.get("readable_report"),
                         standards_markdown=data.get("standards_markdown"),
                         errors=data.get("errors", []),
                         warnings=data.get("warnings", [])
