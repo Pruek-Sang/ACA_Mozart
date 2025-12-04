@@ -227,7 +227,11 @@ class ResultBuilder:
         return md
     
     def create_readable_report(self, result: DesignResult) -> str:
-        """Create human-readable report in Thai/English with full Markdown layout."""
+        """Create human-readable report in Thai/English with full Markdown layout.
+        
+        Uses values from Panel (sent by RAG) instead of recalculating.
+        This ensures consistency between answer (Chat) and readable_report (Export).
+        """
         lines = []
         
         # Total load calculation
@@ -238,38 +242,48 @@ class ResultBuilder:
         total_amps = total_watts / 230  # Thai standard 230V
         num_loads = len(result.request.loads)
         
-        # Main Breaker sizing: NEC 215.3 / วสท. = Load × 1.25 for continuous load
+        # === USE VALUES FROM PANEL (sent by RAG) ===
+        # RAG already calculated main_breaker_rating with ×1.25 factor
+        # We should use that value instead of recalculating
+        
+        # Get main_breaker_rating from first panel (Main Panel)
+        panel_main_breaker = 100  # Default
+        if result.request.panels:
+            panel_main_breaker = result.request.panels[0].main_breaker_rating
+        
+        # Design current = load × 1.25 (NEC 215.3 / วสท.)
         design_current = total_amps * 1.25
         
-        # Meter recommendation based on design_current (with 1.25 factor)
-        if design_current <= 15:
+        # Use panel's main_breaker_rating to determine meter and wire
+        # This ensures consistency with RAG's calculation
+        if panel_main_breaker <= 16:
             meter = "5(15)A"
             main_wire = "THW 4 mm²"
-            main_breaker = "16A 2P"
-        elif design_current <= 30:
+            main_breaker = f"{panel_main_breaker}A 2P"
+        elif panel_main_breaker <= 32:
             meter = "15(45)A"
             main_wire = "THW 6 mm²"
-            main_breaker = "32A 2P"
-        elif design_current <= 50:
+            main_breaker = f"{panel_main_breaker}A 2P"
+        elif panel_main_breaker <= 50:
             meter = "30(100)A"
             main_wire = "THW 10 mm²"
-            main_breaker = "50A 2P"
-        elif design_current <= 63:
+            main_breaker = f"{panel_main_breaker}A 2P"
+        elif panel_main_breaker <= 63:
             meter = "30(100)A"
             main_wire = "THW 16 mm²"
-            main_breaker = "63A 2P"
-        elif design_current <= 100:
+            main_breaker = f"{panel_main_breaker}A 2P"
+        elif panel_main_breaker <= 100:
             meter = "30(100)A"
             main_wire = "THW 25 mm²"
-            main_breaker = "100A 2P"
-        elif design_current <= 125:
+            main_breaker = f"{panel_main_breaker}A 2P"
+        elif panel_main_breaker <= 125:
             meter = "50(150)A"
             main_wire = "THW 35 mm²"
-            main_breaker = "125A 2P"
+            main_breaker = f"{panel_main_breaker}A 2P"
         else:
             meter = "50(150)A หรือ CT"
             main_wire = "THW 50 mm²"
-            main_breaker = "150A 2P"
+            main_breaker = f"{panel_main_breaker}A 2P"
         
         # Header
         lines.append(f"# 🏠✨ รายงานการออกแบบระบบไฟฟ้า - {result.request.project_name}")
