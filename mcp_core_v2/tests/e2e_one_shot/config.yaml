@@ -1,0 +1,43 @@
+# Configuration for One-Shot E2E Tests
+
+# RAG Service
+rag_endpoint: "http://localhost:8080/api/v1/mcp_spec"
+
+# MCP Service (TBD - might use direct pipeline call instead)
+mcp_endpoint: "http://localhost:8001/design"
+
+# Timeouts
+timeout: 30  # seconds
+
+# Tolerance for result comparison
+tolerance:
+  # Percentage tolerance for current calculation (%)
+  current_percent: 5.0
+  
+  # Percentage tolerance for voltage drop (%)
+  voltage_drop_percent: 0.5
+  
+  # Wire size must match exactly (true) or allow +1 size (false)
+  wire_size_exact: true
+  
+  # Breaker rating must match exactly
+  breaker_exact: true
+
+# Test execution
+execution:
+  # Stop on first failure
+  fail_fast: false
+  
+  # Parallel execution (future)
+  parallel: false
+  
+  # Verbose output
+  verbose: true
+
+# Reporting
+reporting:
+  # Save detailed diff for failures
+  save_diff: true
+  
+  # Generate HTML report (future)
+  html_report: false
