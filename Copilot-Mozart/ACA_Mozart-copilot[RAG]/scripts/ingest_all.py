@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Ingest All Knowledge Documents into ChromaDB
+Ingest All Knowledge Documents into Vector DB (FAISS)
 
 Usage:
     python scripts/ingest_all.py
@@ -10,7 +10,7 @@ Philosophy: Aura's Memory Initialization
 - Ingests all 4 knowledge folders
 - Preserves metadata from knowledge_index.json
 - Idempotent (safe to run multiple times)
-- Batch processing with delay (ไม่ให้ Gemini API rate limit)
+- Batch processing with delay
 """
 
 import argparse
@@ -21,7 +21,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.database import VectorDatabase
+from core.vector_adapter import get_vector_db, VectorDBInterface
 from core.ingest import IngestionEngine
 
 # Batch settings (ป้องกัน Gemini API rate limit)
@@ -29,7 +29,7 @@ BATCH_SIZE = 5  # จำนวน chunks ต่อ batch
 BATCH_DELAY = 1.0  # delay ระหว่าง batch (วินาที)
 
 
-def upsert_with_batching(db: VectorDatabase, docs: list) -> int:
+def upsert_with_batching(db: VectorDBInterface, docs: list) -> int:
     """Upsert documents in small batches with delay"""
     total = 0
     for i in range(0, len(docs), BATCH_SIZE):
@@ -56,7 +56,7 @@ def main():
     
     # Initialize
     print("🔄 Initializing VectorDatabase...")
-    db = VectorDatabase()
+    db = get_vector_db()
     engine = IngestionEngine()
     
     knowledge_root = Path(__file__).parent.parent / "rag_knowledge"

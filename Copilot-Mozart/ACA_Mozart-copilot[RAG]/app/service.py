@@ -56,7 +56,6 @@ from app.models import (
 from app.config import settings
 from app.knowledge_service import KnowledgeService
 from app.trust_log import trust_logger
-from core.database import VectorDatabase
 from core.privacy import PrivacyGuard
 
 logger = logging.getLogger("Aura.Service")
