@@ -26,7 +26,7 @@ from app.config import settings
 from app.mcp_adapter import McpAdapter, convert_to_mcp
 from app.mcp_client import McpClient, McpDesignResponse
 from core.ingest import IngestionEngine
-from core.database import VectorDatabase
+from core.vector_adapter import get_vector_db
 
 logger = logging.getLogger("Aura.Routes")
 
@@ -218,7 +218,7 @@ async def ingest(req: IngestRequest, bg_tasks: BackgroundTasks):
         )
     
     engine = IngestionEngine()
-    db = VectorDatabase()
+    db = get_vector_db()
     
     def task(path):
         try:
@@ -244,7 +244,7 @@ async def delete_doc(req: DeleteRequest):
     
     Returns number of documents deleted.
     """
-    db = VectorDatabase()
+    db = get_vector_db()
     success = db.delete_source(req.source_path)
     
     return {
