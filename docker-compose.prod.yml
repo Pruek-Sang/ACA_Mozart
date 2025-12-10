@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════════════════════════════
+# Mozart Production Deployment - Docker Compose
+# ═══════════════════════════════════════════════════════════════════
+# Usage: docker-compose -f docker-compose.prod.yml up -d
+# Note: This pulls pre-built images from Docker Hub. No source code needed.
+# ═══════════════════════════════════════════════════════════════════
+
+services:
+  # ═══════════════════════════════════════════════════════════════════
+  # MCP Core v2 - Electrical Calculation Engine
+  # ═══════════════════════════════════════════════════════════════════
+  mcp-core:
+    container_name: mcp-core-prod
+    image: acatest01/mcp-core:latest  # <--- Pulls from your Docker Hub
+    
+    ports:
+      - "5001:5001"
+    
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=5001
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    
+    restart: always
+    
+    networks:
+      - mozart-network
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Mozart RAG - AI-Powered Spec Engine
+  # ═══════════════════════════════════════════════════════════════════
+  mozart-rag:
+    container_name: mozart-rag-prod
+    image: acatest01/mozart-rag:latest  # <--- Pulls from your Docker Hub
+    
+    ports:
+      - "8080:8080"
+    
+    environment:
+      - MCP_CORE_URL=http://mcp-core:5001
+      - VECTOR_DB_BACKEND=faiss
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}  # Needs .env file
+    
+    depends_on:
+      - mcp-core
+    
+    restart: always
+    
+    networks:
+      - mozart-network
+
+networks:
+  mozart-network:
+    driver: bridge
