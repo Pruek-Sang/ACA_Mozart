@@ -1,0 +1,636 @@
+{
+  "run_id": "20251202_020644",
+  "timestamp": "2025-12-02T02:12:56.919457",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 12,
+  "passed": 8,
+  "soft_fail": 3,
+  "hard_fail": 1,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 12\n✅ PASS: 8\n⚠️  SOFT-FAIL: 3\n❌ HARD-FAIL: 1\n⏭️  SKIPPED: 0\n\nPass Rate: 66.7%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "ampacity",
+            "expected": "24",
+            "actual": "24.0",
+            "passed": true,
+            "message": "THW 2.5mm² ampacity: expected 24A ±5.0%, got 24.0A"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญไฟฟ้า ผมจะตอบคำถามของคุณตามขั้นตอนต่อไปนี้\n\n### คิดทีละขั้นตอน (Let's think step by step)\n\n1.  **วิเคราะห์คำถาม:** คำถามต้องการทราบ \"พิกัดกระแส\" (ampacity) ของ \"สาย THW ขนาด 2.5 ตร.มม.\" ที่ติดตั้งแบบ \"เดินในท่อร้อยสาย\"\n2.  **ค้นหาข้อมูล:** ผมจะค้นหาเอกสารที่เกี่ยวข้องกับมาตรฐานสายไฟฟ้า โดยใช้คำสำคัญ \"สาย THW\", \"2.5\", \"พิกัดกระแส\", และ \"ท่อร้อยสาย\"\n3.  **ระบุแหล่งข้อมูล:**\n    *   การค้นหาพบข้อมูลที่ตรงที่สุดในเอกสาร `DOC_STD_KEY_TABLES` ซึ่งมีหัวข้อ \"สรุปพิกัดกระแสสา",
+      "execution_time_ms": 34817.634,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "voltage_drop",
+            "expected": "3.0",
+            "actual": "3.0",
+            "passed": true,
+            "message": "VD: expected 3.0% ±0.2%, got 3.0%"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญไฟฟ้า ผมจะตอบคำถามของคุณตามขั้นตอนดังนี้\n\n### คิดทีละขั้นตอน (Let's think step by step)\n\n1.  **วิเคราะห์คำถาม:** คำถามต้องการทราบค่า \"แรงดันตกสูงสุด\" (Maximum Voltage Drop) ที่ยอมรับได้สำหรับ \"วงจรย่อย\" ใน \"บ้านพักอาศัย\" ตาม \"มาตรฐาน วสท.\"\n2.  **ค้นหาคำสำคัญ:** ผมจะค้นหาคำว่า \"แรงดันตก\", \"Voltage Drop\", \"วสท.\", และ \"%\" ในเอกสารทั้งหมดที่ได้รับ\n3.  **ตรวจสอบเอกสาร:**\n    *   ผมได้ตรวจสอบเอกสาร `DOC_STD_KEY_TABLES`, `DOC_MCP_CAPABILITIES`, และ `DOC_STD_EIT_2564` แต่ไม่",
+      "execution_time_ms": 31130.696,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-DERATING-MULTIFACTOR",
+      "test_case_name": "Derating Factor for Grouped Conductors",
+      "question": "ถ้าเดินสายไฟ 6 เส้นในท่อเดียวกัน ต้องใช้ตัวคูณลดค่ากระแส (derating factor) เท่าไหร่?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "derating_factor",
+            "expected": "0.8",
+            "actual": "0.8",
+            "passed": true,
+            "message": "Derating for conductor_grouping=6: expected 0.8 ±0.05, got 0.8"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ตามขั้นตอนการคิด (Let's think step by step) ดังนี้ครับ:\n\n1.  **ค้นหาข้อมูล:** ผมจะค้นหาคำว่า \"derating factor\" หรือ \"ตัวคูณลดค่ากระแส\" และ \"6 เส้น\" ในเอกสารที่ให้มา\n2.  **พบข้อมูลที่เกี่ยวข้อง:** ผมพบข้อมูลในเอกสาร `DOC_STD_KEY_TABLES.md` ในหัวข้อ \"2. ตัวคูณปรับค่า (Derating Factor)\" และในภาคผนวกท้ายเอกสาร\n3.  **ตรวจสอบตาราง:** ตารางที่ 2 \"ตัวคูณปรับค่า (Derating Factor)\" ซึ่งอ้างอิงจาก วสท. 2564 ตารางที่ 5-8 ระบุว่าสำหรับ \"จำนวนตัวนำที่มีกระแสไหล (เส้น)\" จำนวน 4-6 เส้น จะมี \"ตัวคูณปรับค่า (Cg)\"",
+      "execution_time_ms": 23230.652,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-BREAKER-SELECTION",
+      "test_case_name": "Circuit Breaker Selection for Load",
+      "question": "โหลดไฟฟ้า 18 แอมป์ ควรใช้เบรกเกอร์ขนาดกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "HARD-FAIL",
+        "validations": [
+          {
+            "field": "breaker_rating",
+            "expected": "25",
+            "actual": "22",
+            "passed": false,
+            "message": "Load 18A exceeds 80% of 22A breaker (17.6A)"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญด้านไฟฟ้า ผมจะตอบคำถามนี้ตามขั้นตอนและข้อมูลจากเอกสารที่ให้มาครับ\n\n### คิดทีละขั้นตอน (Let's think step by step)\n\n1.  **ค้นหาหลักการเลือกขนาดเบรกเกอร์:** โดยทั่วไป การเลือกขนาดเบรกเกอร์สำหรับโหลดต่อเนื่อง จะต้องมีค่าเผื่อความปลอดภัย (Safety Margin) เพื่อป้องกันการตัดวงจรโดยไม่จำเป็นและเพื่อให้เป็นไปตามมาตรฐานความปลอดภัย หลักการนี้คือขนาดพิกัดของเบรกเกอร์ควรมีค่าประมาณ 125% ของกระแสโหลด\n2.  **นำหลักการมาคำนวณ:**\n    *   กระแสโหลดที่กำหนดคือ 18 แอมป์ (A)\n    *   ตามหลั",
+      "execution_time_ms": 43317.589,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-CATALOG-DEVICE-CODE",
+      "test_case_name": "Device Code Catalog Validation",
+      "question": "เครื่องทำน้ำอุ่นไฟฟ้า 3500W ใช้รหัสอุปกรณ์อะไรใน catalog?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "HEATER-3500W",
+            "passed": true,
+            "message": "Device code HEATER-3500W: valid (DEVICE_CODES)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "HEATER-3500W",
+            "passed": true,
+            "message": "Device code HEATER-3500W: valid (DEVICE_CODES)"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "จากการตรวจสอบข้อมูลตามขั้นตอน มีรายละเอียดดังนี้ครับ\n\n**คิดทีละขั้นตอน (Let's think step by step):**\n\n1.  **ค้นหาเอกสาร:** เริ่มต้นจากการค้นหาเอกสารที่รวบรวมรหัสอุปกรณ์ (Device Codes) ซึ่งคือ `DOC_DB_DEVICE_CODES`\n2.  **ค้นหาส่วนที่เกี่ยวข้อง:** ภายในเอกสาร `DOC_DB_DEVICE_CODES` ค้นหาส่วนที่เกี่ยวกับเครื่องทำน้ำอุ่น ซึ่งคือหัวข้อ \"Water Heaters\"\n3.  **ระบุรหัสอุปกรณ์:** ในหัวข้อ \"Water Heaters\" พบรายการที่ตรงกับ \"เครื่องทำน้ำอุ่น 3500W\" ดังนี้:\n    *   `HEATER-3500W` - Water Heater 3500W\n\nดังนั้",
+      "execution_time_ms": 13960.139,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "rcd_requirement",
+            "expected": "RCD for bathroom",
+            "actual": "mentioned",
+            "passed": true,
+            "message": "RCD 30mA mentioned for bathroom"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "ตามขั้นตอนการคิด (Let's think step by step):\n\n1.  เริ่มต้นด้วยการค้นหาคำสำคัญ \"RCD\", \"RCBO\", \"ห้องน้ำ\", \"เครื่องตัดไฟรั่ว\" และ \"กระแสรั่วไหล\" ในเอกสารทั้งหมด\n2.  พบข้อมูลที่ตรงที่สุดในเอกสาร `DOC_STD_KEY_TABLES.md` ในหัวข้อ \"ข้อกำหนดเครื่องตัดไฟรั่ว (RCD)\" และในภาคผนวกของเอกสาร `DOC_STD_EIT_2564`\n3.  ข้อมูลในเอกสารระบุว่า: \"ห้องน้ำ: วงจรเต้ารับและเครื่องทำน้ำอุ่นในห้องน้ำ ต้องติดตั้ง RCD/RCBO ที่มีพิกัดกระแสรั่วไหลไม่เกิน **30 mA** และตัดวงจรภายใน **0.04 วินาที**\"\n4.  นำข้อมูลที่ได้มาสรุปเป็นคำต",
+      "execution_time_ms": 19951.060999999998,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-INCOMPLETE-SPEC",
+      "test_case_name": "Incomplete Specification Handling",
+      "question": "ช่วยออกแบบระบบไฟฟ้าให้หน่อย",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": null,
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "asks_clarification": true,
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญด้านไฟฟ้า ผมสามารถช่วยแนะนำและรวบรวมข้อมูลที่จำเป็นสำหรับการออกแบบระบบไฟฟ้าสำหรับบ้านพักอาศัยได้ครับ\n\nเพื่อให้การออกแบบเป็นไปตามมาตรฐานและเหมาะสมกับการใช้งานของคุณ กรุณาให้ข้อมูลตามขั้นตอนต่อไปนี้ครับ\n\n### Let's think step by step\n\n**ขั้นตอนที่ 1: กรุณาระบุประเภทของอาคาร**\n\nระบบของเราออกแบบมาสำหรับบ้านพักอาศัยในประเทศไทยโดยเฉพาะ กรุณาเลือกลักษณะบ้านของคุณจากรายการต่อไปนี้ครับ:\n*   บ้านเดี่ยว 1 ชั้น\n*   บ้านเดี่ยว 2-3 ชั้น\n*   ทาวน์เฮ้าส์/ทาวน์โฮม 2-3 ชั้น\n*   บ้านแฝด",
+      "execution_time_ms": 43099.862,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-OUT-OF-SCOPE",
+      "test_case_name": "Out of Scope Question Rejection",
+      "question": "วิธีทำอาหารไทยที่อร่อยที่สุด",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": null,
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "should_refuse": false,
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญด้านไฟฟ้า ผมจะตรวจสอบข้อมูลตามขั้นตอนต่อไปนี้\n\n### Let's think step by step\n\n1.  **วิเคราะห์คำถาม:** คำถามคือ \"วิธีทำอาหารไทยที่อร่อยที่สุด\" ซึ่งเกี่ยวข้องกับวิธีการปรุงอาหาร\n2.  **ตรวจสอบเนื้อหาในเอกสารทั้งหมด:** ผมได้ทำการค้นหาข้อมูลที่เกี่ยวข้องกับคำว่า \"อาหาร\", \"ทำอาหาร\", \"สูตรอาหาร\" หรือ \"วิธีทำ\" ในเอกสารทั้งหมดที่ได้รับ\n3.  **สรุปผลการค้นหา:** เอกสารทั้งหมดที่อยู่ในระบบ เช่น `DOC_DB_DEVICE_CODES`, `DOC_MCP_CAPABILITIES`, `DOC_STD_KEY_TABLES`, และ `DOC_STD_THAI_",
+      "execution_time_ms": 21724.56,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-LANG-EN-STRICT",
+      "test_case_name": "English Language Response",
+      "question": "What is the ampacity of THW 4.0mm² cable in conduit according to EIT standard?",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "ampacity",
+            "expected": "32",
+            "actual": "32.0",
+            "passed": true,
+            "message": "THW 4.0mm² ampacity: expected 32A ±5.0%, got 32.0A"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "SOFT-FAIL",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "NO",
+        "violations": [
+          "Expected English but answer contains Thai"
+        ],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": false
+      },
+      "answer": "จากการตรวจสอบข้อมูลตามขั้นตอนต่อไปนี้:\n\n1.  **เริ่มต้น:** ค้นหาข้อมูลเกี่ยวกับ \"พิกัดกระแส\" (Ampacity) ของสายไฟฟ้าชนิด \"THW\" ขนาด \"4.0mm²\" ที่ติดตั้งใน \"ท่อร้อยสาย\" (conduit) ตามมาตรฐานการไฟฟ้า (วสท. หรือ EIT Standard)\n2.  **ค้นหาในเอกสาร:** ตรวจสอบเอกสาร `DOC_STD_KEY_TABLES` และ `DOC_STD_EIT_2564` ซึ่งมีตารางข้อมูลทางไฟฟ้าที่สำคัญ\n3.  **ระบุข้อมูล:**\n    *   ในเอกสาร `DOC_STD_KEY_TABLES` หัวข้อ \"1. ตารางพิกัดกระแสสายไฟฟ้า (Ampacity)\" ซึ่งอ้างอิงจาก \"วสท. 2564 ตารางที่ 5-20\" พบว่าสายขนาด 4 ตร.มม",
+      "execution_time_ms": 28432.517,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-STANDARD-CONFLICT",
+      "test_case_name": "Standard Conflict Resolution",
+      "question": "มาตรฐาน วสท. กับ IEC มีข้อกำหนดแรงดันตกต่างกันไหม? ควรใช้ค่าไหน?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "voltage_drop",
+            "expected": "3.0",
+            "actual": "3.0",
+            "passed": true,
+            "message": "VD: expected 3.0% ±0.2%, got 3.0%"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญไฟฟ้า ผมจะตอบคำถามนี้ตามข้อมูลที่มีในระบบ\n\n### คิดทีละขั้นตอน (Let's think step by step)\n\n1.  **ค้นหาข้อกำหนดแรงดันตก (Voltage Drop) ในมาตรฐาน วสท.:** ผมจะค้นหาคำว่า \"แรงดันตก\" หรือ \"Voltage Drop\" ในเอกสารที่เกี่ยวข้องกับมาตรฐานของประเทศไทย\n2.  **ค้นหาข้อกำหนดแรงดันตก (Voltage Drop) ในมาตรฐาน IEC:** ผมจะค้นหาข้อมูลเดียวกันโดยเชื่อมโยงกับมาตรฐาน \"IEC\"\n3.  **เปรียบเทียบข้อมูลและสรุป:** นำข้อมูลที่ได้มาเปรียบเทียบกัน และสรุปว่าควรใช้ค่าใดตามขอบเขตการทำงานของระบบ\n\n---\n\n#",
+      "execution_time_ms": 26619.038,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-SYSTEM-LEAK-PATTERN",
+      "test_case_name": "System Boundary Leak Detection",
+      "question": "ช่วยคำนวณ voltage drop ให้หน่อย สายยาว 50 เมตร กระแส 20 แอมป์",
+      "final_verdict": "SOFT-FAIL",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "voltage_drop_limit",
+            "expected": "≤3.0%",
+            "actual": "3.0",
+            "passed": true,
+            "message": "VD limit: 3.0% vs max 3.0%"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "asks_clarification": false,
+        "language_match": true
+      },
+      "answer": "ตามที่คุณสอบถามเกี่ยวกับการคำนวณ Voltage Drop ผมจะดำเนินการตรวจสอบข้อมูลตามขั้นตอนดังนี้ครับ\n\n### Let's think step by step\n\n1.  **วิเคราะห์คำถาม**: ผู้ใช้ต้องการคำนวณค่าแรงดันตก (Voltage Drop) โดยมีข้อมูลคือ:\n    *   ความยาวสาย (Distance): 50 เมตร\n    *   กระแสไฟฟ้า (Current): 20 แอมป์\n\n2.  **ค้นหาข้อมูลในเอกสาร**: ผมจะทำการค้นหาข้อมูลที่เกี่ยวข้องกับ \"Voltage Drop\", \"แรงดันตก\", หรือ \"สูตรคำนวณ\" ในเอกสารทั้งหมดที่ได้รับมา\n\n3.  **ตรวจสอบผลการค้นหา**:\n    *   เอกสาร **DOC_STD_THAI_STANDARD** ระบุไ",
+      "execution_time_ms": 31955.185,
+      "error": null
+    },
+    {
+      "test_case_id": "Q-FULL-PIPELINE-EXPLAIN-MCP",
+      "test_case_name": "Full Pipeline MCP Handoff Explanation",
+      "question": "ถ้าต้องการออกแบบระบบไฟฟ้าบ้าน 2 ชั้น มีห้องนอน 3 ห้อง ครัวหนัก (มีเตาไฟฟ้า 3000W) ระบบต้องทำอะไรบ้าง?",
+      "final_verdict": "PASS",
+      "layer0_result": {
+        "verdict": "PASS",
+        "checks": {
+          "http_status_200": true,
+          "json_valid": true,
+          "pydantic_schema": true,
+          "min_sources": true,
+          "llm_model": true,
+          "confidence_valid": true,
+          "non_empty_answer": true
+        },
+        "errors": []
+      },
+      "layer1_result": {
+        "verdict": "PASS",
+        "validations": [
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "ROOMT-BEDROOM-STD",
+            "passed": true,
+            "message": "Device code ROOMT-BEDROOM-STD: valid (ROOM_TEMPLATE)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "ROOMT-KITCHEN-HEAVY",
+            "passed": true,
+            "message": "Device code ROOMT-KITCHEN-HEAVY: valid (ROOM_TEMPLATE)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "INDUCTION-3000W",
+            "passed": true,
+            "message": "Device code INDUCTION-3000W: valid (DEVICE_CODES)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "SOCKET-16A",
+            "passed": true,
+            "message": "Device code SOCKET-16A: valid (DEVICE_CODES)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "AC-12000BTU",
+            "passed": true,
+            "message": "Device code AC-12000BTU: valid (DEVICE_CODES)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "HEATER-3500W",
+            "passed": true,
+            "message": "Device code HEATER-3500W: valid (DEVICE_CODES)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "LIGHT-LED-10W",
+            "passed": true,
+            "message": "Device code LIGHT-LED-10W: valid (DEVICE_CODES)"
+          },
+          {
+            "field": "device_code",
+            "expected": "in DEVICE_CODES.md or ROOM_TEMPLATES.md",
+            "actual": "INDUCTION-3000W",
+            "passed": true,
+            "message": "Device code INDUCTION-3000W: valid (DEVICE_CODES)"
+          }
+        ],
+        "errors": [],
+        "warnings": []
+      },
+      "layer2_result": {
+        "verdict": "PASS",
+        "answer_quality": "GOOD",
+        "uses_docs": "YES",
+        "logic_correct": "YES",
+        "math_correct": "N_A",
+        "language_ok": "YES",
+        "violations": [],
+        "reasoning": "Mock evaluation using heuristics (Relaxed for Thai)"
+      },
+      "special_checks": {
+        "language_match": true
+      },
+      "answer": "แน่นอนครับ ในฐานะผู้เชี่ยวชาญไฟฟ้า ผมจะวิเคราะห์และอธิบายขั้นตอนที่ระบบต้องทำสำหรับการออกแบบบ้านตามที่คุณต้องการ โดยคิดทีละขั้นตอนตามข้อมูลที่มีครับ\n\n### **Let's think step by step**\n\n#### **ขั้นตอนที่ 1: การกำหนดค่าเริ่มต้นและตรวจสอบขอบเขตของโครงการ (Project Initialization & Scope Validation)**\n\n1.  **ระบุประเภทอาคาร:** จากโจทย์ \"บ้าน 2 ชั้น\" ระบบจะทำการจับคู่กับประเภทอาคารที่รองรับคือ `RESIDENTIAL_SINGLE_2F` (บ้านเดี่ยว 2 ชั้น) ซึ่งมีข้อกำหนดโหลดรวมสูงสุดที่ 25 kVA และรองรับห้องได้สูงสุด 25 ห้",
+      "execution_time_ms": 54651.023,
+      "error": null
+    }
+  ]
+}

@@ -24,6 +24,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Use lightweight requirements
 COPY Docker/requirements_light.txt .
+
+# Install CPU-only torch first to save space (avoid downloading 3GB+ GPU libs)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
 RUN pip install --no-cache-dir -r requirements_light.txt
 
 # Copy app
@@ -32,8 +36,12 @@ COPY core ./core
 COPY main_ACA.py ./main.py
 COPY rag_knowledge ./rag_knowledge
 
-# Create dirs
-RUN mkdir -p logs/mcp_spec vector_db
+# Copy pre-built vector_db (ingested on Codespace)
+# This avoids needing to run ingest on Local/Docker
+COPY vector_db ./vector_db
+
+# Create log dirs
+RUN mkdir -p logs/mcp_spec
 
 EXPOSE 8080
 

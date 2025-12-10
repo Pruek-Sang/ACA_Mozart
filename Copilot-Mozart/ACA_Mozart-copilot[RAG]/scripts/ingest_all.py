@@ -94,11 +94,12 @@ def main():
         
         print(f"📁 Processing: {folder_name}/")
         
-        # Get all files
-        files = list(folder_path.glob("*.md")) + \
-                list(folder_path.glob("*.txt")) + \
-                list(folder_path.glob("*.csv"))
+        # Get all files (recursive - rglob finds nested files too!)
+        files = list(folder_path.rglob("*.md")) + \
+                list(folder_path.rglob("*.txt")) + \
+                list(folder_path.rglob("*.csv"))
         
+        print(f"   📊 Found {len(files)} files")
         folder_docs = 0
         
         for file_path in files:

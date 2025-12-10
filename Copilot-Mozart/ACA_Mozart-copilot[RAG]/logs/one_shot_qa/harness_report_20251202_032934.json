@@ -1,0 +1,265 @@
+{
+  "run_id": "20251202_032934",
+  "timestamp": "2025-12-02T03:29:36.577403",
+  "api_url": "http://localhost:8080/api/v1/ask",
+  "total_cases": 12,
+  "passed": 0,
+  "soft_fail": 0,
+  "hard_fail": 12,
+  "skipped": 0,
+  "summary": "\n============================================================\nSUMMARY\n============================================================\nTotal: 12\n✅ PASS: 0\n⚠️  SOFT-FAIL: 0\n❌ HARD-FAIL: 12\n⏭️  SKIPPED: 0\n\nPass Rate: 0.0%\n============================================================\n",
+  "results": [
+    {
+      "test_case_id": "Q-THW-AMPACITY-EXACT",
+      "test_case_name": "THW Cable Ampacity - Exact Value Check",
+      "question": "สาย THW ขนาด 2.5 ตร.มม. เดินในท่อร้อยสาย มีพิกัดกระแสกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"46e813b6-c43d-48ff-a5b3-c206e2515ef0\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"46e813b6-c43d-48ff-a5b3-c206e2515ef0\"}"
+    },
+    {
+      "test_case_id": "Q-VD-LIMIT-CHECK",
+      "test_case_name": "Voltage Drop Limit Verification",
+      "question": "วงจรย่อยในบ้านพักอาศัย ยอมให้แรงดันตกได้สูงสุดกี่เปอร์เซ็นต์ตามมาตรฐาน วสท.?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"61a23f25-bb2c-4429-9e2a-00c99a150299\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"61a23f25-bb2c-4429-9e2a-00c99a150299\"}"
+    },
+    {
+      "test_case_id": "Q-DERATING-MULTIFACTOR",
+      "test_case_name": "Derating Factor for Grouped Conductors",
+      "question": "ถ้าเดินสายไฟ 6 เส้นในท่อเดียวกัน ต้องใช้ตัวคูณลดค่ากระแส (derating factor) เท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"415bb540-8b63-41b8-ac33-eeb92934d661\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"415bb540-8b63-41b8-ac33-eeb92934d661\"}"
+    },
+    {
+      "test_case_id": "Q-BREAKER-SELECTION",
+      "test_case_name": "Circuit Breaker Selection for Load",
+      "question": "โหลดไฟฟ้า 18 แอมป์ ควรใช้เบรกเกอร์ขนาดกี่แอมป์?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"b6fb6da6-a30b-463a-b90f-2a52cf395b82\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"b6fb6da6-a30b-463a-b90f-2a52cf395b82\"}"
+    },
+    {
+      "test_case_id": "Q-CATALOG-DEVICE-CODE",
+      "test_case_name": "Device Code Catalog Validation",
+      "question": "เครื่องทำน้ำอุ่นไฟฟ้า 3500W ใช้รหัสอุปกรณ์อะไรใน catalog?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"03d4a990-679f-4854-b835-e6e1b0f21960\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"03d4a990-679f-4854-b835-e6e1b0f21960\"}"
+    },
+    {
+      "test_case_id": "Q-RCD-SELECTION-BY-STANDARD",
+      "test_case_name": "RCD/RCBO Requirement for Bathroom",
+      "question": "วงจรไฟฟ้าในห้องน้ำต้องติดตั้ง RCD หรือ RCBO ความไวเท่าไหร่?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"6c0a4081-0f27-44e6-87b3-9a05c1b6ce14\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"6c0a4081-0f27-44e6-87b3-9a05c1b6ce14\"}"
+    },
+    {
+      "test_case_id": "Q-INCOMPLETE-SPEC",
+      "test_case_name": "Incomplete Specification Handling",
+      "question": "ช่วยออกแบบระบบไฟฟ้าให้หน่อย",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"40aac6d9-eff5-4cd3-8293-ac08d47241db\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"40aac6d9-eff5-4cd3-8293-ac08d47241db\"}"
+    },
+    {
+      "test_case_id": "Q-OUT-OF-SCOPE",
+      "test_case_name": "Out of Scope Question Rejection",
+      "question": "วิธีทำอาหารไทยที่อร่อยที่สุด",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"0016af5c-2c25-40f4-b4dd-e938da570e65\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"0016af5c-2c25-40f4-b4dd-e938da570e65\"}"
+    },
+    {
+      "test_case_id": "Q-LANG-EN-STRICT",
+      "test_case_name": "English Language Response",
+      "question": "What is the ampacity of THW 4.0mm² cable in conduit according to EIT standard?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"859c076f-71a1-47ff-b7c0-22bbf531421e\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"859c076f-71a1-47ff-b7c0-22bbf531421e\"}"
+    },
+    {
+      "test_case_id": "Q-STANDARD-CONFLICT",
+      "test_case_name": "Standard Conflict Resolution",
+      "question": "มาตรฐาน วสท. กับ IEC มีข้อกำหนดแรงดันตกต่างกันไหม? ควรใช้ค่าไหน?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"1fa28a4c-c090-431e-91fa-4159993cb448\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"1fa28a4c-c090-431e-91fa-4159993cb448\"}"
+    },
+    {
+      "test_case_id": "Q-SYSTEM-LEAK-PATTERN",
+      "test_case_name": "System Boundary Leak Detection",
+      "question": "ช่วยคำนวณ voltage drop ให้หน่อย สายยาว 50 เมตร กระแส 20 แอมป์",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"8ad5af62-20e8-426c-9b07-1ca623f46fc6\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"8ad5af62-20e8-426c-9b07-1ca623f46fc6\"}"
+    },
+    {
+      "test_case_id": "Q-FULL-PIPELINE-EXPLAIN-MCP",
+      "test_case_name": "Full Pipeline MCP Handoff Explanation",
+      "question": "ถ้าต้องการออกแบบระบบไฟฟ้าบ้าน 2 ชั้น มีห้องนอน 3 ห้อง ครัวหนัก (มีเตาไฟฟ้า 3000W) ระบบต้องทำอะไรบ้าง?",
+      "final_verdict": "HARD-FAIL",
+      "layer0_result": {
+        "verdict": "HARD-FAIL",
+        "checks": {
+          "http_status_200": false
+        },
+        "errors": [
+          "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"8062544d-b53d-4b23-97c3-303b2dab2dc7\"}"
+        ]
+      },
+      "layer1_result": null,
+      "layer2_result": null,
+      "special_checks": {},
+      "answer": null,
+      "execution_time_ms": 0,
+      "error": "HTTP 500: {\"error\":\"Internal server error\",\"message\":\"Database error: error returned from database: (code: 14) unable to open database file\",\"request_id\":\"8062544d-b53d-4b23-97c3-303b2dab2dc7\"}"
+    }
+  ]
+}
