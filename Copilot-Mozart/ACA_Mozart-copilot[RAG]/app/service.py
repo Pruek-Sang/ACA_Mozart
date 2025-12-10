@@ -94,6 +94,21 @@ class RagService:
         # Use vector adapter (FAISS by default, ChromaDB if VECTOR_DB_BACKEND=chroma)
         from core.vector_adapter import get_vector_db
         self.db = get_vector_db()
+        
+        # =====================================================================
+        # AUTO-INGEST: Only run in Codespace environment (not Docker/Local)
+        # Docker/Local should use pre-built vector_db from Git
+        # =====================================================================
+        is_codespace = os.getenv("CODESPACES") == "true"
+        if self.db.count() == 0:
+            if is_codespace:
+                logger.warning("⚠️ Vector DB is empty! Auto-ingesting knowledge base...")
+                self._auto_ingest_knowledge()
+            else:
+                logger.error("❌ Vector DB is empty! Please ensure vector_db/ is included from Git.")
+                logger.error("   Run 'git pull' or check that vector_db/ was not deleted.")
+                raise RuntimeError("Vector DB is empty. Pre-built vector_db/ required for Local/Docker.")
+        
         self.privacy = PrivacyGuard()
         self.knowledge = KnowledgeService()
         self.use_google_ai: bool = False
@@ -122,6 +137,39 @@ class RagService:
             raise RuntimeError("GOOGLE_API_KEY not found in .env or environment. Vertex AI fallback disabled.")
         
         logger.info("RagService initialized with divine components")
+    
+    def _auto_ingest_knowledge(self) -> None:
+        """
+        Auto-ingest knowledge base when vector_db is empty
+        This is a safety net to prevent RAG from being unable to answer
+        """
+        from pathlib import Path
+        from core.ingest import IngestionEngine
+        
+        try:
+            engine = IngestionEngine()
+            knowledge_root = Path(settings.KNOWLEDGE_ROOT)
+            
+            folders = ["db", "example", "mcp", "standard"]
+            total_docs = 0
+            
+            for folder_name in folders:
+                folder_path = knowledge_root / folder_name
+                if not folder_path.exists():
+                    logger.warning(f"Folder not found: {folder_path}")
+                    continue
+                
+                docs = engine.process_folder(str(folder_path))
+                if docs:
+                    self.db.upsert(docs)
+                    total_docs += len(docs)
+                    logger.info(f"✅ Auto-ingested {len(docs)} chunks from {folder_name}/")
+            
+            logger.info(f"✨ Auto-ingest complete! Total: {total_docs} documents")
+            
+        except Exception as e:
+            logger.error(f"❌ Auto-ingest failed: {e}")
+            raise RuntimeError(f"Failed to auto-ingest knowledge base: {e}")
     
     def _get_generation_config(
         self, 
