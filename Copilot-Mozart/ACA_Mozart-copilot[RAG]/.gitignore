@@ -5,6 +5,6 @@
 Docker/.env_ACA
 *.key
 *credentials*.json
-vector_db/
+# Note: vector_db/ is NOT ignored - pre-built and committed for Local/Docker
 __pycache__/
 *.pyc

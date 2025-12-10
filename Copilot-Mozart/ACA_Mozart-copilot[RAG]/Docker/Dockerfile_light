@@ -32,8 +32,12 @@ COPY core ./core
 COPY main_ACA.py ./main.py
 COPY rag_knowledge ./rag_knowledge
 
-# Create dirs
-RUN mkdir -p logs/mcp_spec vector_db
+# Copy pre-built vector_db (ingested on Codespace)
+# This avoids needing to run ingest on Local/Docker
+COPY vector_db ./vector_db
+
+# Create log dirs
+RUN mkdir -p logs/mcp_spec
 
 EXPOSE 8080
 
