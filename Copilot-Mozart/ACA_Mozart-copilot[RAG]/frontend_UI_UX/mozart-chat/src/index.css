@@ -8,13 +8,16 @@
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: #1A1A1A;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #444;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
@@ -25,6 +28,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -39,16 +43,19 @@
 .markdown-body p {
   margin-bottom: 0.75em;
 }
+
 .markdown-body ul {
   list-style-type: disc;
   margin-left: 20px;
   margin-bottom: 0.75em;
 }
+
 .markdown-body ol {
   list-style-type: decimal;
   margin-left: 20px;
   margin-bottom: 0.75em;
 }
+
 .markdown-body pre {
   background: #111;
   padding: 12px;
@@ -56,12 +63,14 @@
   overflow-x: auto;
   border: 1px solid #333;
 }
+
 .markdown-body code {
   font-family: monospace;
   background: rgba(255, 255, 255, 0.1);
   padding: 2px 5px;
   border-radius: 4px;
 }
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
@@ -69,16 +78,56 @@
   border-radius: 8px;
   overflow: hidden;
 }
+
 .markdown-body th,
 .markdown-body td {
   padding: 10px 14px;
   border: 1px solid #444;
   text-align: left;
 }
+
 .markdown-body th {
   background-color: #2D2D2D;
   font-weight: 600;
 }
+
 .markdown-body tr:nth-child(even) {
   background-color: #2c333d;
+}
+
+/* ===== PHONE FRAME STYLES ===== */
+.phone-frame {
+  background: #0D0D0D;
+  border: 4px solid #333;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.2),
+    0 0 40px rgba(99, 102, 241, 0.15),
+    0 0 80px rgba(168, 85, 247, 0.1),
+    inset 0 0 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.phone-frame:first-child {
+  border-color: #4F46E5;
+}
+
+.phone-frame:last-child {
+  border-color: #7C3AED;
+}
+
+/* Notch decoration (optional - like iPhone) */
+.phone-frame::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 6px;
+  background: #333;
+  border-radius: 3px;
+  z-index: 100;
 }

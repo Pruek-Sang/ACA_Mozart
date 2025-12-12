@@ -16,7 +16,6 @@ function App() {
     setApiKey,
     send,
     clearMessages,
-    setJsonData,
   } = useChat();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -26,15 +25,56 @@ function App() {
   };
 
   const handleSendToMcp = (data: Record<string, unknown>) => {
-    // TODO: Implement MCP calculation call
     console.log('Sending to MCP:', data);
     send(`คำนวณจาก JSON: ${JSON.stringify(data).slice(0, 100)}...`);
   };
 
+  // ===== LOGIN SCREEN (Block access until authenticated) =====
+  if (!isAuthenticated) {
+    return (
+      <div className="h-screen bg-black flex items-center justify-center relative overflow-hidden">
+        {/* Aurora Background */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div
+            className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
+            style={{
+              background: 'radial-gradient(circle, #6366F1 0%, transparent 70%)',
+              top: '20%',
+              left: '10%',
+            }}
+          />
+          <div
+            className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
+            style={{
+              background: 'radial-gradient(circle, #A855F7 0%, transparent 70%)',
+              bottom: '10%',
+              right: '10%',
+            }}
+          />
+        </div>
+
+        {/* Login Modal */}
+        <ApiKeyModal
+          visible={true}
+          onSave={(key) => setApiKey(key)}
+          initialKey=""
+        />
+      </div>
+    );
+  }
+
+  // ===== MAIN APP (After authenticated) =====
   return (
-    <div className="h-screen bg-bgPrimary text-textPrimary flex relative overflow-hidden">
+    <div className="h-screen bg-black text-textPrimary flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Logo Watermark Placeholder */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+        <div className="text-[200px] font-bold text-white/5 select-none tracking-widest">
+          ACA
+        </div>
+      </div>
+
       {/* Aurora Background */}
-      <div className="absolute inset-0 pointer-events-none z-0">
+      <div className="absolute inset-0 pointer-events-none">
         <div
           className="absolute w-[600px] h-[600px] rounded-full opacity-15 blur-3xl"
           style={{
@@ -53,10 +93,11 @@ function App() {
         />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 flex w-full">
-        {/* Left Pane - Chat (40%) */}
-        <div className="w-2/5 flex flex-col border-r border-gray-800">
+      {/* ===== DUAL PHONE CONTAINER ===== */}
+      <div className="relative z-10 flex gap-6 w-full h-full max-w-[1600px]">
+
+        {/* ===== LEFT PHONE: Chat ===== */}
+        <div className="phone-frame flex-1 flex flex-col">
           <Header
             onClear={clearMessages}
             onSettings={() => setShowSettings(true)}
@@ -69,15 +110,15 @@ function App() {
           <InputBar onSend={send} disabled={isTyping} />
         </div>
 
-        {/* Right Pane - JSON Editor (60%) */}
-        <div className="w-3/5 bg-bgPrimary">
+        {/* ===== RIGHT PHONE: JSON Editor ===== */}
+        <div className="phone-frame flex-1">
           <JSONEditorPane data={jsonData} onSendToMcp={handleSendToMcp} />
         </div>
       </div>
 
-      {/* API Key Modal */}
+      {/* Settings Modal */}
       <ApiKeyModal
-        visible={!isAuthenticated || showSettings}
+        visible={showSettings}
         onSave={(key) => {
           setApiKey(key);
           setShowSettings(false);
