@@ -11,6 +11,9 @@ export const API_CONFIG = {
 
     /** Request timeout in milliseconds */
     TIMEOUT_MS: 60000,
+
+    /** Mock Mode to bypass Auth for development/demo */
+    MOCK_MODE: import.meta.env.VITE_MOCK_MODE === 'true',
 };
 
 /**
