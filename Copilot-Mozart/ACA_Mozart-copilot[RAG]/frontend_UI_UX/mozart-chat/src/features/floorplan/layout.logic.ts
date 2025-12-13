@@ -1,4 +1,3 @@
-
 // src/features/floorplan/layout.logic.ts
 
 /**
@@ -7,44 +6,79 @@
  * ที่พร้อมให้ Component นำไปวาดเป็นภาพได้ทันที โดยใช้หลัก Zoning & Adjacency
  */
 
-// 1. กำหนดประเภทของโซนและสี
-export enum RoomZone {
-  PUBLIC = 'PUBLIC',
-  SERVICE = 'SERVICE',
-  PRIVATE = 'PRIVATE',
-  OUTDOOR = 'OUTDOOR',
-}
+// 1. กำหนดประเภทของโซน
+export const RoomZone = {
+  PUBLIC: 'PUBLIC',
+  SERVICE: 'SERVICE',
+  PRIVATE: 'PRIVATE',
+  OUTDOOR: 'OUTDOOR',
+} as const;
 
-export const ZoneColors: Record<RoomZone, string> = {
-  [RoomZone.PUBLIC]: '#A7F3D0',   // สีเขียว Mint
-  [RoomZone.SERVICE]: '#FEF08A',  // สีเหลือง Lemon
-  [RoomZone.PRIVATE]: '#FECACA',  // สีแดง Rose
-  [RoomZone.OUTDOOR]: '#E5E7EB',  // สีเทา
+export type RoomZoneType = (typeof RoomZone)[keyof typeof RoomZone];
+
+// **[UPDATED]** Use Tailwind classes instead of Hex codes for better theming
+export const ZoneStyles: Record<RoomZoneType, { container: string; text: string; border: string; icon: string }> = {
+  [RoomZone.PUBLIC]: {
+    container: 'bg-emerald-500/10 hover:bg-emerald-500/20',
+    border: 'border-emerald-500/30',
+    text: 'text-emerald-200',
+    icon: 'text-emerald-400',
+  },
+  [RoomZone.SERVICE]: {
+    container: 'bg-amber-500/10 hover:bg-amber-500/20',
+    border: 'border-amber-500/30',
+    text: 'text-amber-200',
+    icon: 'text-amber-400',
+  },
+  [RoomZone.PRIVATE]: {
+    container: 'bg-rose-500/10 hover:bg-rose-500/20',
+    border: 'border-rose-500/30',
+    text: 'text-rose-200',
+    icon: 'text-rose-400',
+  },
+  [RoomZone.OUTDOOR]: {
+    container: 'bg-slate-500/10 hover:bg-slate-500/20',
+    border: 'border-slate-500/30',
+    text: 'text-slate-300',
+    icon: 'text-slate-400',
+  },
 };
 
 // 2. Mapping ประเภทห้องจาก Backend ไปยัง Zone ที่เรากำหนด
-const roomTypeToZone: Record<string, RoomZone> = {
+const roomTypeToZone: Record<string, RoomZoneType> = {
   // Public Zone
   LIVING_ROOM: RoomZone.PUBLIC,
   FOYER: RoomZone.PUBLIC,
   RECEPTION: RoomZone.PUBLIC,
+  HALLWAY: RoomZone.PUBLIC,
 
   // Service Zone
   KITCHEN: RoomZone.SERVICE,
   DINING: RoomZone.SERVICE,
   LAUNDRY: RoomZone.SERVICE,
+  STORAGE: RoomZone.SERVICE,
+  GARAGE: RoomZone.SERVICE,
+  PUMP_ROOM: RoomZone.SERVICE,
 
   // Private Zone
   BEDROOM: RoomZone.PRIVATE,
   BATHROOM: RoomZone.PRIVATE,
   OFFICE: RoomZone.PRIVATE,
   MASTER_BEDROOM: RoomZone.PRIVATE,
+  WALK_IN_CLOSET: RoomZone.PRIVATE,
 
   // Outdoor Zone
-  GARAGE: RoomZone.OUTDOOR,
-  PUMP_ROOM: RoomZone.OUTDOOR,
   GARDEN: RoomZone.OUTDOOR,
+  TERRACE: RoomZone.OUTDOOR,
+  BALCONY: RoomZone.OUTDOOR,
 };
+
+// **[NEW]** Load Data Interface
+export interface LoadData {
+  id: string;
+  type: string; // e.g., 'LIGHT', 'OUTLET', 'SWITCH'
+  name: string;
+}
 
 // 3. Interface สำหรับข้อมูลห้องและ Layout ที่จะส่งออกไป
 export interface RoomData {
@@ -52,17 +86,26 @@ export interface RoomData {
   name: string;
   room_type: string;
   floor: number;
+  loads?: LoadData[]; // **[NEW]** Support loads
 }
 
 export interface LayoutRoom extends RoomData {
-  zone: RoomZone;
+  zone: RoomZoneType;
+  index: number; // For animation stagger
+}
+
+// **[NEW]** Wire Connection Interface
+export interface WireData {
+  id: string;
+  fromRoomId: string;
+  toRoomId: string;
+  zone: RoomZoneType;
 }
 
 export interface FloorLayout {
   floor: number;
-  // Layout จะเป็น Array ของ Array (Grid) เพื่อให้วาดง่าย
-  // เช่น [[Room1, Room2], [Room3]]
   rows: LayoutRoom[][];
+  wires: WireData[]; // **[NEW]** Connections for visualizer
 }
 
 // 4. ฟังก์ชันหลัก: อัลกอริทึมการคำนวณ Layout
@@ -72,9 +115,10 @@ export const calculateLayout = (rooms: RoomData[]): FloorLayout[] => {
   }
 
   // Step 1: แปลงข้อมูลดิบและกำหนด Zone ให้แต่ละห้อง
-  const layoutRooms: LayoutRoom[] = rooms.map(room => ({
+  const layoutRooms: LayoutRoom[] = rooms.map((room, index) => ({
     ...room,
     zone: roomTypeToZone[room.room_type.toUpperCase()] || RoomZone.PRIVATE,
+    index,
   }));
 
   // Step 2: จัดกลุ่มห้องตาม "ชั้น"
@@ -84,26 +128,48 @@ export const calculateLayout = (rooms: RoomData[]): FloorLayout[] => {
   }, {});
 
   // Step 3: สร้าง Layout ของแต่ละชั้น
+  const zoneOrder: RoomZoneType[] = [RoomZone.OUTDOOR, RoomZone.PUBLIC, RoomZone.SERVICE, RoomZone.PRIVATE];
+
   const finalLayouts = Object.keys(roomsByFloor).map(floorStr => {
     const floor = parseInt(floorStr);
     const floorRooms = roomsByFloor[floor];
 
     // จัดเรียงห้องตาม Zone: OUTDOOR -> PUBLIC -> SERVICE -> PRIVATE
     const sortedRooms = [...floorRooms].sort((a, b) => {
-      const zoneOrder = [RoomZone.OUTDOOR, RoomZone.PUBLIC, RoomZone.SERVICE, RoomZone.PRIVATE];
       return zoneOrder.indexOf(a.zone) - zoneOrder.indexOf(b.zone);
     });
 
     // สร้าง Grid Layout แบบง่ายๆ (วาง 3 ห้องต่อแถว)
     const rows: LayoutRoom[][] = [];
-    for (let i = 0; i < sortedRooms.length; i += 3) {
-      rows.push(sortedRooms.slice(i, i + 3));
+    const roomsPerRow = 3;
+    for (let i = 0; i < sortedRooms.length; i += roomsPerRow) {
+      rows.push(sortedRooms.slice(i, i + roomsPerRow));
     }
-    
-    return { floor, rows };
+
+    // **[NEW]** Generate Simple Wiring Connections
+    // Connect rooms sequentially within the same zone to simulate a "circuit"
+    const wires: WireData[] = [];
+
+    // Group by zone to create intra-zone connections
+    const roomsByZone: Record<string, LayoutRoom[]> = {};
+    sortedRooms.forEach(room => {
+      (roomsByZone[room.zone] = roomsByZone[room.zone] || []).push(room);
+    });
+
+    Object.entries(roomsByZone).forEach(([, zoneRooms]) => {
+      for (let i = 0; i < zoneRooms.length - 1; i++) {
+        wires.push({
+          id: `wire-${zoneRooms[i].id}-${zoneRooms[i + 1].id}`,
+          fromRoomId: zoneRooms[i].id,
+          toRoomId: zoneRooms[i + 1].id,
+          zone: zoneRooms[i].zone,
+        });
+      }
+    });
+
+    return { floor, rows, wires };
   });
 
   // จัดเรียงชั้นจากมากไปน้อย (ชั้น 2 อยู่บน ชั้น 1 อยู่ล่าง)
   return finalLayouts.sort((a, b) => b.floor - a.floor);
 };
-
