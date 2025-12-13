@@ -1,11 +1,33 @@
+
+// src/hooks/useChat.ts
 /**
  * Custom hook for managing chat state
+ * Version 2: Integrated with Floor Plan data
  */
 
 import { useState, useCallback } from 'react';
 import { API_CONFIG } from '../config/api.config';
 import type { Message, ChatState } from '../types/gateway';
-import { sendMessage, extractDisplayMessage, hasStructuredData } from '../services/gateway';
+import { sendMessage, extractDisplayMessage } from '../services/gateway';
+import type { RoomData } from '../features/floorplan/layout.logic';
+
+// Helper function to extract room data from the raw response
+const extractRoomData = (data: any): RoomData[] => {
+  // Logic to find room data in the complex nested object from Gateway
+  if (data && data.result && data.result.project_requirements)
+  {
+    return data.result.project_requirements.rooms || [];
+  }
+  if (data && data.project_requirements)
+  {
+    return data.project_requirements.rooms || [];
+  }
+  if(data && data.rooms)
+  {
+    return data.rooms;
+  }
+  return [];
+};
 
 export function useChat() {
     const [state, setState] = useState<ChatState>(() => ({
@@ -15,7 +37,8 @@ export function useChat() {
         isAuthenticated: !!localStorage.getItem(API_CONFIG.STORAGE_KEY),
     }));
 
-    const [jsonData, setJsonData] = useState<Record<string, unknown> | null>(null);
+    // State for the Floor Plan Visualizer
+    const [rooms, setRooms] = useState<RoomData[]>([]);
 
     const setApiKey = useCallback((key: string) => {
         localStorage.setItem(API_CONFIG.STORAGE_KEY, key);
@@ -44,30 +67,27 @@ export function useChat() {
         async (input: string) => {
             if (!input.trim() || state.isTyping) return;
 
-            // Add user message
             addMessage({ role: 'user', content: input });
-
-            // Set typing state
             setState((prev) => ({ ...prev, isTyping: true }));
 
             try {
                 const response = await sendMessage(input, state.apiKey);
 
-                // Extract display message
                 const displayContent = extractDisplayMessage(response.data);
-
-                // Check for structured data (for JSON Editor)
-                if (hasStructuredData(response.data)) {
-                    setJsonData(response.data);
+                
+                // **[NEW]** Extract room data for the visualizer
+                const roomData = extractRoomData(response.data);
+                if (roomData.length > 0) {
+                    setRooms(roomData);
                 }
 
-                // Add bot message
                 addMessage({
                     role: 'bot',
                     content: displayContent,
                     mode: response.mode,
                     rawData: response.data,
                 });
+
             } catch (error) {
                 const errorMessage =
                     error instanceof Error ? error.message : 'Unknown error occurred';
@@ -85,19 +105,21 @@ export function useChat() {
 
     const clearMessages = useCallback(() => {
         setState((prev) => ({ ...prev, messages: [] }));
-        setJsonData(null);
+        setRooms([]); // **[NEW]** Clear rooms on chat clear
     }, []);
 
     return {
+        // Existing state and functions
         messages: state.messages,
         isTyping: state.isTyping,
         apiKey: state.apiKey,
         isAuthenticated: state.isAuthenticated,
-        jsonData,
         setApiKey,
         clearApiKey,
         send,
         clearMessages,
-        setJsonData,
+        
+        // **[NEW]** State for the Floor Plan
+        rooms,
     };
 }

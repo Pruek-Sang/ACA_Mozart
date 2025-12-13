@@ -1,21 +1,28 @@
+
+// src/App.tsx
+// Version 2: Replaced JSON Editor with Floor Plan Visualizer
+
 import { useState } from 'react';
 import { Header } from './components/Header';
 import { ChatPane } from './components/ChatPane';
 import { InputBar } from './components/InputBar';
 import { ApiKeyModal } from './components/ApiKeyModal';
-import { JSONEditorPane } from './components/JSONEditorPane';
 import { useChat } from './hooks/useChat';
+import FloorPlanVisualizer from './features/floorplan/FloorPlanVisualizer'; // 🆕 Import the new component
 
 function App() {
   const {
+    // Chat-related state
     messages,
     isTyping,
-    isAuthenticated,
-    apiKey,
-    jsonData,
-    setApiKey,
     send,
     clearMessages,
+    // Auth-related state
+    isAuthenticated,
+    apiKey,
+    setApiKey,
+    // **[NEW]** Floor plan data
+    rooms,
   } = useChat();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -24,16 +31,11 @@ function App() {
     send(text);
   };
 
-  const handleSendToMcp = (data: Record<string, unknown>) => {
-    console.log('Sending to MCP:', data);
-    send(`คำนวณจาก JSON: ${JSON.stringify(data).slice(0, 100)}...`);
-  };
-
-  // ===== LOGIN SCREEN (Block access until authenticated) =====
+  // ===== LOGIN SCREEN =====
   if (!isAuthenticated) {
     return (
       <div className="h-screen bg-black flex items-center justify-center relative overflow-hidden">
-        {/* Aurora Background */}
+        {/* Background effects... */}
         <div className="absolute inset-0 pointer-events-none">
           <div
             className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
@@ -52,8 +54,6 @@ function App() {
             }}
           />
         </div>
-
-        {/* Login Modal */}
         <ApiKeyModal
           visible={true}
           onSave={(key) => setApiKey(key)}
@@ -63,41 +63,24 @@ function App() {
     );
   }
 
-  // ===== MAIN APP (After authenticated) =====
+  // ===== MAIN APP =====
   return (
-    <div className="h-screen bg-black text-textPrimary flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Logo Watermark Placeholder */}
+    <div className="h-screen bg-black text-white flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background & Watermark... */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
         <div className="text-[200px] font-bold text-white/5 select-none tracking-widest">
           ACA
         </div>
       </div>
-
-      {/* Aurora Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div
-          className="absolute w-[600px] h-[600px] rounded-full opacity-15 blur-3xl"
-          style={{
-            background: 'radial-gradient(circle, #6366F1 0%, transparent 70%)',
-            top: '10%',
-            left: '5%',
-          }}
-        />
-        <div
-          className="absolute w-[600px] h-[600px] rounded-full opacity-15 blur-3xl"
-          style={{
-            background: 'radial-gradient(circle, #A855F7 0%, transparent 70%)',
-            bottom: '10%',
-            right: '5%',
-          }}
-        />
+        {/* ...aurora effects... */}
       </div>
 
-      {/* ===== DUAL PHONE CONTAINER ===== */}
+      {/* ===== DUAL PANE CONTAINER ===== */}
       <div className="relative z-10 flex gap-6 w-full h-full max-w-[1600px]">
 
-        {/* ===== LEFT PHONE: Chat ===== */}
-        <div className="phone-frame flex-1 flex flex-col">
+        {/* ===== LEFT PANE: Chat ===== */}
+        <div className="phone-frame flex-1 flex flex-col bg-gray-900/50 backdrop-blur-sm">
           <Header
             onClear={clearMessages}
             onSettings={() => setShowSettings(true)}
@@ -110,9 +93,9 @@ function App() {
           <InputBar onSend={send} disabled={isTyping} />
         </div>
 
-        {/* ===== RIGHT PHONE: JSON Editor ===== */}
-        <div className="phone-frame flex-1">
-          <JSONEditorPane data={jsonData} onSendToMcp={handleSendToMcp} />
+        {/* ===== RIGHT PANE: Floor Plan Visualizer 🆕 ===== */}
+        <div className="phone-frame flex-1 flex flex-col bg-gray-900/50 backdrop-blur-sm">
+          <FloorPlanVisualizer rooms={rooms} />
         </div>
       </div>
 
