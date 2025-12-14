@@ -50,6 +50,39 @@ services:
     networks:
       - mozart-network
 
+  # ═══════════════════════════════════════════════════════════════════
+  # Gateway - API Orchestration Layer
+  # ═══════════════════════════════════════════════════════════════════
+  gateway:
+    container_name: gateway-prod
+    image: acatest01/mozart-gateway:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - MOZART_ENDPOINT=http://mozart-rag:8080
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - mozart-rag
+      - mcp-core
+    restart: always
+    networks:
+      - mozart-network
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Frontend (NGINX + React App)
+  # ═══════════════════════════════════════════════════════════════════
+  frontend:
+    container_name: frontend-prod
+    image: acatest01/mozart-frontend:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - gateway
+    restart: always
+    networks:
+      - mozart-network
+
 networks:
   mozart-network:
     driver: bridge
