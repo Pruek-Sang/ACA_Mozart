@@ -1,0 +1,26 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Dockerfile for Mozart Frontend (NGINX + React)
+# ═══════════════════════════════════════════════════════════════════════════
+# This is used by GitHub Actions to build the frontend Docker image
+# ═══════════════════════════════════════════════════════════════════════════
+
+FROM nginx:1.25-alpine
+
+# Copy nginx configuration
+COPY Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx.conf /etc/nginx/nginx.conf
+
+# Copy built React app (from GitHub Actions build step)
+COPY Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/dist /usr/share/nginx/html
+
+# Add health check file
+RUN echo '{"status":"healthy","service":"mozart-frontend"}' > /usr/share/nginx/html/health.json
+
+# Expose ports
+EXPOSE 80 443
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -q --spider http://localhost/health || exit 1
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
