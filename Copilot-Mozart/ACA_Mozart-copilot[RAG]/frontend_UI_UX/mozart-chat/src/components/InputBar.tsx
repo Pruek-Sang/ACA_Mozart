@@ -1,5 +1,6 @@
 import { Send } from 'lucide-react';
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef } from 'react';
+import type { KeyboardEvent } from 'react';
 
 interface InputBarProps {
     onSend: (text: string) => void;
@@ -46,7 +47,7 @@ export function InputBar({ onSend, disabled }: InputBarProps) {
                         onKeyDown={handleKeyDown}
                         rows={1}
                         className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 focus:outline-none resize-none max-h-32"
-                        placeholder="พิมพ์ข้อความ... (เช่น 'ออกแบบไฟห้องครัว')"
+                        placeholder="💡 ลองถาม: (เช่น 'ออกแบบไฟห้องครัว')"
                         disabled={disabled}
                     />
                     <button

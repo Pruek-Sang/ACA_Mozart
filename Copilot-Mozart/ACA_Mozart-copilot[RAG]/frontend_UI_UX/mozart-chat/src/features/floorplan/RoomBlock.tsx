@@ -1,5 +1,5 @@
 // src/features/floorplan/RoomBlock.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ZoneStyles } from './layout.logic';
 import type { LayoutRoom, LoadData } from './layout.logic';
 import {
@@ -14,18 +14,22 @@ import {
   Sun,
   Lightbulb,
   Zap,
-  Power
+  Power,
+  GripVertical
 } from 'lucide-react';
 
 interface RoomBlockProps {
   room: LayoutRoom;
+  onDragStart?: (room: LayoutRoom) => void;
+  onDragEnd?: () => void;
 }
 
-const RoomBlock: React.FC<RoomBlockProps> = ({ room }) => {
+const RoomBlock: React.FC<RoomBlockProps> = ({ room, onDragStart, onDragEnd }) => {
   const styles = ZoneStyles[room.zone];
   const delayStyle = { animationDelay: `${room.index * 0.1}s` };
+  const [isDragging, setIsDragging] = useState(false);
 
-  // **[NEW]** Helper to get icon based on room type
+  // Helper to get icon based on room type
   const RoomIcon = useMemo(() => {
     const type = room.room_type.toUpperCase();
     if (type.includes('BED')) return BedDouble;
@@ -39,7 +43,7 @@ const RoomBlock: React.FC<RoomBlockProps> = ({ room }) => {
     return Sun; // Default
   }, [room.room_type]);
 
-  // **[NEW]** Helper to get load icon
+  // Helper to get load icon
   const getLoadIcon = (type: string) => {
     if (type === 'LIGHT') return <Lightbulb className="w-3 h-3 text-yellow-200" />;
     if (type === 'OUTLET') return <Zap className="w-3 h-3 text-blue-200" />;
@@ -47,55 +51,79 @@ const RoomBlock: React.FC<RoomBlockProps> = ({ room }) => {
     return <div className="w-2 h-2 bg-gray-400 rounded-full" />;
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true);
+    e.dataTransfer.setData('text/plain', room.id);
+    onDragStart?.(room);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    onDragEnd?.();
+  };
+
   return (
     <div
       id={`room-${room.id}`}
       style={delayStyle}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       className={`
         relative group
-        w-40 h-32 md:w-48 md:h-36
-        flex flex-col items-center justify-center
-        rounded-xl border backdrop-blur-md
+        w-28 h-28 sm:w-32 sm:h-32 md:w-36 md:h-36 lg:w-40 lg:h-40
+        flex flex-col items-center justify-between p-2
+        rounded-xl border border-white/10 backdrop-blur-md
         transition-all duration-300 ease-out
-        hover:scale-105 hover:shadow-xl hover:z-20
-        cursor-default select-none
+        hover:scale-105 hover:shadow-2xl hover:shadow-white/10 hover:z-20 hover:border-white/30
+        cursor-grab active:cursor-grabbing select-none
         animate-fadeIn opacity-0 fill-mode-forwards
+        shadow-lg shadow-black/20
+        ${isDragging ? 'opacity-50 scale-95' : ''}
         ${styles.container}
         ${styles.border}
       `}
     >
-      {/* Zone Badge */}
+      {/* Drag Handle */}
+      <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-50 transition-opacity">
+        <GripVertical className="w-3 h-3 text-white/50" />
+      </div>
+
+      {/* Zone Badge - top right */}
       <div className={`
-        absolute top-2 right-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider opacity-70
+        absolute top-1 right-1 px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold uppercase tracking-wide opacity-60
         border border-white/10
         ${styles.text}
       `}>
         {room.zone}
       </div>
 
-      {/* Main Icon */}
-      <div className={`mb-2 p-2 rounded-full bg-white/5 shadow-inner ${styles.icon}`}>
-        <RoomIcon className="w-6 h-6 md:w-8 md:h-8" />
+      {/* Main Icon - centered top area */}
+      <div className={`mt-3 p-1.5 sm:p-2 rounded-full bg-white/5 shadow-inner ${styles.icon}`}>
+        <RoomIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
       </div>
 
-      {/* Room Name */}
-      <div className="text-center px-2 w-full">
-        <h4 className={`text-sm md:text-base font-semibold truncate ${styles.text}`}>
+      {/* Room Name - bottom area, NOT blocking icon */}
+      <div className="text-center w-full mt-auto">
+        <h4 className={`text-[10px] sm:text-xs md:text-sm font-semibold truncate px-1 ${styles.text}`}>
           {room.name}
         </h4>
-        <p className="text-[10px] text-gray-400 font-mono mt-0.5">
+        <p className="text-[8px] text-gray-400 font-mono">
           ID: {room.id.slice(0, 4)}
         </p>
       </div>
 
-      {/* **[NEW]** Loads Simulation */}
+      {/* Loads Simulation - absolute bottom */}
       {room.loads && room.loads.length > 0 && (
-        <div className="absolute bottom-2 left-2 right-2 flex justify-center gap-1 flex-wrap">
-          {room.loads.map((load: LoadData, idx: number) => (
-            <div key={`${load.id}-${idx}`} title={load.name} className="p-0.5 bg-black/20 rounded hover:bg-black/40 transition-colors">
+        <div className="absolute -bottom-1 left-1 right-1 flex justify-center gap-0.5 flex-wrap">
+          {room.loads.slice(0, 4).map((load: LoadData, idx: number) => (
+            <div key={`${load.id}-${idx}`} title={load.name} className="p-0.5 bg-black/30 rounded hover:bg-black/50 transition-colors">
               {getLoadIcon(load.type)}
             </div>
           ))}
+          {room.loads.length > 4 && (
+            <span className="text-[8px] text-gray-400">+{room.loads.length - 4}</span>
+          )}
         </div>
       )}
     </div>

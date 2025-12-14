@@ -128,16 +128,12 @@ const FloorPlanVisualizer: React.FC<FloorPlanVisualizerProps> = ({ rooms }) => {
               <div className="h-px bg-gray-800 flex-1" />
             </div>
 
-            <div className="grid gap-6 p-6 rounded-2xl bg-bgSecondary/30 border border-gray-800/50 backdrop-blur-sm shadow-xl relative overflow-hidden group">
-              {/* Subtle grid background */}
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 p-4 sm:p-5 md:p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-xl relative overflow-hidden group hover:bg-white/10 transition-colors duration-500">
+              {/* Subtle grid background - lighter opacity */}
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
 
-              {floorData.rows.map((row, rowIndex: number) => (
-                <div key={rowIndex} className="flex flex-wrap justify-center gap-6 relative z-10">
-                  {row.map(room => (
-                    <RoomBlock key={room.id} room={room} />
-                  ))}
-                </div>
+              {floorData.rows.flatMap(row => row).map(room => (
+                <RoomBlock key={room.id} room={room} />
               ))}
             </div>
           </div>
