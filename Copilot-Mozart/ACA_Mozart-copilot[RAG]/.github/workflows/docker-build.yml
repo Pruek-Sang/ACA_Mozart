@@ -85,7 +85,7 @@ jobs:
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.19.0'
           cache: 'npm'
           cache-dependency-path: './Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/package-lock.json'
 
