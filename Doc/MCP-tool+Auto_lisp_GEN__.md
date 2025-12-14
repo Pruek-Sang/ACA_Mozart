@@ -1,0 +1,323 @@
+# Source: 📐 แผนดำเนินการจริง_ จากจุดวางปลั๊ก ถึงหน้างานติดตั้ง.md
+
+```md
+# **📐 แผนดำเนินการจริง: จากจุดวางปลั๊ก ถึงหน้างานติดตั้ง**
+
+(มองปัญหาจากมุมช่างไฟฟ้าในไซต์งาน)
+
+---
+
+## **🎯 เป้าหมายสุดท้ายของระบบ**
+
+"ไม่ใช่แค่ได้เส้นสีฟ้าบนจอ AutoCAD... แต่ต้องได้ 'คู่มือติดตั้ง' ที่ช่างเอาไปทำงานได้จริง โดยไม่ต้องคิดเอง"
+
+---
+
+## **🔧 ข้อ 5: การเดินสายต้องคำนึงถึงวิธีการติดตั้ง**
+
+### **ปัญหาในงานจริงที่เห็นชัดเจน:**
+
+1. เส้นในแบบ ≠ เส้นในหน้างาน  
+   * แบบวาดเส้นตรงลอย ๆ แต่จริงต้องเดินอ้อมเสา หลบท่อแอร์  
+2. ขนาดท่อ ≠ จำนวนสาย  
+   * ลากสาย 5 เส้นใส่ท่อ 20mm ไม่ได้ (เต็มเกิน 40%)  
+3. ไม่มีจุดยึด \= ห้อยโหนเอาทีหลัง  
+   * ท่อต้องมีจุดยึดทุก 1.5m แต่แบบไม่เคยเขียน  
+4. ลำดับการติดตั้งสลับกัน  
+   * ควรร้อยท่อก่อนดึงสาย แต่แบบวาดเป็นขั้นตอนเดียว
+
+---
+
+## **🗺️ แผนดำเนินการ 4 ขั้นตอน (Step-by-Step)**
+
+### **ขั้นที่ 1: Device Placement \+ Validation (วางอุปกรณ์ให้ถูกที่)**
+
+*(ก่อนคิดเรื่องเดินสาย)*
+
+lisp
+
+;; Input: JSON ที่บอกมีอุปกรณ์อะไร อยู่ที่ไหน  
+;; Output: ตำแหน่งที่ผ่านกฎแล้ว
+
+(defun validate-for-installation (device-list)  
+  ;; ตรวจสอบ 3 ระดับก่อนวางสาย:  
+    
+  ;; 1\. ตรวจกฎพื้นฐาน (Basic Rules)  
+  (check-height device-type)       ;; ปลั๊ก 300mm, สวิตช์ 1100mm  
+  (check-clearance device-type)    ;; ห่างประตู 200mm, ห่างมุม 150mm  
+    
+  ;; 2\. ตรวจการเข้าถึง (Accessibility)  
+  (check-behind-furniture?)        ;; ปลั๊กอยู่หลังตู้เลยติดตั้งไม่ได้  
+  (check-future-maintenance?)      ;; แผงไฟอยู่ในซอกแคบ ๆ เปิดฝาไม่ได้  
+    
+  ;; 3\. ตรวจความปลอดภัย (Safety)  
+  (check-near-water?)              ;; บริเวณเปียกต้องเป็น IP44  
+  (check-overload-area?)           ;; วางอุปกรณ์หนาแน่นเกินไป  
+    
+  ;; ถ้าไม่ผ่าน → ขอตำแหน่งใหม่ หรือ แจ้ง error  
+  (return validated-devices)
+
+)
+
+ผลลัพธ์ขั้นนี้:  
+✅ รายการอุปกรณ์พร้อมตำแหน่งที่ "ติดตั้งได้จริง"  
+❌ ตำแหน่งที่ต้องแก้ไข \+ เหตุผล
+
+---
+
+### **ขั้นที่ 2: Wiring Path Planning \+ Conduit Design**
+
+*(คิดท่อและสายไปพร้อมกัน)*
+
+lisp
+
+;; Input: อุปกรณ์ที่ validated แล้ว  
+;; Output: เส้นทางเดินท่อ \+ ขนาดท่อ \+ จุดยึด
+
+(defun plan-conduit-routes (validated-devices)  
+  ;; ไม่ใช่แค่ลากเส้นตรง แต่ต้องคิดว่า...  
+    
+  ;; 1\. เลือกวิธีการเดิน (Wiring Method)  
+  (cond  
+    ;; กรณี 1: ฝังในคอนกรีต (ต้องวางก่อนเทเสา)  
+    ((in-slab-area)   
+     (setq method "EMBEDDED\_IN\_SLAB")  
+     (setq conduit-type "PVC\_RIGID")  
+     (setq install-phase "BEFORE\_CONCRETE"))  
+      
+    ;; กรณี 2: ฝังในผนัง (ต้องเจาะก่อนปูน)  
+    ((in-wall-area)  
+     (setq method "EMBEDDED\_IN\_WALL")  
+     (setq conduit-type "PVC\_FLEX")  
+     (setq install-phase "AFTER\_BLOCK\_WORK"))  
+      
+    ;; กรณี 3: วางผิว (งาน renovation)  
+    ((exposed-area)  
+     (setq method "SURFACE\_MOUNT")  
+     (setq conduit-type "EMT")  
+     (setq install-phase "AFTER\_FINISH"))  
+  )  
+    
+  ;; 2\. คำนวณขนาดท่อ (Conduit Sizing)  
+  (defun calculate-conduit-size (wires)  
+    ;; ตามมาตรฐาน NEC/IEC/EIT:  
+    ;; พื้นที่หน้าตัดของสาย ≤ 40% ของพื้นที่ท่อ  
+    (let\* ((total-wire-area (sum-wire-areas wires))  
+           (min-conduit-area (/ total-wire-area 0.4))  
+           (conduit-size (round-up-to-standard-size min-conduit-area)))  
+      conduit-size))  
+    
+  ;; 3\. กำหนดจุดยึด (Supports)  
+  (defun add-supports (conduit-path)  
+    ;; ท่อต้องมีจุดยึด:  
+    ;; \- ทุก ๆ 1.5m สำหรับท่อขนาด ≤ 20mm  
+    ;; \- ทุก ๆ 2.0m สำหรับท่อขนาด \> 20mm  
+    ;; \- ใกล้จุดเปลี่ยนทิศทาง (≤ 300mm)  
+    (generate-support-points conduit-path))  
+    
+  (return (list method conduit-type conduit-size support-points))
+
+)
+
+ผลลัพธ์ขั้นนี้:  
+✅ แผนผังเดินท่อ \+ ขนาดท่อแต่ละเส้นทาง  
+✅ รายการจุดยึด (ตำแหน่ง exact)  
+✅ วิธีการติดตั้ง \+ จังหวะงาน (ติดตั้งตอนไหน)
+
+---
+
+### **ขั้นที่ 3: Generate Installation Instructions**
+
+*(แปลแบบแปลนเป็นภาษาช่าง)*
+
+lisp
+
+;; Input: เส้นทางเดินท่อ \+ อุปกรณ์  
+;; Output: คู่มือติดตั้งทีละขั้นตอน
+
+(defun generate-work-instructions (conduit-plan)  
+  ;; สร้าง "ใบสั่งงาน" อัตโนมัติ  
+    
+  (list  
+    ;; ส่วนที่ 1: วัสดุที่ต้องใช้ (Material Take-off)  
+    :materials  
+    \`((conduit ,(get-conduit-length conduit-plan) "m")  
+      (conduit-fittings ,(count-fittings conduit-plan) "pcs")  
+      (support-clips ,(count-supports conduit-plan) "pcs")  
+      (wire-2.5mm2 ,(calculate-wire-length conduit-plan) "m"))  
+      
+    ;; ส่วนที่ 2: ลำดับการทำงาน (Work Sequence)  
+    :sequence  
+    '(1 "ตีเส้นตำแหน่งท่อและจุดยึด"  
+       2 "ติดตั้งจุดยึดท่อตามตำแหน่ง"  
+       3 "ตัดและต่อท่อตามความยาวที่กำหนด"  
+       4 "ร้อยสายไฟผ่านท่อ (อย่าลืมดึงสายดิน)"  
+       5 "ตรวจสอบความตึงและจุดยึด"  
+       6 "ติดตั้งอุปกรณ์ปลายทาง")  
+      
+    ;; ส่วนที่ 3: ข้อควรระวัง (Cautions)  
+    :cautions  
+    '("ห้ามเดินท่อไฟฟ้าคู่กับท่อน้ำในรางเดียวกัน"  
+      "จุดต่อท่อต้องใช้กาว PVC ให้สนิท"  
+      "ก่อนดึงสาย ให้เช็ดภายในท่อให้สะอาด")  
+  )
+
+)
+
+ผลลัพธ์ขั้นนี้:  
+✅ Bill of Materials (BOM) ที่แม่นยำ  
+✅ ลำดับขั้นตอนติดตั้ง (Work Sequence)  
+✅ ข้อควรระวังเฉพาะจุด
+
+---
+
+### **ขั้นที่ 4: Drawings \+ Annotations ที่สื่อสารกับช่าง**
+
+*(สุดท้ายค่อย plot แบบแปลน)*
+
+lisp
+
+;; Input: ทุกอย่างจาก 3 ขั้นตอนก่อนหน้า  
+;; Output: แบบแปลนที่ช่างอ่านเข้าใจ
+
+(defun generate-construction-drawing (all-data)  
+  ;; Layer ไม่ใช่แค่สี แต่สื่อความหมาย  
+  (create-layers  
+    '("E-POWER-WIRE"    :color 1 :desc "สายไฟกำลัง (ต้องต่อระบบก่อน)")  
+    ('("E-CONDUIT"       :color 8 :linetype "DASHED" :desc "ท่อร้อยสาย")  
+    ('("E-SUPPORT"       :color 9 :linetype "DOT" :desc "จุดยึดท่อ")  
+    ('("E-NOTE-INSTALL"  :color 3 :desc "หมายเหตุการติดตั้ง")  
+  )  
+    
+  ;; วาดท่อ \+ ขนาดอัตโนมัติ  
+  (draw-conduit-with-dimensions conduit-path)  
+    
+  ;; ใส่สัญลักษณ์จุดยึด  
+  (draw-support-symbols support-points)  
+    
+  ;; หมายเหตุเป็นภาษาเข้าใจง่าย  
+  (add-installation-notes  
+    "ท่อนี้เดินฝังพื้น → ต้องวางก่อนเทคอนกรีตวันที่ 15/11"  
+    "จุดนี้ต้องใช้ข้องอ 90 องศา 2 ตัว"  
+    "ปล่อยสายยาวเผื่อ 30cm ที่ปลายท่อ")  
+    
+  ;; สร้าง Detail View อัตโนมัติตรงจุดซับซ้อน  
+  (when (complex-junction? conduit-path)  
+    (create-detail-view "DETAIL-A" scale 1:20))
+
+)
+
+ผลลัพธ์ขั้นนี้:  
+✅ แบบแปลน AutoCAD .dwg ที่ plot ออกมาทำงานได้เลย  
+✅ มี Detail View เฉพาะจุดยาก  
+✅ หมายเหตุภาษาไทยชัดเจน
+
+---
+
+## **📊 ตารางสรุป Data Flow ทั้งหมด**
+
+| ขั้นตอน | Input | Output | เป้าหมาย |
+| :---- | :---- | :---- | :---- |
+| 1\. Validate Placement | JSON devices | Validated positions \+ Errors | "ติดตั้งได้จริงไหม" |
+| 2\. Plan Conduit | Validated devices | Conduit path \+ Size \+ Supports | "เดินยังไง ใช้ท่ออะไร" |
+| 3\. Generate Instructions | Conduit plan | BOM \+ Work Sequence \+ Cautions | "ต้องใช้อะไรบ้าง ทำยังไง" |
+| 4\. Create Drawings | Everything | Annotated drawings \+ Details | "แบบแปลนส่งหน้างาน" |
+
+---
+
+## **🚨 สิ่งที่ขาดไปในระบบเดิม (และต้องเพิ่ม)**
+
+### **1\. Construction Phasing Logic**
+
+lisp
+
+;; แยกเฟสงานอัตโนมัติ  
+(defun auto-phase-plan (project-size)  
+  (case project-size  
+    (:small-house  '(("Phase1" "ร้อยท่อและดึงสายทั้งหมด")  
+                     ("Phase2" "ติดตั้งอุปกรณ์ทั้งหมด")))  
+    (:large-building '(("Phase1" "ร้อยท่อชั้น 1")  
+                       ("Phase2" "ดึงสายชั้น 1")  
+                       ("Phase3" "ร้อยท่อชั้น 2")
+
+                       ...)))
+
+### **2\. Existing Conditions Handler**
+
+lisp
+
+;; กรณี renovation \- อ่านแบบเดิมก่อน  
+(defun handle-existing-wiring (old-drawing)  
+  (detect-existing-conduits old-drawing)  
+  (check-reusability old-wires)  ;; สายเก่าใช้ต่อได้ไหม?  
+  (plan-connection-to-existing)  ;; ต่อกับระบบเก่ายังไง
+
+)
+
+### **3\. Inspection Points Generation**
+
+lisp
+
+;; สร้างจุดตรวจสอบสำหรับ Clerk of Works  
+(defun generate-inspection-points (conduit-path)  
+  '(  
+    ("ก่อนปิดท่อ" "ตรวจสอบไม่มีขี้เลื่อยในท่อ")  
+    ("หลังดึงสาย" "ตรวจสอบฉนวนไม่ชำรุด")  
+    ("ก่อนต่อไฟ" "ตรวจสอบค่า insulation resistance")  
+  )
+
+)
+
+---
+
+## **🎯 แผนดำเนินการจริง (Timeline)**
+
+### **สัปดาห์ 1-2: พัฒนา Core Engine**
+
+text
+
+1\. Validate Placement Module (พื้นฐานที่สุด)  
+2\. Conduit Sizing Calculator (ตามมาตรฐานจริง)
+
+3\. Support Point Generator
+
+### **สัปดาห์ 3-4: เพิ่ม Construction Logic**
+
+text
+
+1\. Wiring Method Selector (ฝัง/วางผิว)  
+2\. Work Sequence Generator
+
+3\. BOM Generator
+
+### **สัปดาห์ 5-6: Complete Drawing Output**
+
+text
+
+1\. Auto-Annotation System  
+2\. Detail View Generator
+
+3\. Inspection Points Marker
+
+### **สัปดาห์ 7-8: Testing & Refinement**
+
+text
+
+1\. Test with real projects (เล็ก→ใหญ่)  
+2\. Refine based on feedback
+
+3\. Document user manual
+
+---
+
+## **💡 แนวคิดหลักที่ต้องยึดถือ:**
+
+"เรากำลังสร้าง 'ช่างไฟฟ้าจำลองในคอมพิวเตอร์' ที่คิดแบบช่าง วางแผนแบบหัวหน้าเวิร์ก และเขียนแบบแบบวิศวกร"
+
+1. Think like a wire: สายไฟไม่ชอบเดินอ้อมไกล ถ้าไม่จำเป็น  
+2. Think like a conduit: ท่อต้องมีที่ยึด ต้องเข้าถึงได้ ต้องบำรุงรักษาได้  
+3. Think like an installer: ช่างต้องการคำสั่งชัดเจน ไม่กำกวม  
+4. Think like an inspector: ทุกจุดต้องตรวจสอบได้
+
+
+```
