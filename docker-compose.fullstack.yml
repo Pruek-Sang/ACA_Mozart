@@ -1,0 +1,151 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Mozart Full Stack - Production Docker Compose (v2+)
+# ═══════════════════════════════════════════════════════════════════════════
+# Version: 2.0 (Modern format, no deprecated 'version' key)
+# Usage: docker compose -f docker-compose.fullstack.yml up -d
+# ═══════════════════════════════════════════════════════════════════════════
+# Architecture:
+#   [Client] → [NGINX:80] → [Gateway:8000] → [RAG:8080] → [MCP:5001]
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: mozart-fullstack
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════
+  # 1. MCP Core v2 - Electrical Calculation Engine
+  # ═══════════════════════════════════════════════════════════════════════
+  mcp-core:
+    container_name: mcp-core-prod
+    image: acatest01/mcp-core:latest
+    ports:
+      - "5001:5001"
+    environment:
+      API_HOST: "0.0.0.0"
+      API_PORT: "5001"
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: "INFO"
+    restart: unless-stopped
+    networks:
+      - mozart-internal
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 2. Mozart RAG - AI-Powered Spec Engine
+  # ═══════════════════════════════════════════════════════════════════════
+  mozart-rag:
+    container_name: mozart-rag-prod
+    image: acatest01/mozart-rag:latest
+    ports:
+      - "8080:8080"
+    environment:
+      MCP_CORE_URL: "http://mcp-core:5001"
+      VECTOR_DB_BACKEND: "faiss"
+      GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      mcp-core:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mozart-internal
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 3. Gateway - API Orchestration Layer
+  # ═══════════════════════════════════════════════════════════════════════
+  gateway:
+    container_name: gateway-prod
+    build:
+      context: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "8000:8000"
+    environment:
+      RAG_URL: "http://mozart-rag:8080"
+      MCP_URL: "http://mcp-core:5001"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      mozart-rag:
+        condition: service_healthy
+      mcp-core:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - mozart-internal
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 4. Frontend (NGINX + React App)
+  # ═══════════════════════════════════════════════════════════════════════
+  frontend:
+    container_name: frontend-prod
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./frontend-dist:/usr/share/nginx/html:ro
+      - ./Docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Uncomment for SSL
+      # - ./ssl/cert.pem:/etc/nginx/ssl/cert.pem:ro
+      # - ./ssl/key.pem:/etc/nginx/ssl/key.pem:ro
+    depends_on:
+      - gateway
+    restart: unless-stopped
+    networks:
+      - mozart-internal
+      - mozart-external
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NETWORKS
+# ═══════════════════════════════════════════════════════════════════════════
+networks:
+  mozart-internal:
+    driver: bridge
+    internal: true # No external access, only inter-container
+  mozart-external:
+    driver: bridge # Frontend can access external (for users)
+
+# ═══════════════════════════════════════════════════════════════════════════
+# VOLUMES (Optional: For persistent data)
+# ═══════════════════════════════════════════════════════════════════════════
+volumes:
+  rag-data:
+    driver: local
+  logs:
+    driver: local
