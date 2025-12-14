@@ -2,36 +2,38 @@
 // src/hooks/useChat.ts
 /**
  * Custom hook for managing chat state
- * Version 2: Integrated with Floor Plan data
+ * Version 3: Integrated with Floor Plan data + Chat Memory
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { API_CONFIG } from '../config/api.config';
 import type { Message, ChatState } from '../types/gateway';
 import { sendMessage, extractDisplayMessage } from '../services/gateway';
+import { saveMessages, loadMessages, clearMessages as clearStoredMessages } from '../services/chatMemory';
 import type { RoomData } from '../features/floorplan/layout.logic';
 
 // Helper function to extract room data from the raw response
-const extractRoomData = (data: any): RoomData[] => {
-  // Logic to find room data in the complex nested object from Gateway
-  if (data && data.result && data.result.project_requirements)
-  {
-    return data.result.project_requirements.rooms || [];
-  }
-  if (data && data.project_requirements)
-  {
-    return data.project_requirements.rooms || [];
-  }
-  if(data && data.rooms)
-  {
-    return data.rooms;
-  }
-  return [];
+const extractRoomData = (data: Record<string, unknown>): RoomData[] => {
+    // Logic to find room data in the complex nested object from Gateway
+    const result = data?.result as Record<string, unknown> | undefined;
+    const projectReq = result?.project_requirements as Record<string, unknown> | undefined;
+    const topLevelProjectReq = data?.project_requirements as Record<string, unknown> | undefined;
+
+    if (projectReq?.rooms) {
+        return projectReq.rooms as RoomData[];
+    }
+    if (topLevelProjectReq?.rooms) {
+        return topLevelProjectReq.rooms as RoomData[];
+    }
+    if (data?.rooms) {
+        return data.rooms as RoomData[];
+    }
+    return [];
 };
 
 export function useChat() {
     const [state, setState] = useState<ChatState>(() => ({
-        messages: [],
+        messages: loadMessages(), // **[NEW]** Load saved messages on init
         isTyping: false,
         apiKey: localStorage.getItem(API_CONFIG.STORAGE_KEY) || '',
         isAuthenticated: !!localStorage.getItem(API_CONFIG.STORAGE_KEY),
@@ -39,6 +41,13 @@ export function useChat() {
 
     // State for the Floor Plan Visualizer
     const [rooms, setRooms] = useState<RoomData[]>([]);
+
+    // **[NEW]** Save messages to localStorage whenever they change
+    useEffect(() => {
+        if (state.messages.length > 0) {
+            saveMessages(state.messages);
+        }
+    }, [state.messages]);
 
     const setApiKey = useCallback((key: string) => {
         localStorage.setItem(API_CONFIG.STORAGE_KEY, key);
@@ -74,8 +83,8 @@ export function useChat() {
                 const response = await sendMessage(input, state.apiKey);
 
                 const displayContent = extractDisplayMessage(response.data);
-                
-                // **[NEW]** Extract room data for the visualizer
+
+                // Extract room data for the visualizer
                 const roomData = extractRoomData(response.data);
                 if (roomData.length > 0) {
                     setRooms(roomData);
@@ -105,7 +114,8 @@ export function useChat() {
 
     const clearMessages = useCallback(() => {
         setState((prev) => ({ ...prev, messages: [] }));
-        setRooms([]); // **[NEW]** Clear rooms on chat clear
+        setRooms([]);
+        clearStoredMessages(); // **[NEW]** Clear localStorage as well
     }, []);
 
     return {
@@ -118,8 +128,8 @@ export function useChat() {
         clearApiKey,
         send,
         clearMessages,
-        
-        // **[NEW]** State for the Floor Plan
+
+        // State for the Floor Plan
         rooms,
     };
 }

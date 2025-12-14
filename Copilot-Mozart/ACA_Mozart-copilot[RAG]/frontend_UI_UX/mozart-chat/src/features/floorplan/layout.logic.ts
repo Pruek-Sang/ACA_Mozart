@@ -19,28 +19,28 @@ export type RoomZoneType = (typeof RoomZone)[keyof typeof RoomZone];
 // **[UPDATED]** Use Tailwind classes instead of Hex codes for better theming
 export const ZoneStyles: Record<RoomZoneType, { container: string; text: string; border: string; icon: string }> = {
   [RoomZone.PUBLIC]: {
-    container: 'bg-emerald-500/10 hover:bg-emerald-500/20',
+    container: 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30',
     border: 'border-emerald-500/30',
-    text: 'text-emerald-200',
-    icon: 'text-emerald-400',
+    text: 'text-emerald-100 drop-shadow-md',
+    icon: 'text-emerald-300',
   },
   [RoomZone.SERVICE]: {
-    container: 'bg-amber-500/10 hover:bg-amber-500/20',
+    container: 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30',
     border: 'border-amber-500/30',
-    text: 'text-amber-200',
-    icon: 'text-amber-400',
+    text: 'text-amber-100 drop-shadow-md',
+    icon: 'text-amber-300',
   },
   [RoomZone.PRIVATE]: {
-    container: 'bg-rose-500/10 hover:bg-rose-500/20',
+    container: 'bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30',
     border: 'border-rose-500/30',
-    text: 'text-rose-200',
-    icon: 'text-rose-400',
+    text: 'text-rose-100 drop-shadow-md',
+    icon: 'text-rose-300',
   },
   [RoomZone.OUTDOOR]: {
-    container: 'bg-slate-500/10 hover:bg-slate-500/20',
+    container: 'bg-slate-500/20 hover:bg-slate-500/30 border border-slate-500/30',
     border: 'border-slate-500/30',
-    text: 'text-slate-300',
-    icon: 'text-slate-400',
+    text: 'text-slate-100 drop-shadow-md',
+    icon: 'text-slate-300',
   },
 };
 

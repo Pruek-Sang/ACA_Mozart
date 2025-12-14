@@ -61,9 +61,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 </div>
                 <div className="relative group">
                     <div
-                        className={`px-4 py-3 rounded-2xl shadow-sm leading-relaxed break-words ${isUser
-                                ? 'bg-userBubble text-white rounded-tr-none'
-                                : 'bg-botBubble text-gray-100 rounded-tl-none'
+                        className={`px-4 py-3 rounded-2xl leading-relaxed break-words backdrop-blur-sm ${isUser
+                            ? 'bg-userBubble/90 text-white rounded-tr-none shadow-lg shadow-blue-900/30 border border-blue-400/20'
+                            : 'bg-botBubble/90 text-gray-100 rounded-tl-none shadow-lg shadow-gray-900/30 border border-gray-600/20'
                             }`}
                     >
                         {isUser ? (

@@ -65,22 +65,44 @@ function App() {
 
   // ===== MAIN APP =====
   return (
-    <div className="h-screen bg-black text-white flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background & Watermark... */}
+    <div className="h-screen bg-black text-textPrimary flex items-center justify-center p-6 relative overflow-hidden">
+
+      {/* Aurora Background (Whitish-Purple) - Enhanced for Visibility */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div
+          className="absolute w-[1000px] h-[1000px] rounded-full opacity-60 blur-[120px] animate-pulse"
+          style={{
+            background: 'radial-gradient(circle, #4F46E5 0%, transparent 60%)', // Indigo-600
+            top: '-20%',
+            left: '-20%',
+            animationDuration: '10s'
+          }}
+        />
+        <div
+          className="absolute w-[800px] h-[800px] rounded-full opacity-60 blur-[120px] animate-pulse"
+          style={{
+            background: 'radial-gradient(circle, #9333EA 0%, transparent 60%)', // Purple-600
+            bottom: '-10%',
+            right: '-10%',
+            animationDuration: '15s'
+          }}
+        />
+        {/* Floating stars/particles layer */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-150 contrast-150 mix-blend-overlay"></div>
+      </div>
+
+      {/* Logo Watermark Placeholder (Faded) */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-        <div className="text-[200px] font-bold text-white/5 select-none tracking-widest">
+        <div className="text-[200px] font-bold text-gray-900/5 select-none tracking-widest">
           ACA
         </div>
-      </div>
-      <div className="absolute inset-0 pointer-events-none">
-        {/* ...aurora effects... */}
       </div>
 
       {/* ===== DUAL PANE CONTAINER ===== */}
       <div className="relative z-10 flex gap-6 w-full h-full max-w-[1600px]">
 
         {/* ===== LEFT PANE: Chat ===== */}
-        <div className="phone-frame flex-1 flex flex-col bg-gray-900/50 backdrop-blur-sm">
+        <div className="phone-frame flex-1 flex flex-col">
           <Header
             onClear={clearMessages}
             onSettings={() => setShowSettings(true)}
@@ -94,7 +116,7 @@ function App() {
         </div>
 
         {/* ===== RIGHT PANE: Floor Plan Visualizer 🆕 ===== */}
-        <div className="phone-frame flex-1 flex flex-col bg-gray-900/50 backdrop-blur-sm">
+        <div className="phone-frame flex-1 flex flex-col">
           <FloorPlanVisualizer rooms={rooms} />
         </div>
       </div>
