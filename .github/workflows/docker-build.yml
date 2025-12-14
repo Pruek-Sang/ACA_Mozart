@@ -86,8 +86,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: './Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/package-lock.json'
+          # Note: cache disabled due to special chars in path [RAG]
 
       - name: 📥 Install dependencies
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
