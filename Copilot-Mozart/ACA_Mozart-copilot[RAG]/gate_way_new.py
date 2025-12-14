@@ -344,13 +344,17 @@ app = FastAPI(
     description="Intent Router for MOZART (RAG/MCP) and AMADEUS (AGI) services"
 )
 
-# Add CORS middleware for frontend integration
+# Security: CORS configuration from environment
+# Set ALLOWED_ORIGINS=https://your-domain.com,https://app.your-domain.com
+# For development, use ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Development - allow all origins
+    allow_origins=ALLOWED_ORIGINS,  # Restricted to specified origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],  # Only needed methods
+    allow_headers=["Content-Type", "Authorization", "X-Trace-ID", "X-API-Key"],
 )
 
 # Global instances
