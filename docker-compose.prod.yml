@@ -11,19 +11,19 @@ services:
   # ═══════════════════════════════════════════════════════════════════
   mcp-core:
     container_name: mcp-core-prod
-    image: acatest01/mcp-core:latest  # <--- Pulls from your Docker Hub
-    
+    image: acatest01/mcp-core:latest # <--- Pulls from your Docker Hub
+
     ports:
       - "5001:5001"
-    
+
     environment:
       - API_HOST=0.0.0.0
       - API_PORT=5001
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
-    
+
     restart: always
-    
+
     networks:
       - mozart-network
 
@@ -32,21 +32,21 @@ services:
   # ═══════════════════════════════════════════════════════════════════
   mozart-rag:
     container_name: mozart-rag-prod
-    image: acatest01/mozart-rag:latest  # <--- Pulls from your Docker Hub
-    
+    image: acatest01/mozart-rag:latest # <--- Pulls from your Docker Hub
+
     ports:
       - "8080:8080"
-    
+
     environment:
       - MCP_CORE_URL=http://mcp-core:5001
       - VECTOR_DB_BACKEND=faiss
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}  # Needs .env file
-    
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY} # Needs .env file
+
     depends_on:
       - mcp-core
-    
+
     restart: always
-    
+
     networks:
       - mozart-network
 
@@ -60,6 +60,7 @@ services:
       - "8000:8000"
     environment:
       - MOZART_ENDPOINT=http://mozart-rag:8080
+      - ALLOWED_ORIGINS=http://localhost,http://localhost:80,http://localhost:5173
       - PYTHONUNBUFFERED=1
     depends_on:
       - mozart-rag
