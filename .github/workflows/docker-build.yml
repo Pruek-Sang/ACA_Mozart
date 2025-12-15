@@ -94,8 +94,10 @@ jobs:
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
         run: npm ci
 
-      - name: 🔨 Build React app
+      - name: 🔨 Build React app (with Cloud Run Gateway URL)
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
+        env:
+          VITE_GATEWAY_URL: https://gateway-rc5mtgajza-as.a.run.app
         run: npm run build
 
       - name: 📁 Copy dist to root (avoid special chars in path)
