@@ -94,15 +94,12 @@ jobs:
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
         run: npm ci
 
-      - name: 📝 Create .env.production from GitHub Secrets
-        working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
-        run: |
-          echo "VITE_GATEWAY_URL=${{ secrets.VITE_GATEWAY_URL }}" > .env.production
-          echo "VITE_MOCK_MODE=false" >> .env.production
-
       - name: 🔨 Build React app
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
-        run: npm run build
+        run: |
+          echo "📋 Using .env.production from repo:"
+          cat .env.production
+          npm run build
 
       - name: 📁 Copy dist to root (avoid special chars in path)
         run: cp -r "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/dist" ./frontend-dist
