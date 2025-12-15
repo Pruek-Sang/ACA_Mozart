@@ -94,10 +94,14 @@ jobs:
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
         run: npm ci
 
-      - name: 🔨 Build React app (with Cloud Run Gateway URL)
+      - name: 📝 Create .env.production from GitHub Secrets
         working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
-        env:
-          VITE_GATEWAY_URL: https://gateway-rc5mtgajza-as.a.run.app
+        run: |
+          echo "VITE_GATEWAY_URL=${{ secrets.VITE_GATEWAY_URL }}" > .env.production
+          echo "VITE_MOCK_MODE=false" >> .env.production
+
+      - name: 🔨 Build React app
+        working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
         run: npm run build
 
       - name: 📁 Copy dist to root (avoid special chars in path)
