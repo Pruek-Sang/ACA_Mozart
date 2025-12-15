@@ -3,8 +3,10 @@
  */
 
 export const API_CONFIG = {
-    /** Gateway base URL - configurable via environment variable */
-    GATEWAY_URL: import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8000',
+    /** Gateway base URL - uses localhost in dev, Cloud Run in production */
+    GATEWAY_URL: import.meta.env.DEV
+        ? 'http://localhost:8000'
+        : 'https://gateway-rc5mtgajza-as.a.run.app',
 
     /** LocalStorage key for API key */
     STORAGE_KEY: 'aca_mozart_api_key',
