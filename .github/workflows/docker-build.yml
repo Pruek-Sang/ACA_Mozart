@@ -110,11 +110,11 @@ jobs:
       - name: 🏗️ Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 🐳 Build and push Frontend
+      - name: 🐳 Build and push Frontend (Cloud Run)
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/Dockerfile.frontend
+          file: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/Dockerfile.frontend-cloudrun
           push: true
           tags: |
             ${{ env.FRONTEND_IMAGE }}:latest
