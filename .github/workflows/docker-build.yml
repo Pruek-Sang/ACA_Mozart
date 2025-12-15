@@ -30,10 +30,10 @@ on:
 
 env:
   DOCKERHUB_USERNAME: acatest01
-  GATEWAY_IMAGE: acatest01/mozart-gateway
-  FRONTEND_IMAGE: acatest01/mozart-frontend
-  MCP_CORE_IMAGE: acatest01/mcp-core
-  RAG_IMAGE: acatest01/mozart-rag
+  GATEWAY_IMAGE: docker.io/acatest01/mozart-gateway
+  FRONTEND_IMAGE: docker.io/acatest01/mozart-frontend
+  MCP_CORE_IMAGE: docker.io/acatest01/mcp-core
+  RAG_IMAGE: docker.io/acatest01/mozart-rag
 
 jobs:
   # ═══════════════════════════════════════════════════════════════════════
