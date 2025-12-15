@@ -3,8 +3,8 @@
 # ═══════════════════════════════════════════════════════════════════════════
 FROM nginx:1.25-alpine
 
-# Copy the simplified nginx config (no upstream) - path relative to repo root
-COPY Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf /etc/nginx/nginx.conf
+# Copy the simplified nginx config (copied to root by GitHub Actions)
+COPY nginx-cloudrun.conf /etc/nginx/nginx.conf
 
 # Copy the built React app (copied to root by GitHub Actions)
 COPY frontend-dist /usr/share/nginx/html

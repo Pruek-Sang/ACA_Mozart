@@ -101,6 +101,9 @@ jobs:
       - name: 📁 Copy dist to root (avoid special chars in path)
         run: cp -r "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/dist" ./frontend-dist
 
+      - name: 📁 Copy nginx config to root (avoid special chars in path)
+        run: cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf" ./nginx-cloudrun.conf
+
       - name: 🔐 Login to Docker Hub
         uses: docker/login-action@v3
         with:
