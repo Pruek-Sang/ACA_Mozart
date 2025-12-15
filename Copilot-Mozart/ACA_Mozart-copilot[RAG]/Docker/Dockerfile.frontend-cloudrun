@@ -1,0 +1,18 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Dockerfile for Mozart Frontend - Cloud Run Version
+# ═══════════════════════════════════════════════════════════════════════════
+FROM nginx:1.25-alpine
+
+# Copy the simplified nginx config (no upstream)
+COPY Docker/nginx-cloudrun.conf /etc/nginx/nginx.conf
+
+# Copy the built React app
+COPY frontend-dist /usr/share/nginx/html
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
