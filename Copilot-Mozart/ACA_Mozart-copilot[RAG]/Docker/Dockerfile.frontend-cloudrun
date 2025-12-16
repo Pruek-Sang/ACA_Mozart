@@ -1,8 +1,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # Dockerfile for Mozart Frontend - Cloud Run Version (Multi-stage Build)
 # ═══════════════════════════════════════════════════════════════════════════
-# This Dockerfile builds the React app inside Docker to ensure correct files
-# are always included, regardless of GitHub Actions context issues.
+# Source files are copied to ./frontend-src by GitHub Actions to avoid [RAG] path issues
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Stage 1: Build the React app
@@ -11,13 +10,13 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files first (for better caching)
-COPY Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/package*.json ./
+COPY frontend-src/package*.json ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy source code
-COPY Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/ ./
+COPY frontend-src/ ./
 
 # Build the app (uses .env.production automatically)
 RUN npm run build
@@ -25,8 +24,8 @@ RUN npm run build
 # Stage 2: Serve with nginx
 FROM nginx:1.25-alpine
 
-# Copy the simplified nginx config
-COPY Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf /etc/nginx/nginx.conf
+# Copy the nginx config (copied to root by GitHub Actions)
+COPY nginx-cloudrun.conf /etc/nginx/nginx.conf
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
