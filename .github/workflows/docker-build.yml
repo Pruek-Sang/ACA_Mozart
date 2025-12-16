@@ -131,8 +131,7 @@ jobs:
           tags: |
             asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:latest
             asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: ✅ Frontend build complete
         run: echo "Frontend image pushed to asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:latest"
