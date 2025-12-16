@@ -84,29 +84,6 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.19.0'
-          # Note: cache disabled due to special chars in path [RAG]
-
-      - name: 📥 Install dependencies
-        working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
-        run: npm ci
-
-      - name: 🔨 Build React app
-        working-directory: ./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat
-        run: |
-          echo "📋 Using .env.production from repo:"
-          cat .env.production
-          npm run build
-
-      - name: 📁 Copy dist to root (avoid special chars in path)
-        run: cp -r "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat/dist" ./frontend-dist
-
-      - name: 📁 Copy nginx config to root (avoid special chars in path)
-        run: cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf" ./nginx-cloudrun.conf
-
       - name: 🔐 Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -135,6 +112,7 @@ jobs:
 
       - name: ✅ Frontend build complete
         run: echo "Frontend image pushed to asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:latest"
+
 
   # ═══════════════════════════════════════════════════════════════════════
   # Build MCP Core Image
