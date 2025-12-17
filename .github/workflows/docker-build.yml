@@ -196,6 +196,7 @@ jobs:
 
   # ═══════════════════════════════════════════════════════════════════════
   # Deploy to Cloud Run (Auto-Deploy after successful build)
+  # ⚠️ IMPORTANT: This job uses the SAME image paths as build jobs above
   # ═══════════════════════════════════════════════════════════════════════
   deploy-to-cloudrun:
     name: 🚀 Deploy to Cloud Run
@@ -203,6 +204,13 @@ jobs:
     needs: [build-gateway, build-frontend, build-mcp-core, build-rag]
     if: success()  # Only deploy if ALL builds succeed
     
+    # Environment variables for easy debugging
+    env:
+      GCP_PROJECT: gen-lang-client-0658701327
+      GCP_REGION: asia-southeast1
+      # Image paths (MUST match build jobs above!)
+      FRONTEND_AR_IMAGE: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend
+
     steps:
       - name: 🔐 Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -212,49 +220,95 @@ jobs:
       - name: ☁️ Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: aca-mozart
+          project_id: gen-lang-client-0658701327
 
-      - name: 🚀 Deploy Gateway to Cloud Run
-        run: |
-          gcloud run deploy gateway \
-            --image ${{ env.GATEWAY_IMAGE }}:${{ github.sha }} \
-            --region asia-southeast1 \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 8000
-
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy Frontend (from Artifact Registry)
+      # ─────────────────────────────────────────────────────────────────────
       - name: 🚀 Deploy Frontend to Cloud Run
+        id: deploy-frontend
+        continue-on-error: true
         run: |
+          echo "📦 Deploying Frontend..."
+          echo "   Image: ${{ env.FRONTEND_AR_IMAGE }}:${{ github.sha }}"
           gcloud run deploy frontend \
-            --image asia-southeast1-docker.pkg.dev/aca-mozart/mozart-images/mozart-frontend:${{ github.sha }} \
-            --region asia-southeast1 \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 80
-
-      - name: 🚀 Deploy MCP Core to Cloud Run
-        run: |
-          gcloud run deploy mcp-core \
-            --image ${{ env.MCP_CORE_IMAGE }}:${{ github.sha }} \
-            --region asia-southeast1 \
+            --image ${{ env.FRONTEND_AR_IMAGE }}:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --port 8080
 
-      - name: 🚀 Deploy Mozart RAG to Cloud Run
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy Gateway (from Docker Hub)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy Gateway to Cloud Run
+        id: deploy-gateway
+        continue-on-error: true
         run: |
+          echo "📦 Deploying Gateway..."
+          echo "   Image: docker.io/acatest01/mozart-gateway:${{ github.sha }}"
+          gcloud run deploy gateway \
+            --image docker.io/acatest01/mozart-gateway:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8000
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy MCP Core (from Docker Hub)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy MCP Core to Cloud Run
+        id: deploy-mcp
+        continue-on-error: true
+        run: |
+          echo "📦 Deploying MCP Core..."
+          echo "   Image: docker.io/acatest01/mcp-core:${{ github.sha }}"
+          gcloud run deploy mcp-core \
+            --image docker.io/acatest01/mcp-core:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy Mozart RAG (from Docker Hub)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy Mozart RAG to Cloud Run
+        id: deploy-rag
+        continue-on-error: true
+        run: |
+          echo "📦 Deploying Mozart RAG..."
+          echo "   Image: docker.io/acatest01/mozart-rag:${{ github.sha }}"
           gcloud run deploy mozart-rag \
-            --image ${{ env.RAG_IMAGE }}:${{ github.sha }} \
-            --region asia-southeast1 \
+            --image docker.io/acatest01/mozart-rag:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --port 8001
 
-      - name: ✅ Deploy complete
+      # ─────────────────────────────────────────────────────────────────────
+      # Summary (shows which deployments succeeded/failed)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 📊 Deploy Summary
         run: |
-          echo "🎉 All services deployed to Cloud Run!"
-          echo "Gateway: https://gateway-rc5mtgajza-as.a.run.app"
-          echo "Frontend: https://frontend-rc5mtgajza-as.a.run.app"
+          echo "═══════════════════════════════════════════════════════════"
+          echo "                    DEPLOY SUMMARY"
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Frontend:   ${{ steps.deploy-frontend.outcome }}"
+          echo "Gateway:    ${{ steps.deploy-gateway.outcome }}"
+          echo "MCP Core:   ${{ steps.deploy-mcp.outcome }}"
+          echo "Mozart RAG: ${{ steps.deploy-rag.outcome }}"
+          echo "═══════════════════════════════════════════════════════════"
+          
+          # Fail the job if any deployment failed
+          if [ "${{ steps.deploy-frontend.outcome }}" == "failure" ] || \
+             [ "${{ steps.deploy-gateway.outcome }}" == "failure" ] || \
+             [ "${{ steps.deploy-mcp.outcome }}" == "failure" ] || \
+             [ "${{ steps.deploy-rag.outcome }}" == "failure" ]; then
+            echo "❌ One or more deployments failed!"
+            exit 1
+          fi
+          echo "✅ All deployments successful!"
 
   # ═══════════════════════════════════════════════════════════════════════
   # Summary
