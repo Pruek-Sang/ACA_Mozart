@@ -268,7 +268,7 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --port 8080
+            --port 5001
 
       # ─────────────────────────────────────────────────────────────────────
       # Deploy Mozart RAG (from Docker Hub)
@@ -284,7 +284,7 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --port 8001
+            --port 8080
 
       # ─────────────────────────────────────────────────────────────────────
       # Summary (shows which deployments succeeded/failed)
