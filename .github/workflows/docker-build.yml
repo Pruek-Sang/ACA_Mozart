@@ -195,25 +195,87 @@ jobs:
         run: echo "Mozart RAG image pushed to ${{ env.RAG_IMAGE }}:latest"
 
   # ═══════════════════════════════════════════════════════════════════════
+  # Deploy to Cloud Run (Auto-Deploy after successful build)
+  # ═══════════════════════════════════════════════════════════════════════
+  deploy-to-cloudrun:
+    name: 🚀 Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: [build-gateway, build-frontend, build-mcp-core, build-rag]
+    if: success()  # Only deploy if ALL builds succeed
+    
+    steps:
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: ☁️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: aca-mozart
+
+      - name: 🚀 Deploy Gateway to Cloud Run
+        run: |
+          gcloud run deploy gateway \
+            --image ${{ env.GATEWAY_IMAGE }}:${{ github.sha }} \
+            --region asia-southeast1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8000
+
+      - name: 🚀 Deploy Frontend to Cloud Run
+        run: |
+          gcloud run deploy frontend \
+            --image asia-southeast1-docker.pkg.dev/aca-mozart/mozart-images/mozart-frontend:${{ github.sha }} \
+            --region asia-southeast1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 80
+
+      - name: 🚀 Deploy MCP Core to Cloud Run
+        run: |
+          gcloud run deploy mcp-core \
+            --image ${{ env.MCP_CORE_IMAGE }}:${{ github.sha }} \
+            --region asia-southeast1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080
+
+      - name: 🚀 Deploy Mozart RAG to Cloud Run
+        run: |
+          gcloud run deploy mozart-rag \
+            --image ${{ env.RAG_IMAGE }}:${{ github.sha }} \
+            --region asia-southeast1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8001
+
+      - name: ✅ Deploy complete
+        run: |
+          echo "🎉 All services deployed to Cloud Run!"
+          echo "Gateway: https://gateway-rc5mtgajza-as.a.run.app"
+          echo "Frontend: https://frontend-rc5mtgajza-as.a.run.app"
+
+  # ═══════════════════════════════════════════════════════════════════════
   # Summary
   # ═══════════════════════════════════════════════════════════════════════
   summary:
     name: 📊 Build Summary
     runs-on: ubuntu-latest
-    needs: [build-gateway, build-frontend, build-mcp-core, build-rag]
+    needs: [build-gateway, build-frontend, build-mcp-core, build-rag, deploy-to-cloudrun]
     if: always()
     
     steps:
       - name: 📋 Print Summary
         run: |
-          echo "## 🐳 Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🐳 Docker Build & Deploy Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Gateway | ${{ needs.build-gateway.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${{ needs.build-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| MCP Core | ${{ needs.build-mcp-core.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Mozart RAG | ${{ needs.build-rag.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Build | Deploy |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Gateway | ${{ needs.build-gateway.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.build-frontend.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| MCP Core | ${{ needs.build-mcp-core.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mozart RAG | ${{ needs.build-rag.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 

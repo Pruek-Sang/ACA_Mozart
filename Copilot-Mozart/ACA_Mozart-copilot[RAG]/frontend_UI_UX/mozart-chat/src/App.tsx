@@ -116,9 +116,13 @@ function App() {
         </div>
 
         {/* ===== RIGHT PANE: Floor Plan Visualizer 🆕 ===== */}
-        <div className="phone-frame flex-1 flex flex-col">
-          <FloorPlanVisualizer rooms={rooms} />
+        <div className="phone-frame flex-1 flex flex-col overflow-hidden">
+          <FloorPlanVisualizer
+            rooms={rooms}
+            chatText={messages.filter(m => m.role === 'bot').slice(-1)[0]?.content || ''}
+          />
         </div>
+
       </div>
 
       {/* Settings Modal */}
