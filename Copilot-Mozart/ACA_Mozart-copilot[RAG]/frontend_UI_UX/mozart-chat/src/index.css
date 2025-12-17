@@ -1,8 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600&display=swap');
 
+/* Component CSS imports */
+@import './features/floorplan/floorplan.css';
+@import './features/loadschedule/loadschedule.css';
+@import './components/editable.css';
+@import './components/modal.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {

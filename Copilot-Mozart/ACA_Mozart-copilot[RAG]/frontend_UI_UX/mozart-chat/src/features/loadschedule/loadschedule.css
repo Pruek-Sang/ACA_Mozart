@@ -1,0 +1,346 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Load Schedule Editor CSS - Beautiful editable table with PDF export
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Container */
+.load-schedule-editor {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+}
+
+/* Header */
+.lse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lse-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.lse-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Export Button */
+.lse-export-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lse-export-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.lse-close-btn {
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.lse-close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Hint */
+.lse-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    background: rgba(99, 102, 241, 0.1);
+    font-size: 0.75rem;
+    color: rgba(165, 180, 252, 0.9);
+}
+
+/* Table Wrapper */
+.lse-table-wrapper {
+    flex: 1;
+    overflow: auto;
+    padding: 20px;
+}
+
+/* Print Header & Footer (hidden on screen) */
+.lse-print-header,
+.lse-print-footer {
+    display: none;
+}
+
+/* Table */
+.lse-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.lse-table th,
+.lse-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lse-table th {
+    background: rgba(0, 0, 0, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.lse-table tbody tr {
+    transition: background 0.2s;
+}
+
+.lse-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.lse-table tbody tr.editable-row {
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.lse-table tbody tr.editable-row:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+/* Category cell */
+.category-cell {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Quantity cell - editable */
+.quantity-cell {
+    min-width: 80px;
+}
+
+.quantity-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.quantity-value.editable {
+    background: rgba(99, 102, 241, 0.15);
+    color: #a5b4fc;
+    cursor: pointer;
+}
+
+.quantity-value.editable:hover {
+    background: rgba(99, 102, 241, 0.25);
+}
+
+.quantity-value .edit-icon {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.quantity-value.editable:hover .edit-icon {
+    opacity: 1;
+}
+
+/* Edit input */
+.edit-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.edit-input {
+    width: 60px;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(99, 102, 241, 0.5);
+    border-radius: 4px;
+    color: white;
+    font-size: inherit;
+    text-align: center;
+}
+
+.edit-input:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.save-btn,
+.cancel-btn {
+    padding: 4px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.save-btn {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.save-btn:hover {
+    background: rgba(34, 197, 94, 0.3);
+}
+
+.cancel-btn {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.cancel-btn:hover {
+    background: rgba(239, 68, 68, 0.3);
+}
+
+/* Load cell */
+.load-cell {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Footer rows */
+.lse-table tfoot tr {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.lse-table tfoot .total-row {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+    font-weight: 600;
+}
+
+.lse-table tfoot .total-row td {
+    color: white;
+    font-size: 0.9rem;
+}
+
+.lse-table tfoot .summary-row td {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+}
+
+/* Empty state */
+.load-schedule-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Print Styles (for PDF export)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media print {
+
+    .lse-header,
+    .lse-hint,
+    .lse-export-btn,
+    .lse-close-btn,
+    .edit-icon {
+        display: none !important;
+    }
+
+    .lse-print-header,
+    .lse-print-footer {
+        display: block !important;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .lse-print-header h1 {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+        color: #1a1a1a;
+    }
+
+    .lse-print-header p {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .lse-print-footer {
+        margin-top: 20px;
+        font-size: 0.75rem;
+        color: #999;
+    }
+
+    .load-schedule-editor {
+        background: white !important;
+        border: none !important;
+    }
+
+    .lse-table th {
+        background: #f0f0f0 !important;
+        color: #333 !important;
+    }
+
+    .lse-table td {
+        color: #333 !important;
+        border-color: #ddd !important;
+    }
+
+    .quantity-value {
+        background: transparent !important;
+        color: #333 !important;
+    }
+
+    .lse-table tfoot .total-row {
+        background: #e8e8ff !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+    .lse-table {
+        font-size: 0.75rem;
+    }
+
+    .lse-table th,
+    .lse-table td {
+        padding: 8px 10px;
+    }
+
+    .lse-export-btn span {
+        display: none;
+    }
+}

@@ -1,146 +1,121 @@
 // src/features/floorplan/FloorPlanVisualizer.tsx
-import React, { useEffect, useRef, useState } from 'react';
-import { calculateLayout } from './layout.logic';
-import type { RoomData, FloorLayout, WireData } from './layout.logic';
-import RoomBlock from './RoomBlock';
-import { Sparkles, Map } from 'lucide-react';
+// Version 3: New drag-drop floor grid with beautiful design
+
+import React, { useMemo } from 'react';
+import { Sparkles, LayoutGrid } from 'lucide-react';
+import FloorGrid from './FloorGrid';
+import type { GridRoom } from './FloorGrid';
+import { parseRoomsFromText, getFloors } from './roomParser';
+import './floorplan.css';
+
+// Legacy type for backward compatibility
+interface RoomData {
+  id: string;
+  name: string;
+  type?: string;
+  floor?: number;
+  zone?: string;
+}
 
 interface FloorPlanVisualizerProps {
   rooms: RoomData[];
+  chatText?: string; // Optional: raw chat text to parse rooms from
 }
 
-const FloorPlanVisualizer: React.FC<FloorPlanVisualizerProps> = ({ rooms }) => {
-  const floorLayouts: FloorLayout[] = calculateLayout(rooms);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [wires, setWires] = useState<Array<{ id: string; d: string; color: string }>>([]);
+const FloorPlanVisualizer: React.FC<FloorPlanVisualizerProps> = ({ rooms, chatText }) => {
+  // Convert legacy rooms to GridRoom format or parse from chat text
+  const gridRooms = useMemo((): GridRoom[] => {
+    // Priority 1: Parse from chatText if provided
+    if (chatText && chatText.length > 0) {
+      const parsed = parseRoomsFromText(chatText);
+      if (parsed.length > 0) return parsed;
+    }
 
-  // **[NEW]** Calculate SVG paths for wires after render
-  useEffect(() => {
-    if (!containerRef.current) return;
+    // Priority 2: Convert from rooms prop
+    if (rooms && rooms.length > 0) {
+      return rooms.map((room, index) => ({
+        id: room.id || `room-${index}`,
+        name: room.name || 'ห้อง',
+        type: mapRoomType(room.type || room.name),
+        floor: room.floor || 1
+      }));
+    }
 
-    const newWires: Array<{ id: string; d: string; color: string }> = [];
+    return [];
+  }, [rooms, chatText]);
 
-    floorLayouts.forEach(floor => {
-      floor.wires.forEach((wire: WireData) => {
-        const fromEl = document.getElementById(`room-${wire.fromRoomId}`);
-        const toEl = document.getElementById(`room-${wire.toRoomId}`);
+  // Get sorted floors (descending: floor 2 first)
+  const floors = useMemo(() => getFloors(gridRooms), [gridRooms]);
 
-        if (fromEl && toEl) {
-          const fromRect = fromEl.getBoundingClientRect();
-          const toRect = toEl.getBoundingClientRect();
-          const containerRect = containerRef.current!.getBoundingClientRect();
+  // Get rooms for each floor
+  const getRoomsForFloor = (floor: number): GridRoom[] => {
+    return gridRooms.filter(r => r.floor === floor);
+  };
 
-          // Calculate center points relative to the container
-          const x1 = fromRect.left + fromRect.width / 2 - containerRect.left;
-          const y1 = fromRect.top + fromRect.height / 2 - containerRect.top;
-          const x2 = toRect.left + toRect.width / 2 - containerRect.left;
-          const y2 = toRect.top + toRect.height / 2 - containerRect.top;
-
-          // Create a curved path (cubic bezier)
-          const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2;
-          // Curve intensity
-          const offset = 40;
-
-          let d = '';
-          // Simple heuristic for curve direction based on relative position
-          if (Math.abs(x1 - x2) > Math.abs(y1 - y2)) {
-            // Horizontal connection -> curve up/down
-            d = `M ${x1} ${y1} Q ${midX} ${midY - offset} ${x2} ${y2}`;
-          } else {
-            // Vertical connection -> curve left/right
-            d = `M ${x1} ${y1} Q ${midX - offset} ${midY} ${x2} ${y2}`;
-          }
-
-          // **Extracted Color from Tailwind class map (simplified mapping for SVG stroke)**
-          // Note: Tailwind classes like 'text-emerald-400' are CSS. For SVG stroke we need actual colors.
-          // For MVP we map zone to hex approximations matching the Tailwind palette.
-          let strokeColor = '#9CA3AF'; // default gray
-          if (wire.zone === 'PUBLIC') strokeColor = '#34D399'; // emerald-400
-          if (wire.zone === 'SERVICE') strokeColor = '#FBBF24'; // amber-400
-          if (wire.zone === 'PRIVATE') strokeColor = '#FB7185'; // rose-400
-          if (wire.zone === 'OUTDOOR') strokeColor = '#94A3B8'; // slate-400
-
-          newWires.push({ id: wire.id, d, color: strokeColor });
-        }
-      });
-    });
-
-    setWires(newWires);
-  }, [rooms, floorLayouts.length]); // Re-run when rooms change
-
-  // Empty State - Beautifully styled
-  if (floorLayouts.length === 0) {
+  // Empty State - Beautiful placeholder
+  if (gridRooms.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-6 animate-fadeIn">
-        <div className="w-24 h-24 rounded-full bg-bgSecondary/50 border border-gray-800 flex items-center justify-center shadow-2xl shadow-indigo-500/10">
-          <Map className="w-10 h-10 text-gray-600" />
+        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shadow-2xl shadow-indigo-500/10">
+          <LayoutGrid className="w-10 h-10 text-indigo-400" />
         </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-gray-300">เริ่มการออกแบบ</h3>
-          <p className="text-gray-500 max-w-xs mx-auto">
-            พิมพ์ความต้องการของคุณทางซ้ายมือ เช่น <br />
-            <span className="text-accentMozart">"ออกแบบบ้าน 2 ชั้น 3 ห้องนอน"</span>
+        <div className="space-y-3">
+          <h3 className="text-xl font-semibold text-gray-200">เริ่มออกแบบผังบ้าน</h3>
+          <p className="text-gray-400 max-w-xs mx-auto leading-relaxed">
+            พิมพ์ความต้องการของคุณทางซ้ายมือ เช่น<br />
+            <span className="text-indigo-400 font-medium">"บ้าน 2 ชั้น 3 ห้องนอน 2 ห้องน้ำ"</span>
           </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span>ลากเพื่อจัดเรียงห้อง</span>
+          <span className="text-gray-600">•</span>
+          <span>ช่องว่างคือกำแพง</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-6 relative" ref={containerRef}>
-
-      {/* **[NEW]** SVG Overlay for Wires */}
-      <svg className="absolute inset-0 pointer-events-none z-0 w-full h-full" style={{ minHeight: '100%' }}>
-        <defs>
-          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#6B7280" opacity="0.5" />
-          </marker>
-        </defs>
-        {wires.map(wire => (
-          <path
-            key={wire.id}
-            d={wire.d}
-            stroke={wire.color}
-            strokeWidth="2"
-            fill="none"
-            strokeDasharray="5,5"
-            className="animate-[dash_20s_linear_infinite]"
-            opacity="0.6"
-          />
-        ))}
-      </svg>
-
-      <div className="relative z-10 space-y-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-lg bg-accentMozart/10 border border-accentMozart/20">
-            <Sparkles className="w-5 h-5 text-accentMozart" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-100">Floor Plan & Zoning</h2>
+    <div className="floor-grid-wrapper">
+      {/* Header */}
+      <div className="floor-grid-header">
+        <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/10">
+          <Sparkles className="w-5 h-5 text-indigo-400" />
         </div>
-
-        {floorLayouts.map((floorData: FloorLayout) => (
-          <div key={floorData.floor} className="space-y-4 animate-fadeIn">
-            <div className="flex items-center gap-4">
-              <h3 className="text-sm font-medium text-textSecondary uppercase tracking-wider">
-                ชั้นที่ {floorData.floor}
-              </h3>
-              <div className="h-px bg-gray-800 flex-1" />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5 p-4 sm:p-5 md:p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-xl relative overflow-hidden group hover:bg-white/10 transition-colors duration-500">
-              {/* Subtle grid background - lighter opacity */}
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
-
-              {floorData.rows.flatMap(row => row).map(room => (
-                <RoomBlock key={room.id} room={room} />
-              ))}
-            </div>
-          </div>
-        ))}
+        <h2>ผังห้อง</h2>
+        <div className="flex-1" />
+        <span className="text-xs text-gray-500 bg-white/5 px-3 py-1 rounded-full">
+          {gridRooms.filter(r => r.type !== 'wall').length} ห้อง • {floors.length} ชั้น
+        </span>
       </div>
+
+      {/* Floor Grids */}
+      {floors.map(floor => (
+        <FloorGrid
+          key={floor}
+          floor={floor}
+          rooms={getRoomsForFloor(floor)}
+        />
+      ))}
     </div>
   );
 };
+
+/**
+ * Map room type string to GridRoom type
+ */
+function mapRoomType(typeOrName: string): GridRoom['type'] {
+  const s = (typeOrName || '').toLowerCase();
+
+  if (s.includes('living') || s.includes('นั่งเล่น')) return 'living';
+  if (s.includes('kitchen') || s.includes('ครัว')) return 'kitchen';
+  if (s.includes('bedroom') || s.includes('นอน')) return 'bedroom';
+  if (s.includes('bathroom') || s.includes('น้ำ')) return 'bathroom';
+  if (s.includes('storage') || s.includes('เก็บ')) return 'storage';
+  if (s.includes('garage') || s.includes('รถ')) return 'garage';
+  if (s.includes('exterior') || s.includes('ระเบียง') || s.includes('สวน')) return 'exterior';
+
+  return 'bedroom'; // default
+}
 
 export default FloorPlanVisualizer;

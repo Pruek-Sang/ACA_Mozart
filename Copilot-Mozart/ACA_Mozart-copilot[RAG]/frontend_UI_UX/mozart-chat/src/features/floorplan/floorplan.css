@@ -1,0 +1,262 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Floor Grid CSS - Beautiful glassmorphism design
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Floor Container - Glassmorphism */
+.floor-container {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.floor-container:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+/* Floor Title */
+.floor-title {
+    color: rgba(255, 255, 255, 0.95);
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.floor-icon {
+    font-size: 1.2em;
+}
+
+/* Grid 3x2 - Responsive */
+.room-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 12px;
+}
+
+/* Room Card */
+.room-card {
+    aspect-ratio: 1;
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: grab;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow:
+        0 4px 15px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+    min-height: 80px;
+}
+
+.room-card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow:
+        0 12px 30px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.room-card:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+}
+
+.room-card.dragging {
+    opacity: 0.6;
+    cursor: grabbing;
+    transform: scale(1.05) rotate(2deg);
+    z-index: 100;
+}
+
+.room-card.drag-over {
+    border: 2px dashed rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Room Content */
+.room-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 1;
+}
+
+.room-icon {
+    font-size: 1.8em;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.room-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Drag Hint */
+.drag-hint {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.room-card:hover .drag-hint {
+    opacity: 1;
+}
+
+/* Wall Type - Special Styling */
+.room-card.wall {
+    background: linear-gradient(135deg, rgba(60, 60, 70, 0.9) 0%, rgba(40, 40, 50, 0.95) 100%) !important;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    cursor: default;
+}
+
+.room-card.wall:hover {
+    transform: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.room-card.wall .room-icon {
+    opacity: 0.5;
+}
+
+.room-card.wall .room-name {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Floor Grid Wrapper - for FloorPlanVisualizer
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.floor-grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.floor-grid-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.floor-grid-header h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Responsive Design
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+    .floor-container {
+        padding: 14px;
+        border-radius: 16px;
+    }
+
+    .room-grid {
+        gap: 8px;
+    }
+
+    .room-card {
+        min-height: 60px;
+        border-radius: 10px;
+    }
+
+    .room-icon {
+        font-size: 1.4em;
+    }
+
+    .room-name {
+        font-size: 0.65rem;
+    }
+
+    .floor-title {
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .room-grid {
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(3, 1fr);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes roomFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.room-card {
+    animation: roomFadeIn 0.4s ease-out backwards;
+}
+
+.room-card:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.room-card:nth-child(2) {
+    animation-delay: 0.1s;
+}
+
+.room-card:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+.room-card:nth-child(4) {
+    animation-delay: 0.2s;
+}
+
+.room-card:nth-child(5) {
+    animation-delay: 0.25s;
+}
+
+.room-card:nth-child(6) {
+    animation-delay: 0.3s;
+}
