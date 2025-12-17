@@ -236,7 +236,7 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --port 8080
+            --port 80
 
       # ─────────────────────────────────────────────────────────────────────
       # Deploy Gateway (from Docker Hub)
