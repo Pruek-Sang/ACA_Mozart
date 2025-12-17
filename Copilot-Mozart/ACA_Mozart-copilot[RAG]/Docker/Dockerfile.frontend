@@ -1,7 +1,21 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Dockerfile for Mozart Frontend (NGINX + React)
+# ⚠️ NOT IN USE - DEPRECATED
 # ═══════════════════════════════════════════════════════════════════════════
-# This is used by GitHub Actions to build the frontend Docker image
+# This Dockerfile is NO LONGER USED by GitHub Actions
+# 
+# ACTIVE DOCKERFILES (as of Dec 2024):
+# ┌──────────────┬────────────────────────────────────────────────────────────┐
+# │ Service      │ Dockerfile Path                                            │
+# ├──────────────┼────────────────────────────────────────────────────────────┤
+# │ Frontend     │ Docker/Dockerfile.frontend-cloudrun  (EXPOSE 80)           │
+# │ Gateway      │ Dockerfile.gateway                   (EXPOSE 8000)         │
+# │ MCP Core     │ mcp_core_v2/Docker/Dockerfile        (EXPOSE 5001)         │
+# │ Mozart RAG   │ Docker/Dockerfile_light              (EXPOSE 8080)         │
+# └──────────────┴────────────────────────────────────────────────────────────┘
+# ═══════════════════════════════════════════════════════════════════════════
+# ORIGINAL DESCRIPTION:
+# Dockerfile for Mozart Frontend (NGINX + React)
+# This was used by old GitHub Actions to build the frontend Docker image
 # ═══════════════════════════════════════════════════════════════════════════
 
 FROM nginx:1.25-alpine

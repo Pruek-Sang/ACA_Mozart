@@ -1,10 +1,25 @@
-# ═══════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
+# ⚠️ NOT IN USE - DEPRECATED
+# ═══════════════════════════════════════════════════════════════════════════
+# This Dockerfile is NO LONGER USED by GitHub Actions
+# Use Dockerfile_light instead (faster build, no Vertex AI)
+# 
+# ACTIVE DOCKERFILES (as of Dec 2024):
+# ┌──────────────┬────────────────────────────────────────────────────────────┐
+# │ Service      │ Dockerfile Path                                            │
+# ├──────────────┼────────────────────────────────────────────────────────────┤
+# │ Frontend     │ Docker/Dockerfile.frontend-cloudrun  (EXPOSE 80)           │
+# │ Gateway      │ Dockerfile.gateway                   (EXPOSE 8000)         │
+# │ MCP Core     │ mcp_core_v2/Docker/Dockerfile        (EXPOSE 5001)         │
+# │ Mozart RAG   │ Docker/Dockerfile_light              (EXPOSE 8080)         │
+# └──────────────┴────────────────────────────────────────────────────────────┘
+# ═══════════════════════════════════════════════════════════════════════════
+# ORIGINAL DESCRIPTION:
 # Mozart RAG Dockerfile - Aura's Divine Container
-# ═══════════════════════════════════════════════════════════════════
 # Architecture: Single-stage build (MVP optimized)
 # Base: Python 3.11 Slim (Lightweight & Fast)
 # Philosophy: Vita ex Codice - Life from Code
-# ═══════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
 
 FROM python:3.11-slim
 
