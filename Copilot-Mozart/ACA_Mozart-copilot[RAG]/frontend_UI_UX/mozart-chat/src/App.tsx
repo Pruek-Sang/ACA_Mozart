@@ -1,27 +1,32 @@
 
 // src/App.tsx
-// Version 2: Replaced JSON Editor with Floor Plan Visualizer
+// Version 3: Added Supabase Authentication
 
 import { useState } from 'react';
 import { Header } from './components/Header';
 import { ChatPane } from './components/ChatPane';
 import { InputBar } from './components/InputBar';
 import { ApiKeyModal } from './components/ApiKeyModal';
+import { LoginForm } from './components/LoginForm';
 import { useChat } from './hooks/useChat';
-import FloorPlanVisualizer from './features/floorplan/FloorPlanVisualizer'; // 🆕 Import the new component
+import { useAuthContext } from './contexts/AuthContext';
+import FloorPlanVisualizer from './features/floorplan/FloorPlanVisualizer';
+
 
 function App() {
+  // Supabase Auth
+  const { isAuthenticated, loading: authLoading } = useAuthContext();
+
   const {
     // Chat-related state
     messages,
     isTyping,
     send,
     clearMessages,
-    // Auth-related state
-    isAuthenticated,
+    // API Key for Gateway (still needed for RAG)
     apiKey,
     setApiKey,
-    // **[NEW]** Floor plan data
+    // Floor plan data
     rooms,
   } = useChat();
 
@@ -31,11 +36,20 @@ function App() {
     send(text);
   };
 
-  // ===== LOGIN SCREEN =====
+  // ===== LOADING STATE =====
+  if (authLoading) {
+    return (
+      <div className="h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-xl">กำลังโหลด...</div>
+      </div>
+    );
+  }
+
+  // ===== LOGIN SCREEN (Supabase Auth) =====
   if (!isAuthenticated) {
     return (
       <div className="h-screen bg-black flex items-center justify-center relative overflow-hidden">
-        {/* Background effects... */}
+        {/* Background effects */}
         <div className="absolute inset-0 pointer-events-none">
           <div
             className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
@@ -54,14 +68,11 @@ function App() {
             }}
           />
         </div>
-        <ApiKeyModal
-          visible={true}
-          onSave={(key) => setApiKey(key)}
-          initialKey=""
-        />
+        <LoginForm />
       </div>
     );
   }
+
 
   // ===== MAIN APP =====
   return (
