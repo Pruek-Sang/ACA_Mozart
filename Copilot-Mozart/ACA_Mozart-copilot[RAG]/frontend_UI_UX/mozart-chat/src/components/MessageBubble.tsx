@@ -77,7 +77,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                         <div
                             className={`px-4 py-3 rounded-2xl leading-relaxed break-words backdrop-blur-sm ${isUser
                                 ? 'bg-userBubble/90 text-white rounded-tr-none shadow-lg shadow-blue-900/30 border border-blue-400/20'
-                                : 'bg-botBubble/90 text-gray-100 rounded-tl-none shadow-lg shadow-gray-900/30 border border-gray-600/20'
+                                : message.mode === 'AMADEUS'
+                                    ? 'bg-purple-900/60 text-gray-100 rounded-tl-none shadow-lg shadow-purple-900/40 border border-purple-500/30'
+                                    : message.mode === 'MOZART'
+                                        ? 'bg-indigo-900/60 text-gray-100 rounded-tl-none shadow-lg shadow-indigo-900/40 border border-indigo-500/30'
+                                        : 'bg-botBubble/90 text-gray-100 rounded-tl-none shadow-lg shadow-gray-900/30 border border-gray-600/20'
                                 }`}
                         >
                             {isUser ? (

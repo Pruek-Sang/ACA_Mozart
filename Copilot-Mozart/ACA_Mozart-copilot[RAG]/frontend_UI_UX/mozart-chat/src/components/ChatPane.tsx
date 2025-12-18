@@ -37,7 +37,7 @@ export function ChatPane({ messages, isTyping, onQuickSelect }: ChatPaneProps) {
                             <span className="text-sm font-medium text-textSecondary">System</span>
                         </div>
                         <div className="bg-botBubble text-gray-100 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm max-w-[85%] md:max-w-[75%] leading-relaxed">
-                            สวัสดีค่ะ! Drafta (ในร่าง Avatar) พร้อมรับคำสั่งแล้วค่ะ 🤖
+                            สวัสดีค่ะ! <span className="font-bold text-accentMozart">Mozart</span> พร้อมรับคำสั่งออกแบบไฟฟ้าแล้วค่ะ 🎹⚡
                             <br />
                             ลองใช้คำสั่งตัวอย่าง หรือพิมพ์คำถามที่ต้องการได้เลย
                         </div>
