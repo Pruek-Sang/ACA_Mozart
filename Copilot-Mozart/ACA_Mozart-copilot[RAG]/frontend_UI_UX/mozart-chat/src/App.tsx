@@ -14,8 +14,13 @@ import FloorPlanVisualizer from './features/floorplan/FloorPlanVisualizer';
 
 
 function App() {
+  // ===== DEV MODE: Bypass Supabase Auth for local testing =====
+  // Set to true to skip login screen during development
+  const DEV_MODE = true; // ← เปลี่ยนเป็น false ก่อน deploy production
+
   // Supabase Auth
-  const { isAuthenticated, loading: authLoading } = useAuthContext();
+  const { isAuthenticated: authIsAuthenticated, loading: authLoading } = useAuthContext();
+  const isAuthenticated = DEV_MODE || authIsAuthenticated;
 
   const {
     // Chat-related state
