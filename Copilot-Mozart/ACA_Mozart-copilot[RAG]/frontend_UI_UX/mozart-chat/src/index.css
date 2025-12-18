@@ -69,13 +69,26 @@
   border-radius: 8px;
   overflow-x: auto;
   border: 1px solid #333;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .markdown-body code {
-  font-family: monospace;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
   background: rgba(255, 255, 255, 0.1);
   padding: 2px 5px;
   border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+/* Load Schedule Table - larger text, no truncation */
+.markdown-body {
+  font-size: 1rem;
+  line-height: 1.7;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 .markdown-body table {
