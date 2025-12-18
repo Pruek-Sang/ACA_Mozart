@@ -64,10 +64,22 @@ class GroupedCircuit:
         
         Formula: I = P / (V × PF)  [Single phase]
         Thai Standard: 230V nominal
+        
+        Diversity Factor (วสท.):
+        - RECEPTACLE: 0.4 (เต้ารับไม่ได้ใช้พร้อมกันทั้งหมด)
+        - Others: 1.0 (dedicated circuits use full load)
         """
         if voltage <= 0:
             voltage = 230.0  # Default Thai residential
-        self.total_current = self.total_watts / (voltage * pf)
+        
+        # Apply diversity factor for receptacles
+        if self.circuit_type == CircuitType.RECEPTACLE:
+            diversity = 0.4  # 40% diversity for general outlets
+            effective_watts = self.total_watts * diversity
+        else:
+            effective_watts = self.total_watts
+        
+        self.total_current = effective_watts / (voltage * pf)
         return self.total_current
 
 
@@ -329,31 +341,58 @@ class CircuitGrouper:
         self.circuits[circuit_id] = circuit
     
     def _create_receptacle_circuit(self, loads: List[ElectricalLoad], floor: str):
-        """Create grouped receptacle circuit for a floor."""
+        """Create grouped receptacle circuit for a floor.
+        
+        Auto-splits into multiple circuits if total outlets > 10.
+        Thai residential standard: max 10 outlets per 20A circuit.
+        """
         if not loads:
             return
         
-        circuit_id = self._next_circuit_id("RC")
-        circuit = GroupedCircuit(
-            circuit_id=circuit_id,
-            circuit_name=f"เต้ารับ ชั้น {floor}",
-            circuit_type=CircuitType.RECEPTACLE,
-            floor=floor,
-            breaker_poles=1
-        )
+        # Split loads into chunks of max 10 outlets each
+        MAX_PER_CIRCUIT = self.MAX_OUTLETS_PER_CIRCUIT  # 10
+        chunks = []
+        current_chunk = []
+        current_count = 0
         
         for load in loads:
-            circuit.add_load(load)
+            qty = load.quantity if hasattr(load, 'quantity') else 1
+            if current_count + qty > MAX_PER_CIRCUIT and current_chunk:
+                # Current chunk is full, start new one
+                chunks.append(current_chunk)
+                current_chunk = [load]
+                current_count = qty
+            else:
+                current_chunk.append(load)
+                current_count += qty
         
-        # Check if need to split
-        total_outlets = sum(l.quantity for l in loads)
-        if total_outlets > self.MAX_OUTLETS_PER_CIRCUIT:
-            circuit.notes.append(
-                f"⚠️ เกิน {self.MAX_OUTLETS_PER_CIRCUIT} จุด พิจารณาแยกวงจร"
+        # Don't forget the last chunk
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        # Create separate circuits for each chunk
+        for i, chunk in enumerate(chunks):
+            circuit_id = self._next_circuit_id("RC")
+            suffix = f" ({i+1})" if len(chunks) > 1 else ""
+            
+            circuit = GroupedCircuit(
+                circuit_id=circuit_id,
+                circuit_name=f"เต้ารับ ชั้น {floor}{suffix}",
+                circuit_type=CircuitType.RECEPTACLE,
+                floor=floor,
+                breaker_poles=1
             )
-        
-        circuit.notes.append(f"รวม {total_outlets} เต้ารับ")
-        self.circuits[circuit_id] = circuit
+            
+            for load in chunk:
+                circuit.add_load(load)
+            
+            total_outlets = sum(l.quantity for l in chunk)
+            circuit.notes.append(f"รวม {total_outlets} จุด")
+            
+            if len(chunks) > 1:
+                circuit.notes.append(f"แยกวงจร {i+1}/{len(chunks)}")
+            
+            self.circuits[circuit_id] = circuit
     
     def _create_room_circuit(self, loads: List[ElectricalLoad], room: str, floor: str):
         """Create circuit for general loads in a room (no dedicated breaker).
@@ -423,8 +462,21 @@ class CircuitGrouper:
         """Select appropriate breaker rating.
         
         Standard ratings (NEC 240.6): 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100
+        
+        Thai Residential Rules (วสท.):
+        - RECEPTACLE: 16A or 20A max (เต้ารับบ้านพัก)
+        - LIGHTING: 15A or 20A max
+        - Others: select based on load current
         """
         standard_ratings = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100]
+        
+        # Rule: Receptacle circuits use 16A or 20A only
+        if circuit_type == CircuitType.RECEPTACLE:
+            allowed_ratings = [16, 20]  # Thai standard: 16A preferred
+            for rating in allowed_ratings:
+                if rating >= current:
+                    return rating
+            return 20  # Max for receptacle
         
         # Apply continuous load factor (125%) if applicable
         if circuit_type in [CircuitType.LIGHTING, CircuitType.HVAC]:

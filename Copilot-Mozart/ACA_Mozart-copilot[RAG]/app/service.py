@@ -785,16 +785,16 @@ class RagService:
                     else:
                         breaker_str = f"MCB {rating}A/{poles}P"
                     
-                    # Truncate name to fit table
+                    # Display name - increase length to show full name
                     display_name = f"{icon} {name}"
-                    if len(display_name) > 24:
-                        display_name = display_name[:21] + "..."
+                    if len(display_name) > 30:
+                        display_name = display_name[:27] + "..."
                     
                     # Wire/conduit info
                     wire_conduit = f"{wire_size}mm²/½\""
                     
                     # Format as table row
-                    lines.append(f"│ {circuit_num:>3} │ {display_name:<24} │ {load_current:>6.1f} │{breaker_str:>7}│ {wire_conduit:<13} │")
+                    lines.append(f"│ {circuit_num:>3} │ {display_name:<30} │ {load_current:>6.1f} │{breaker_str:>7}│ {wire_conduit:<13} │")
                     circuit_num += 1
                     
                     # Add sub-details for lighting circuits
