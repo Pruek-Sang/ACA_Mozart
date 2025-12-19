@@ -363,11 +363,17 @@ class CircuitGrouper:
         
         MAX_PER_CIRCUIT = self.MAX_OUTLETS_PER_CIRCUIT  # 10
         
-        # Step 1: Calculate total outlets
-        total_outlets = sum(
-            load.quantity if hasattr(load, 'quantity') else 1 
-            for load in loads
-        )
+        # Step 1: Calculate total outlet BOXES (not individual receptacles)
+        # Per วสท. 2564: Duplex/Triple in same gang box = 1 point (180 VA)
+        # Only 4+ receptacles in same box = 2 points (360 VA)
+        total_outlets = 0
+        for load in loads:
+            qty = load.quantity if hasattr(load, 'quantity') else 1
+            # 1-3 receptacles in box = 1 point, 4+ = 2 points
+            if qty >= 4:
+                total_outlets += 2
+            else:
+                total_outlets += 1
         
         # Step 2: Calculate minimum circuits needed
         num_circuits = math.ceil(total_outlets / MAX_PER_CIRCUIT)
@@ -389,6 +395,8 @@ class CircuitGrouper:
         
         for load in sorted_loads:
             qty = load.quantity if hasattr(load, 'quantity') else 1
+            # วสท. 2564: 1-3 receptacles = 1 point, 4+ = 2 points
+            points = 2 if qty >= 4 else 1
             
             # Find the circuit with most available space that can fit this load
             # Prefer circuits that won't exceed MAX_PER_CIRCUIT
@@ -397,7 +405,7 @@ class CircuitGrouper:
             
             for i in range(num_circuits):
                 remaining_space = MAX_PER_CIRCUIT - circuit_counts[i]
-                if remaining_space >= qty and remaining_space > best_space:
+                if remaining_space >= points and remaining_space > best_space:
                     best_idx = i
                     best_space = remaining_space
             
@@ -408,7 +416,7 @@ class CircuitGrouper:
             
             # Assign load to best circuit
             circuits_data[best_idx].append(load)
-            circuit_counts[best_idx] += qty
+            circuit_counts[best_idx] += points  # Use points, not qty
         
         # Step 4: Create GroupedCircuit objects for each non-empty bucket
         circuit_num = 0
@@ -431,9 +439,11 @@ class CircuitGrouper:
             for load in chunk:
                 circuit.add_load(load)
             
-            total_in_circuit = sum(
-                l.quantity if hasattr(l, 'quantity') else 1 for l in chunk
-            )
+            # Count outlet BOXES (points) not individual receptacles - วสท. 2564
+            total_in_circuit = 0
+            for l in chunk:
+                qty = l.quantity if hasattr(l, 'quantity') else 1
+                total_in_circuit += 2 if qty >= 4 else 1
             circuit.notes.append(f"รวม {total_in_circuit} จุด")
             
             if num_circuits > 1:
