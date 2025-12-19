@@ -644,6 +644,7 @@ class RagService:
                     outlets_by_floor[floor].append((room, qty))
         
         lines = []
+        outlets_displayed_floors = set()  # Track which floors already displayed outlets
         if language == "th":
             # Get project name from project_req or use default
             project_name = "บ้านพักอาศัย"
@@ -821,23 +822,42 @@ class RagService:
                                 lines.append(f"│     │ {summary_text:<24}│        │       │               │")
                     
                     # Add sub-details for outlet circuits
+                    # BUG FIX: Don't use outlets_by_floor (shows all floor outlets for EACH circuit)
+                    # Instead, show only the summary from circuit notes (circuit already split correctly)
                     if "เต้ารับ" in name:
                         import re
                         floor_match = re.search(r'ชั้น\s*(\d+)', name)
+                        circuit_num_match = re.search(r'\((\d+)\)', name)
+                        
                         if floor_match:
                             floor = int(floor_match.group(1))
-                            if floor in outlets_by_floor:
+                            circuit_suffix = int(circuit_num_match.group(1)) if circuit_num_match else 1
+                            
+                            # Use circuit's notes for summary (already calculated correctly by circuit_grouper)
+                            circuit_notes = b.get("circuit_info", {}).get("notes", [])
+                            
+                            # If we have outlets_by_floor, show them ONLY ONCE (first circuit for that floor)
+                            # Track which floors we've displayed with a flag
+                            # Track which floors we've displayed (local variable, not self attribute)
+                            if floor in outlets_by_floor and floor not in outlets_displayed_floors:
                                 sorted_rooms = sorted(outlets_by_floor[floor], key=room_sort_key)
                                 total_outlets = 0
                                 for room, qty in sorted_rooms:
                                     outlet_type = "คู่" if qty >= 2 else "เดี่ยว"
                                     total_outlets += qty
-                                    # Fixed width: room details fit in column 2 (24 chars)
                                     detail_text = f"  └─ {room}: {outlet_type}×{qty}"
                                     lines.append(f"│     │ {detail_text:<24}│        │       │               │")
-                                total_watts = total_outlets * 180
-                                total_amps = total_watts / 230
-                                summary_text = f"  📊 รวม: {total_outlets}จุด ({total_amps:.1f}A)"
+                                
+                                # Calculate amps based on the CIRCUIT's load_current, not total floor
+                                circuit_amps = load_current  # Already calculated with diversity factor
+                                summary_text = f"  📊 รวม: {total_outlets}จุด ({circuit_amps:.1f}A)"
+                                lines.append(f"│     │ {summary_text:<24}│        │       │               │")
+                                
+                                # Mark as displayed for first circuit only
+                                outlets_displayed_floors.add(floor)
+                            elif circuit_suffix > 1:
+                                # For additional circuits (2, 3, ...), just show summary
+                                summary_text = f"  📊 วงจรที่ {circuit_suffix} ({load_current:.1f}A)"
                                 lines.append(f"│     │ {summary_text:<24}│        │       │               │")
             
             # Add spare circuits row
