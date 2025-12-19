@@ -166,8 +166,35 @@ Frontend → Gateway → RAG → MCP Core
 ```
 
 | Service | ต้องรู้ URL ของ | ENV |
-|---------|---------------|-----|
+|---------|---------------|-----
 | Frontend | Gateway | VITE_GATEWAY_URL |
 | Gateway | RAG | MOZART_ENDPOINT |
 | RAG | MCP Core | MCP_CORE_URL |
 
+---
+
+## 🔴 ความผิดพลาดที่ 7: Path Trigger ไม่ครอบคลุม
+
+**อาการ:**
+- แก้ code ใน `mcp_core_v2/` แล้ว push
+- GitHub Actions **ไม่ trigger**
+- Cloud Run ยังใช้ image เก่า
+
+**สาเหตุ:**
+- `paths:` ใน workflow ไม่มี `mcp_core_v2/**`
+- Workflow trigger เฉพาะ `Copilot-Mozart/**`
+
+**วิธีแก้ที่ถูกต้อง:**
+```yaml
+# .github/workflows/docker-build.yml
+paths:
+  - 'Copilot-Mozart/**'    # RAG, Gateway, Frontend
+  - 'mcp_core_v2/**'       # MCP Core ← เพิ่มนี้!
+  - 'scripts/**'           # Build scripts
+  - '.github/workflows/**' # Workflow changes
+```
+
+**บทเรียน:**
+1. ตรวจสอบ `paths:` ทุกครั้งที่เพิ่ม directory ใหม่
+2. ถ้า CI/CD ไม่ trigger → เช็ค paths ก่อน
+3. ใช้ `workflow_dispatch:` เพื่อ manual trigger ได้
