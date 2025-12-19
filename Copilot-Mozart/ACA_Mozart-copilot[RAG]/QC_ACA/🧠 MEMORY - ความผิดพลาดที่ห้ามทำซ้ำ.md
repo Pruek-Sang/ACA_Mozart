@@ -198,3 +198,32 @@ paths:
 1. ตรวจสอบ `paths:` ทุกครั้งที่เพิ่ม directory ใหม่
 2. ถ้า CI/CD ไม่ trigger → เช็ค paths ก่อน
 3. ใช้ `workflow_dispatch:` เพื่อ manual trigger ได้
+
+---
+
+## 🔴 ความผิดพลาดที่ 8: นับจุดเต้ารับผิดมาตรฐาน
+
+**อาการ:**
+- 19 outlets → 3-4 circuits (ควรเป็น 2)
+- ผลลัพธ์ MCB มากเกินไป
+
+**สาเหตุ:**
+- นับ `quantity` (ช่องเสียบ) แทน outlet box (กล่อง)
+- Duplex (คู่) ถูกนับเป็น 2 จุดแทน 1 จุด
+
+**มาตรฐาน วสท. 2564:**
+- 1-3 ช่องเสียบในกล่องเดียว = **1 จุด** (180 VA)
+- 4+ ช่องเสียบในกล่องเดียว = **2 จุด** (360 VA)
+
+**วิธีแก้ที่ถูกต้อง:**
+```python
+# นับ outlet boxes ไม่ใช่ receptacles
+for load in loads:
+    qty = load.quantity if hasattr(load, 'quantity') else 1
+    points = 2 if qty >= 4 else 1  # วสท. 2564
+```
+
+**บทเรียน:**
+1. อ่านมาตรฐานให้ชัดก่อน implement
+2. "จุด" ในภาษาไทย = outlet box ไม่ใช่ receptacle
+3. ต้อง test กับ case จริง (duplex outlets)
