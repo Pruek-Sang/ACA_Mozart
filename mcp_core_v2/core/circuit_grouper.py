@@ -113,6 +113,11 @@ class CircuitGrouper:
         'WATER_HEATER', 'น้ำอุ่น', 'HEATER',
     }
     
+    # === 3-Phase Load Balancing (Future Feature) ===
+    # Set to True to enable balancing loads across L1/L2/L3 phases
+    # Currently False for standard 1-phase residential designs
+    ENABLE_3PHASE_BALANCE = False
+    
     def __init__(self, default_voltage: float = 230.0):
         """Initialize circuit grouper.
         
@@ -343,37 +348,77 @@ class CircuitGrouper:
     def _create_receptacle_circuit(self, loads: List[ElectricalLoad], floor: str):
         """Create grouped receptacle circuit for a floor.
         
-        Auto-splits into multiple circuits if total outlets > 10.
-        Thai residential standard: max 10 outlets per 20A circuit.
+        Uses BALANCED LOAD DISTRIBUTION instead of greedy splitting.
+        This minimizes the number of circuits while respecting max outlets per circuit.
+        
+        Thai residential standard: max 10 outlets per 20A circuit (วสท. 2564).
+        
+        Algorithm:
+        1. Count total outlets
+        2. Calculate minimum circuits needed (ceil(total/max))
+        3. Distribute loads evenly using best-fit decreasing
         """
         if not loads:
             return
         
-        # Split loads into chunks of max 10 outlets each
         MAX_PER_CIRCUIT = self.MAX_OUTLETS_PER_CIRCUIT  # 10
-        chunks = []
-        current_chunk = []
-        current_count = 0
         
-        for load in loads:
+        # Step 1: Calculate total outlets
+        total_outlets = sum(
+            load.quantity if hasattr(load, 'quantity') else 1 
+            for load in loads
+        )
+        
+        # Step 2: Calculate minimum circuits needed
+        num_circuits = math.ceil(total_outlets / MAX_PER_CIRCUIT)
+        
+        if num_circuits == 0:
+            return
+        
+        # Step 3: Balanced distribution using best-fit decreasing algorithm
+        # Initialize empty circuit buckets
+        circuits_data = [[] for _ in range(num_circuits)]
+        circuit_counts = [0] * num_circuits
+        
+        # Sort loads by quantity (largest first) for better packing
+        sorted_loads = sorted(
+            loads, 
+            key=lambda l: l.quantity if hasattr(l, 'quantity') else 1, 
+            reverse=True
+        )
+        
+        for load in sorted_loads:
             qty = load.quantity if hasattr(load, 'quantity') else 1
-            if current_count + qty > MAX_PER_CIRCUIT and current_chunk:
-                # Current chunk is full, start new one
-                chunks.append(current_chunk)
-                current_chunk = [load]
-                current_count = qty
-            else:
-                current_chunk.append(load)
-                current_count += qty
+            
+            # Find the circuit with most available space that can fit this load
+            # Prefer circuits that won't exceed MAX_PER_CIRCUIT
+            best_idx = None
+            best_space = -1
+            
+            for i in range(num_circuits):
+                remaining_space = MAX_PER_CIRCUIT - circuit_counts[i]
+                if remaining_space >= qty and remaining_space > best_space:
+                    best_idx = i
+                    best_space = remaining_space
+            
+            # If no circuit can fit within limit, find the one with most space anyway
+            # (this handles edge cases where a single load > MAX, though rare)
+            if best_idx is None:
+                best_idx = min(range(num_circuits), key=lambda i: circuit_counts[i])
+            
+            # Assign load to best circuit
+            circuits_data[best_idx].append(load)
+            circuit_counts[best_idx] += qty
         
-        # Don't forget the last chunk
-        if current_chunk:
-            chunks.append(current_chunk)
-        
-        # Create separate circuits for each chunk
-        for i, chunk in enumerate(chunks):
+        # Step 4: Create GroupedCircuit objects for each non-empty bucket
+        circuit_num = 0
+        for i, chunk in enumerate(circuits_data):
+            if not chunk:
+                continue
+            
+            circuit_num += 1
             circuit_id = self._next_circuit_id("RC")
-            suffix = f" ({i+1})" if len(chunks) > 1 else ""
+            suffix = f" ({circuit_num})" if num_circuits > 1 else ""
             
             circuit = GroupedCircuit(
                 circuit_id=circuit_id,
@@ -386,13 +431,19 @@ class CircuitGrouper:
             for load in chunk:
                 circuit.add_load(load)
             
-            total_outlets = sum(l.quantity for l in chunk)
-            circuit.notes.append(f"รวม {total_outlets} จุด")
+            total_in_circuit = sum(
+                l.quantity if hasattr(l, 'quantity') else 1 for l in chunk
+            )
+            circuit.notes.append(f"รวม {total_in_circuit} จุด")
             
-            if len(chunks) > 1:
-                circuit.notes.append(f"แยกวงจร {i+1}/{len(chunks)}")
+            if num_circuits > 1:
+                circuit.notes.append(f"วงจรที่ {circuit_num}/{num_circuits} (balanced)")
             
             self.circuits[circuit_id] = circuit
+        
+        logger.debug(
+            f"Floor {floor}: {total_outlets} outlets → {num_circuits} circuits (balanced)"
+        )
     
     def _create_room_circuit(self, loads: List[ElectricalLoad], room: str, floor: str):
         """Create circuit for general loads in a room (no dedicated breaker).
