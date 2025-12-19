@@ -287,6 +287,119 @@ jobs:
             --port 8080
 
       # ─────────────────────────────────────────────────────────────────────
+      # 🔗 POST-DEPLOY: Update Service URLs + Health Checks
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🔗 Update Service URLs & Health Check
+        if: steps.deploy-mcp.outcome == 'success' && steps.deploy-rag.outcome == 'success'
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "               UPDATING SERVICE CONNECTIONS"
+          echo "═══════════════════════════════════════════════════════════"
+          
+          # 1️⃣ Get MCP Core URL
+          MCP_URL=$(gcloud run services describe mcp-core \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          echo "📡 MCP Core URL: $MCP_URL"
+          
+          # 2️⃣ Health Check MCP Core
+          echo "🩺 Testing MCP Core health..."
+          sleep 10  # Wait for cold start
+          if curl -sf "$MCP_URL/health" --max-time 30 > /dev/null; then
+            echo "✅ MCP Core: HEALTHY"
+          else
+            echo "❌ MCP Core: NOT RESPONDING"
+            echo "🔍 Check Cloud Run logs: gcloud logging read --service=mcp-core"
+          fi
+          
+          # 3️⃣ Update RAG with MCP URL
+          echo "🔄 Updating mozart-rag → MCP_CORE_URL=$MCP_URL"
+          gcloud run services update mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --update-env-vars="MCP_CORE_URL=$MCP_URL"
+          echo "✅ RAG updated with MCP URL"
+          
+          # 4️⃣ Get RAG URL  
+          RAG_URL=$(gcloud run services describe mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          echo "📡 RAG URL: $RAG_URL"
+          
+          # 5️⃣ Health Check RAG (wait for restart)
+          echo "🩺 Waiting for RAG to restart (20s)..."
+          sleep 20
+          if curl -sf "$RAG_URL/" --max-time 30 > /dev/null; then
+            echo "✅ Mozart RAG: HEALTHY"
+          else
+            echo "⚠️ Mozart RAG: May still be starting (check manually)"
+          fi
+          
+          # 6️⃣ Get Gateway URL
+          GATEWAY_URL=$(gcloud run services describe gateway \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          
+          # 7️⃣ Print Connection Summary
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "              ✅ ALL SERVICES CONNECTED"
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Frontend:   https://frontend-203658178245.asia-southeast1.run.app"
+          echo "Gateway:    $GATEWAY_URL"
+          echo "Mozart RAG: $RAG_URL"
+          echo "MCP Core:   $MCP_URL"
+          echo ""
+          echo "Connection Chain: Frontend → Gateway → RAG → MCP"
+          echo "═══════════════════════════════════════════════════════════"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🚨 FALLBACK: Diagnostic Commands (if above fails)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚨 Fallback Diagnostics
+        if: failure()
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "              ⚠️ FALLBACK DIAGNOSTICS"
+          echo "═══════════════════════════════════════════════════════════"
+          
+          echo ""
+          echo "📋 1. All Services Status:"
+          gcloud run services list --region=${{ env.GCP_REGION }} \
+            --format="table(SERVICE,URL,LAST_DEPLOYED_AT)"
+          
+          echo ""
+          echo "📋 2. Mozart RAG ENV Variables:"
+          gcloud run services describe mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --format="yaml(spec.template.spec.containers[0].env)" || true
+          
+          echo ""
+          echo "📋 3. Check API Key Present:"
+          GOOGLE_KEY=$(gcloud run services describe mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --format="value(spec.template.spec.containers[0].env[GOOGLE_API_KEY])" || echo "NOT SET")
+          if [ -n "$GOOGLE_KEY" ]; then
+            echo "✅ GOOGLE_API_KEY: Present (hidden)"
+          else
+            echo "❌ GOOGLE_API_KEY: NOT SET"
+          fi
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "              🔧 MANUAL FIX COMMANDS"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "# 1. Get MCP Core URL:"
+          echo "gcloud run services describe mcp-core --region=${{ env.GCP_REGION }} --format='value(status.url)'"
+          echo ""
+          echo "# 2. Update RAG with correct MCP URL:"
+          echo "gcloud run services update mozart-rag --region=${{ env.GCP_REGION }} --update-env-vars='MCP_CORE_URL=<URL>'"
+          echo ""
+          echo "# 3. Check service logs:"
+          echo "gcloud run services logs read mcp-core --region=${{ env.GCP_REGION }} --limit=20"
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
       # Summary (shows which deployments succeeded/failed)
       # ─────────────────────────────────────────────────────────────────────
       - name: 📊 Deploy Summary
@@ -301,7 +414,6 @@ jobs:
           echo "Mozart RAG: ${{ steps.deploy-rag.outcome }}"
           echo "═══════════════════════════════════════════════════════════"
           echo "✅ Deploy job completed!"
-          echo "✅ All deployments successful!"
 
   # ═══════════════════════════════════════════════════════════════════════
   # Summary
