@@ -126,7 +126,16 @@ async def design(request: DesignRequestInput) -> DesignResultOutput:
     
     if not PIPELINE_AVAILABLE:
         # Return mock result for testing
-        return _mock_design_result(request)
+        mock_result = _mock_design_result(request)
+        # Cache for SLD/BOQ generation
+        _cache_session_result(request.session_id, {
+            "calculations": mock_result.calculations,
+            "breaker_selections": mock_result.breaker_selections,
+            "wire_sizing": mock_result.wire_sizing,
+            "loads": [l.model_dump() if hasattr(l, 'model_dump') else l.dict() for l in request.loads],
+            "project_name": request.project_name
+        })
+        return mock_result
     
     try:
         # Convert input to internal format
@@ -135,6 +144,15 @@ async def design(request: DesignRequestInput) -> DesignResultOutput:
         # Run pipeline
         pipeline = get_design_pipeline()
         result = pipeline.execute(internal_request)
+        
+        # Cache for SLD/BOQ generation
+        _cache_session_result(request.session_id, {
+            "calculations": result.calculations,
+            "breaker_selections": result.breaker_selections,
+            "wire_sizing": result.wire_sizing,
+            "loads": [l.model_dump() if hasattr(l, 'model_dump') else vars(l) for l in internal_request.loads],
+            "project_name": request.project_name
+        })
         
         # Convert result to output format
         return _convert_to_output(result)
@@ -330,6 +348,158 @@ def _convert_to_output(result) -> DesignResultOutput:
         standards_markdown=standards_md,
         readable_report=readable
     )
+
+# =============================================================================
+# SLD & BOQ Endpoints (Separate from main pipeline - lazy fetch)
+# These endpoints generate SLD/BOQ from cached design results
+# =============================================================================
+
+# In-memory session cache (simple implementation)
+# In production, use Redis or similar
+_session_cache: Dict[str, Dict[str, Any]] = {}
+
+def _cache_session_result(session_id: str, result: Dict[str, Any]):
+    """Cache design result for SLD/BOQ generation"""
+    _session_cache[session_id] = {
+        "calculations": result.get("calculations", {}),
+        "breaker_selections": result.get("breaker_selections", {}),
+        "wire_sizing": result.get("wire_sizing", {}),
+        "loads": result.get("loads", []),
+        "project_name": result.get("project_name", "Unknown"),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.get("/sld/{session_id}")
+async def get_sld(session_id: str):
+    """
+    Generate Single Line Diagram for a session.
+    
+    Returns JSON/SVG data for frontend to render.
+    Uses cached design result from previous /design call.
+    """
+    try:
+        from core.sld_generator import SldGenerator
+        
+        # Check cache
+        if session_id not in _session_cache:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Session {session_id} not found. Call /api/v1/design first."
+            )
+        
+        cached = _session_cache[session_id]
+        
+        # Generate SLD
+        generator = SldGenerator()
+        sld_data = generator.generate_sld_data(
+            breaker_selections=cached.get("breaker_selections", {}),
+            wire_sizing=cached.get("wire_sizing", {}),
+            calculations=cached.get("calculations", {}),
+            project_name=cached.get("project_name", "Residential House")
+        )
+        
+        return {
+            "session_id": session_id,
+            "sld": sld_data,
+            "generated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="SLD Generator not available")
+    except Exception as e:
+        logger.error(f"SLD generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/boq/{session_id}")
+async def get_boq(session_id: str):
+    """
+    Generate Bill of Quantities for a session.
+    
+    Returns BOQ with prices from price database.
+    Uses cached design result from previous /design call.
+    """
+    try:
+        import os
+        from core.boq_service import BoqService
+        
+        # Check cache
+        if session_id not in _session_cache:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Session {session_id} not found. Call /api/v1/design first."
+            )
+        
+        cached = _session_cache[session_id]
+        
+        # Find catalog and prices files
+        base_path = os.path.dirname(__file__)
+        catalog_path = os.path.join(base_path, "catalog", "catalog_rows.csv")
+        prices_path = os.path.join(base_path, "catalog", "prices.csv")
+        
+        # Fallback paths if not found
+        if not os.path.exists(catalog_path):
+            catalog_path = os.path.join(base_path, "models", "catalog_rows.csv")
+        if not os.path.exists(prices_path):
+            prices_path = os.path.join(base_path, "models", "prices.csv")
+        
+        # Generate BOQ
+        boq_service = BoqService(catalog_path, prices_path)
+        boq_items = boq_service.generate_from_dicts(
+            breaker_selections=cached.get("breaker_selections", {}),
+            wire_sizing=cached.get("wire_sizing", {}),
+            loads=cached.get("loads", [])
+        )
+        
+        # Convert to dict for JSON serialization
+        boq_list = []
+        for item in boq_items:
+            if hasattr(item, 'model_dump'):
+                boq_list.append(item.model_dump())
+            elif hasattr(item, 'dict'):
+                boq_list.append(item.dict())
+            else:
+                boq_list.append({
+                    "item_code": item.item_code,
+                    "description": item.description,
+                    "quantity": item.quantity,
+                    "unit": item.unit,
+                    "unit_price": item.unit_price,
+                    "total_price": item.total_price,
+                    "source": getattr(item, 'source', 'Unknown')
+                })
+        
+        # Calculate totals
+        total = sum(item.get("total_price", 0) for item in boq_list)
+        
+        return {
+            "session_id": session_id,
+            "boq": boq_list,
+            "total_price_thb": round(total, 2),
+            "item_count": len(boq_list),
+            "generated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except ImportError:
+        raise HTTPException(status_code=500, detail="BOQ Service not available")
+    except Exception as e:
+        logger.error(f"BOQ generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/session/{session_id}")
+async def delete_session(session_id: str):
+    """Delete cached session data"""
+    if session_id in _session_cache:
+        del _session_cache[session_id]
+        return {"status": "deleted", "session_id": session_id}
+    raise HTTPException(status_code=404, detail="Session not found")
+
+@app.get("/sessions")
+async def list_sessions():
+    """List all cached sessions (for debugging)"""
+    return {
+        "sessions": list(_session_cache.keys()),
+        "count": len(_session_cache)
+    }
 
 # =============================================================================
 # Entry Point
