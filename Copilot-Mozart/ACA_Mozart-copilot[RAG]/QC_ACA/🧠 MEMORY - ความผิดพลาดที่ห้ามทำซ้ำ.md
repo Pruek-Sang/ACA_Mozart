@@ -128,4 +128,46 @@ gcloud run revisions list --service=frontend --region=asia-southeast1
 ---
 
 *Memory ฉบับนี้สร้างเมื่อ: 2025-12-18*
+*อัพเดทเมื่อ: 2025-12-19*
 *เพื่อป้องกันไม่ให้ทำผิดพลาดซ้ำอีก*
+
+---
+
+## 🔴 ความผิดพลาดที่ 6: Cloud Run URL เปลี่ยนแต่ไม่อัพเดท
+
+**อาการ:**
+- `⚠️ MCP Core ไม่พร้อมใช้งาน`
+- Services deploy สำเร็จแต่เชื่อมต่อกันไม่ได้
+
+**สาเหตุ:**
+- Cloud Run URL เปลี่ยนเมื่อ recreate service
+- ENV ของ mozart-rag ยังชี้ไป URL เก่า
+- `mcp-core-rc5mtgajza-as.a.run.app` ≠ `mcp-core-203658178245.asia-southeast1.run.app`
+
+**วิธีแก้ที่ถูกต้อง:**
+```yaml
+# ใน workflow หลัง deploy MCP Core
+MCP_URL=$(gcloud run services describe mcp-core --format='value(status.url)')
+gcloud run services update mozart-rag --update-env-vars="MCP_CORE_URL=$MCP_URL"
+```
+
+**บทเรียน:**
+1. Cloud Run URL ไม่ fixed → ต้อง auto-update ทุกครั้ง
+2. Service dependencies ต้อง update หลัง deploy
+3. ใส่ health check ก่อน+หลัง update
+
+---
+
+## ✅ Service Dependencies ที่ต้องจำ
+
+```
+Frontend → Gateway → RAG → MCP Core
+  (80)     (8000)   (8080)   (5001)
+```
+
+| Service | ต้องรู้ URL ของ | ENV |
+|---------|---------------|-----|
+| Frontend | Gateway | VITE_GATEWAY_URL |
+| Gateway | RAG | MOZART_ENDPOINT |
+| RAG | MCP Core | MCP_CORE_URL |
+
