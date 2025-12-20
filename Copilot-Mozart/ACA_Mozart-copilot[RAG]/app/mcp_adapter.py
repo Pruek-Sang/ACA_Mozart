@@ -193,7 +193,20 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     # Pumps (Motor type)
     "PUMP-750W": (750, LoadType.MOTOR, False),
     "PUMP-1500W": (1500, LoadType.MOTOR, False),
+    
+    # EV Chargers (Appliance, continuous - requires 125% sizing)
+    "EV-CHARGER-7KW": (7000, LoadType.APPLIANCE, True),   # Level 2 home charger
+    "EV-CHARGER-22KW": (22000, LoadType.APPLIANCE, True), # Level 2 fast charger
+    
+    # Additional Kitchen Appliances
+    "KETTLE-2200W": (2200, LoadType.APPLIANCE, False),    # กาต้มน้ำ
+    "KETTLE-1800W": (1800, LoadType.APPLIANCE, False),
+    
+    # Exhaust Fans
+    "FAN-EXHAUST-25W": (25, LoadType.OTHER, False),       # พัดลมดูดอากาศ
+    "FAN-EXHAUST-50W": (50, LoadType.OTHER, False),
 }
+
 
 # Default for unknown devices
 DEFAULT_DEVICE = (500, LoadType.OTHER, False)
