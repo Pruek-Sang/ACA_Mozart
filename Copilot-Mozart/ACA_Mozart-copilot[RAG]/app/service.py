@@ -975,14 +975,17 @@ class RagService:
                     lines.append(f"│  กระแสโหลด (Demand Current): {total_current:>10.1f} A                         │")
                     design_current = total_current * 1.25
                     lines.append(f"│  Design Current (×1.25)    : {design_current:>10.1f} A                         │")
-                    # What-If: หากไม่ใส่เต้ารับในห้องน้ำ (ประหยัด 1200W per bathroom)
-                    bathroom_load_w = 1200  # Default bathroom receptacle load
+                    # What-If: หากไม่ใส่เต้ารับในห้องน้ำ (ประหยัด per วสท. 2564: 180VA/outlet)
+                    # ห้องน้ำมี 1 outlet = 180 VA (ไม่ใช่ 1200W!)
+                    bathroom_outlet_count = 1  # ห้องน้ำปกติมี 1 เต้ารับ
+                    bathroom_load_w = bathroom_outlet_count * 180  # 180 VA per outlet per วสท. 2564
                     load_without_bathroom = total_load - bathroom_load_w
                     current_without_bathroom = load_without_bathroom / 230
                     lines.append(f"├─────────────────────────────────────────────────────────────────┤")
                     lines.append(f"│  💡 หากไม่ใส่เต้ารับในห้องน้ำ:                                  │")
-                    lines.append(f"│     โหลดรวม: {load_without_bathroom:>6,.0f} W (-{bathroom_load_w}W)                               │")
-                    lines.append(f"│     กระแส: {current_without_bathroom:>5.1f}A (-{bathroom_load_w/230:.1f}A)                                        │")
+                    lines.append(f"│     โหลดรวม: {load_without_bathroom:>6,.0f} W (-{bathroom_load_w}W)                                │")
+                    lines.append(f"│     กระแส: {current_without_bathroom:>5.1f}A (-{bathroom_load_w/230:.1f}A)                                         │")
+
             
             lines.append("├─────────────────────────────────────────────────────────────────┤")
 
