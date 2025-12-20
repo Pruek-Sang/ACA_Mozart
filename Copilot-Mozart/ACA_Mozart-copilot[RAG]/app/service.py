@@ -74,6 +74,110 @@ DEVICE_WATER_HEATER = "เครื่องทำน้ำอุ่น"
 DEVICE_PUMP = "ปั๊มน้ำ"
 DEVICE_INDUCTION = "เตาแม่เหล็กไฟฟ้า"
 
+# =============================================================================
+# Site Context Validation Constants
+# =============================================================================
+REQUIRED_SITE_FIELDS = ["distance_to_transformer", "installation_area", "panel_type"]
+VALID_SITE_VALUES = {
+    "distance_to_transformer": ["less_than_50m", "50_100m", "more_than_100m"],
+    "installation_area": ["indoor", "high_temp", "outdoor", "underground"],
+    "panel_type": ["main", "sub"]
+}
+
+# Prompt templates for missing fields
+MISSING_FIELD_PROMPTS = {
+    "distance_to_transformer": "❓ **ระยะห่างจากหม้อแปลง?**\n   • น้อยกว่า 50 เมตร\n   • 50-100 เมตร\n   • มากกว่า 100 เมตร",
+    "installation_area": "❓ **พื้นที่ติดตั้ง?**\n   • ในอาคาร/ในบ้าน\n   • ใต้หลังคา/อุณหภูมิสูง\n   • กลางแจ้ง/ฝังดิน",
+    "panel_type": "❓ **ประเภทตู้ไฟ?**\n   • ตู้เมน (Main Panel)\n   • ตู้ย่อย (Sub Panel)"
+}
+
+
+def is_site_context_complete(ctx: Optional[Dict[str, Any]]) -> tuple:
+    """Check if site_context has all required fields.
+    
+    Returns:
+        tuple: (is_complete: bool, missing_fields: list)
+    """
+    if not ctx:
+        return False, REQUIRED_SITE_FIELDS.copy()
+    missing = [f for f in REQUIRED_SITE_FIELDS if f not in ctx or not ctx[f]]
+    return len(missing) == 0, missing
+
+
+def build_missing_field_prompt(missing_fields: list) -> str:
+    """Build a prompt asking user for specific missing fields."""
+    if not missing_fields:
+        return ""
+    
+    lines = ["⚠️ กรุณาระบุข้อมูลเพิ่มเติม:\n"]
+    for field in missing_fields:
+        if field in MISSING_FIELD_PROMPTS:
+            lines.append(MISSING_FIELD_PROMPTS[field])
+    
+    lines.append("\n💡 ตัวอย่าง: \"หม้อแปลง 80 เมตร ติดตั้งในบ้าน ตู้เมน\"")
+    return "\n".join(lines)
+
+
+def extract_site_context_from_text(text: str) -> Dict[str, str]:
+    """Extract site_context fields from Thai natural language text.
+    
+    Uses regex to detect values for:
+    - distance_to_transformer
+    - installation_area  
+    - panel_type
+    - conduit_grouping (optional)
+    
+    Returns:
+        Dict with extracted fields (may be empty or partial)
+    """
+    import re
+    
+    context = {}
+    text_lower = text.lower()
+    
+    # 1. Distance to transformer
+    if re.search(r'(?:หม้อแปลง|transformer).*(?:น้อยกว่า|ใกล้|<)\s*50', text):
+        context['distance_to_transformer'] = 'less_than_50m'
+    elif re.search(r'(?:หม้อแปลง|transformer).*(?:50|ห้าสิบ).*(?:100|ร้อย)', text):
+        context['distance_to_transformer'] = '50_100m'
+    elif re.search(r'(?:หม้อแปลง|transformer).*(?:มากกว่า|ไกล|>)\s*100', text):
+        context['distance_to_transformer'] = 'more_than_100m'
+    elif re.search(r'\d+\s*(?:เมตร|m)', text):
+        match = re.search(r'(\d+)\s*(?:เมตร|m)', text)
+        if match:
+            distance = int(match.group(1))
+            if distance < 50:
+                context['distance_to_transformer'] = 'less_than_50m'
+            elif distance <= 100:
+                context['distance_to_transformer'] = '50_100m'
+            else:
+                context['distance_to_transformer'] = 'more_than_100m'
+    
+    # 2. Installation area
+    if re.search(r'(?:ภายใน|indoor|ในบ้าน|ในอาคาร)', text_lower):
+        context['installation_area'] = 'indoor'
+    elif re.search(r'(?:ใต้หลังคา|หลังคา|ร้อน|อุณหภูมิสูง|high.?temp)', text_lower):
+        context['installation_area'] = 'high_temp'
+    elif re.search(r'(?:กลางแจ้ง|outdoor|นอกบ้าน|นอกอาคาร)', text_lower):
+        context['installation_area'] = 'outdoor'
+    elif re.search(r'(?:ฝังดิน|underground|ใต้ดิน)', text_lower):
+        context['installation_area'] = 'underground'
+    
+    # 3. Panel type
+    if re.search(r'(?:ตู้เมน|main\s*panel|mdb|ตู้หลัก)', text_lower):
+        context['panel_type'] = 'main'
+    elif re.search(r'(?:ตู้ย่อย|sub\s*panel|db|ตู้รอง)', text_lower):
+        context['panel_type'] = 'sub'
+    
+    # 4. Conduit grouping (optional)
+    if re.search(r'(?:รวมท่อ|ท่อรวม|grouping|bundle)', text_lower):
+        if re.search(r'(?:4|5|6|สี่|ห้า|หก)\s*(?:วงจร|circuit)', text_lower):
+            context['conduit_grouping'] = '4-6'
+        elif re.search(r'(?:2|3|สอง|สาม)\s*(?:วงจร|circuit)', text_lower):
+            context['conduit_grouping'] = '2-3'
+    
+    return context
+
 
 class RagService:
     """
@@ -1656,6 +1760,39 @@ class RagService:
                     # Debug: log floors
                     floor_info = {r.name: r.floor for r in project_req.rooms}
                     logger.info(f"🏠 Room floors: {floor_info}")
+                    
+                    # 🆕 FIX: Extract site_context from user's query
+                    site_ctx = extract_site_context_from_text(req.query)
+                    logger.info(f"🔍 Extracted site_context: {site_ctx}")
+                    
+                    # 🆕 FIX: Check if site_context is complete
+                    is_complete, missing_fields = is_site_context_complete(site_ctx)
+                    
+                    if not is_complete:
+                        # Return targeted prompt for missing fields
+                        logger.warning(f"⚠️ Missing site_context fields: {missing_fields}")
+                        prompt = build_missing_field_prompt(missing_fields)
+                        return StandardResponse(
+                            answer=prompt,
+                            sources=[],
+                            confidence="Low",
+                            grounding_status="NEEDS_SITE_CONTEXT",
+                            metadata=AnswerMetadata(
+                                llm_model=settings.MODEL_NAME_ANSWER,
+                                retrieved_docs=[],
+                                retrieval_group="mcp"
+                            )
+                        )
+                    
+                    # Set site_context on project_req before MCP call
+                    from app.models import SiteContext
+                    project_req.site_context = SiteContext(
+                        distance_to_transformer=site_ctx.get("distance_to_transformer", "more_than_100m"),
+                        installation_area=site_ctx.get("installation_area", "indoor"),
+                        panel_type=site_ctx.get("panel_type", "main"),
+                        conduit_grouping=site_ctx.get("conduit_grouping", "1")
+                    )
+                    logger.info(f"✅ site_context set: {project_req.site_context}")
                     
                     # Chain to MCP Core for calculations
                     result = await self._build_design_response(project_req, req.language)

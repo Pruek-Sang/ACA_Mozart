@@ -290,3 +290,46 @@ for load in loads:
 1. มาตรฐานไฟฟ้ามีข้อยกเว้นตามประเภทอาคาร
 2. อย่าใช้ factor เดียวครอบจักรวาล
 
+---
+
+## 🔴 ความผิดพลาดที่ 12: Load Schedule แสดงแต่ Spare Circuits (21 ธ.ค. 2024)
+
+**อาการ:**
+- ผู้ใช้ส่ง request ผ่าน Gateway (ข้อความละเอียดมาก)
+- Load Schedule ที่ได้มีแค่ Spare circuits เปล่าๆ
+- ไม่มี Error message กลับมา
+
+**สาเหตุ (2 จุด):**
+1. `_build_design_response()` ใน `service.py` **ไม่ validate** ว่า rooms/loads ว่างหรือไม่
+   - เมื่อ LLM extraction ล้มเหลว → rooms/loads ว่าง → ส่งไป MCP โดยตรง
+   - MCP สร้าง Panel ที่มีแค่ Spare circuits (ไม่มี load)
+   
+2. `process_ask()` เมื่อ `_extract_loads_from_text()` return empty:
+   - เดิม: Fall back to Q&A flow (ซึ่งอาจคืน Load Schedule เปล่า)
+   - **ควรจะ**: Return error message ที่ชัดเจน
+
+**วิธีแก้:**
+1. เพิ่ม validation ใน `_build_design_response()` ก่อนบรรทัด 1437:
+   ```python
+   if not req.rooms or len(req.rooms) == 0:
+       return StandardResponse(
+           answer="⚠️ ข้อมูลไม่ครบถ้วน...",
+           grounding_status="INSUFFICIENT_DATA"
+       )
+   ```
+
+2. แก้ `process_ask()` ไม่ให้ fall back to Q&A:
+   ```python
+   else:
+       # Return error instead of fallback
+       return StandardResponse(
+           answer="⚠️ ไม่สามารถดึงข้อมูลจากคำขอได้...",
+           grounding_status="EXTRACTION_FAILED"
+       )
+   ```
+
+**บทเรียน:**
+1. **ทุก function ที่รับ input ต้องมี validation** ก่อนประมวลผล
+2. **ห้าม silent fallback** เมื่อเกิดปัญหา - ต้อง return error message ที่ชัดเจน
+3. **LLM extraction อาจล้มเหลว** ต้องมี fallback plan ที่เหมาะสม
+
