@@ -227,3 +227,66 @@ for load in loads:
 1. อ่านมาตรฐานให้ชัดก่อน implement
 2. "จุด" ในภาษาไทย = outlet box ไม่ใช่ receptacle
 3. ต้อง test กับ case จริง (duplex outlets)
+
+---
+
+## 🔴 ความผิดพลาดที่ 9: Hardcoded Values ที่ขัดแย้งกับมาตรฐาน
+
+**อาการ:**
+- ห้องน้ำโหลด 1200W (แทนที่จะเป็น 180 VA)
+- แก้ใน `mcp_adapter` แล้วแต่ผลลัพธ์ไม่เปลี่ยน
+
+**สาเหตุ:**
+- มีการ **Hardcode** `bathroom_load_w = 1200` ใน `service.py` (Result Builder)
+- logic แยกอยู่คนละที่กับ calculation core
+
+**วิธีแก้ที่ถูกต้อง:**
+1. ใช้ค่ามาตรฐานเดียวกันทั้งระบบ (Global Constant)
+2. อย่า hardcode ตัวเลขใน Display Logic
+3. `1 outlet = 180 VA` (วสท. 2564)
+
+**บทเรียน:**
+1. ถ้าแก้ที่ต้นทางแล้วไม่หาย → เช็ค Display Logic ว่ามี hardcode ไหม
+2. Search codebase หาตัวเลขที่น่าสงสัย (freq grep search)
+
+---
+
+## 🔴 ความผิดพลาดที่ 10: Stateful Singleton ใน Pipeline
+
+**อาการ:**
+- `CircuitGrouper` เก็บ state (`self.circuits`)
+- ถูก initialize ครั้งเดียวใน `pipeline.py` (`__init__`)
+- ถ้า reuse pipeline → state เก่าค้าง!
+
+**สาเหตุ:**
+- ใช้ Singleton pattern หรือ Init-once กับ Class ที่มี state สะสม
+- `get_circuit_grouper()` คืนค่า global instance (เดิม)
+
+**วิธีแก้ที่ถูกต้อง:**
+- เปลี่ยนเป็น **Factory Pattern** ที่สร้าง instance ใหม่ทุก request
+- `grouper = get_circuit_grouper(num_floors=...)` ใน `execute()`
+
+**บทเรียน:**
+1. Class ที่มี List/Dict accumulation ห้ามเป็น Singleton
+2. Pipeline ควรสร้าง helper class ใหม่ทุก request (Fresh Scope)
+
+---
+
+## 🔴 ความผิดพลาดที่ 11: Diversity Factor ไม่ Conditional
+
+**อาการ:**
+- ใช้ Diversity Factor 0.4 กับบ้านพักอาศัย (ผิดมาตรฐาน)
+- กระแสเต้ารับต่ำเกินจริง (19 จุด เหลือ 7A)
+
+**มาตรฐาน วสท.:**
+- **อาคารสูง/ทั่วไป (≥10 ชั้น):** ใช้ Diversity Factor 0.4 สำหรับเต้ารับ
+- **บ้านพักอาศัย (<10 ชั้น):** คิด 100% (ไม่ใช้ Diversity Factor)
+
+**วิธีแก้:**
+- เพิ่ม `is_high_rise` flag และ `num_floors` check
+- `if is_high_rise: apply_diversity else: full_load`
+
+**บทเรียน:**
+1. มาตรฐานไฟฟ้ามีข้อยกเว้นตามประเภทอาคาร
+2. อย่าใช้ factor เดียวครอบจักรวาล
+

@@ -59,28 +59,40 @@ class GroupedCircuit:
         self.loads.append(load)
         self.total_watts += load.power_watts * load.quantity
     
-    def calculate_current(self, voltage: float = 230.0, pf: float = 0.85) -> float:
+    def calculate_current(
+        self, 
+        voltage: float = 230.0, 
+        pf: float = 0.85,
+        is_high_rise: bool = False
+    ) -> float:
         """Calculate total current for this circuit.
         
         Formula: I = P / (V × PF)  [Single phase]
         Thai Standard: 230V nominal
         
         Diversity Factor (วสท.):
-        - RECEPTACLE: 0.4 (เต้ารับไม่ได้ใช้พร้อมกันทั้งหมด)
-        - Others: 1.0 (dedicated circuits use full load)
+        - อาคารสูง (≥10 ชั้น): 0.4 สำหรับ RECEPTACLE
+        - บ้านพักอาศัย (<10 ชั้น): 1.0 (ไม่ใช้ diversity)
+        
+        Args:
+            voltage: Voltage (default 230V)
+            pf: Power factor (default 0.85)
+            is_high_rise: True if building ≥ 10 floors (enables diversity)
         """
         if voltage <= 0:
             voltage = 230.0  # Default Thai residential
         
-        # Apply diversity factor for receptacles
-        if self.circuit_type == CircuitType.RECEPTACLE:
-            diversity = 0.4  # 40% diversity for general outlets
+        # Apply diversity factor for receptacles ONLY in high-rise buildings
+        # วสท.: บ้านพักอาศัยไม่ใช้ diversity factor
+        if self.circuit_type == CircuitType.RECEPTACLE and is_high_rise:
+            diversity = 0.4  # 40% diversity for high-rise buildings
             effective_watts = self.total_watts * diversity
         else:
-            effective_watts = self.total_watts
+            effective_watts = self.total_watts  # 100% for residential
         
         self.total_current = effective_watts / (voltage * pf)
         return self.total_current
+
 
 
 class CircuitGrouper:
@@ -118,15 +130,23 @@ class CircuitGrouper:
     # Currently False for standard 1-phase residential designs
     ENABLE_3PHASE_BALANCE = False
     
-    def __init__(self, default_voltage: float = 230.0):
+    # === High-Rise Diversity Factor ===
+    # อาคารสูง (≥10 ชั้น): ใช้ diversity factor 0.4 สำหรับเต้ารับ
+    # บ้านพักอาศัย (<10 ชั้น): ไม่ใช้ diversity (1.0)
+    HIGH_RISE_FLOOR_THRESHOLD = 10
+    
+    def __init__(self, default_voltage: float = 230.0, num_floors: int = 2):
         """Initialize circuit grouper.
         
         Args:
             default_voltage: Default voltage (230V for Thai residential)
+            num_floors: Number of floors in building (for diversity factor)
         """
         self.voltage = default_voltage
         self.circuits: Dict[str, GroupedCircuit] = {}
         self._circuit_counter = 0
+        self.num_floors = num_floors
+        self.is_high_rise = num_floors >= self.HIGH_RISE_FLOOR_THRESHOLD
     
     def group_loads(
         self,
@@ -500,7 +520,11 @@ class CircuitGrouper:
         """Calculate final parameters for all circuits."""
         for circuit in self.circuits.values():
             # Calculate current (Thai 230V standard)
-            circuit.calculate_current(voltage=self.VOLTAGE_1PH)
+            # Apply diversity factor only for high-rise buildings (≥10 floors)
+            circuit.calculate_current(
+                voltage=self.VOLTAGE_1PH,
+                is_high_rise=self.is_high_rise
+            )
             
             # Select breaker rating
             circuit.breaker_rating = self._select_breaker_rating(
@@ -664,13 +688,16 @@ class CircuitGrouper:
         return summary
 
 
-# Global instance
-_circuit_grouper: Optional[CircuitGrouper] = None
-
-
-def get_circuit_grouper() -> CircuitGrouper:
-    """Get the global circuit grouper instance."""
-    global _circuit_grouper
-    if _circuit_grouper is None:
-        _circuit_grouper = CircuitGrouper()
-    return _circuit_grouper
+# Factory function
+def get_circuit_grouper(num_floors: int = 2) -> CircuitGrouper:
+    """Create a circuit grouper instance for a specific project.
+    
+    Args:
+        num_floors: Number of floors in the building.
+                   - < 10: Residential (no diversity factor)
+                   - >= 10: High-rise (uses 40% diversity for receptacles)
+    
+    Returns:
+        CircuitGrouper configured for the building type.
+    """
+    return CircuitGrouper(num_floors=num_floors)

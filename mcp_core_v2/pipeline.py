@@ -36,7 +36,8 @@ class DesignPipeline:
         self.autolisp_generator = get_autolisp_generator()
         self.result_builder = get_result_builder()
         # New modules for circuit grouping
-        self.circuit_grouper = get_circuit_grouper()
+        # self.circuit_grouper IS NOW INSTANTIATED PER-REQUEST in _group_circuits
+        # to ensure correct building floor context and state isolation.
         self.lighting_calculator = get_lighting_calculator()
         self.room_defaults = get_room_defaults_manager()
     
@@ -152,18 +153,35 @@ class DesignPipeline:
         Returns:
             List of grouped circuit dictionaries
         """
+        # Calculate max floor to determine if high-rise
+        num_floors = 1
+        for load in request.loads:
+            try:
+                if load.location and load.location.floor:
+                    f = int(load.location.floor)
+                    if f > num_floors:
+                        num_floors = f
+            except (ValueError, TypeError):
+                continue
+                
+        # Create a FRESH circuit grouper for this request
+        # This isolates state and correctly applies diversity factor based on num_floors
+        # (get_circuit_grouper is imported at top of file)
+        grouper = get_circuit_grouper(num_floors=num_floors)
+        
         # Group loads into circuits
-        self.circuit_grouper.group_loads(request.loads)
+        grouper.group_loads(request.loads)
         
         # Get summary which includes circuit list in dict format
-        summary = self.circuit_grouper.get_circuit_summary()
+        summary = grouper.get_circuit_summary()
         circuits = summary.get('circuits', [])
         
         logger.info(
             f"Grouped {len(request.loads)} loads into {len(circuits)} circuits "
-            f"({summary.get('grouped_circuits', 0)} grouped + {summary.get('dedicated_circuits', 0)} dedicated)"
+            f"(Building floors: {num_floors}, High-rise: {grouper.is_high_rise})"
         )
         return circuits
+
     
     def _calculate_loads(self, request: DesignRequest) -> Dict[str, Any]:
         """Calculate loads for all panels."""
