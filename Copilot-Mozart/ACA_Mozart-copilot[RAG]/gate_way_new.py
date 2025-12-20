@@ -364,6 +364,11 @@ class ServiceProxy:
         - /api/v1/ask for general questions
         """
         try:
+            # [CP1] Checkpoint: Gateway Entry
+            query_len = len(request.input)
+            has_session = hasattr(request, 'session_id') and request.session_id
+            logger.info(f"[CP1] Gateway: query={query_len} chars, session={'Yes' if has_session else 'No'}")
+            
             user_input_lower = request.input.lower()
             
             # Check if this is a design request (wants full calculation)
