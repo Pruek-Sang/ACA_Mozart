@@ -65,9 +65,9 @@ updated_at TIMESTAMPTZ
 | 4 | สร้าง AuthContext | ✅ เสร็จ |
 | 5 | สร้าง LoginForm | ✅ เสร็จ |
 | 6 | อัปเดต App.tsx | ✅ เสร็จ |
-| 7 | Build ผ่าน | ✅ เสร็จ |
-| 8 | สร้าง useProjects | ✅ เสร็จ |
-| 9 | Build ผ่าน (รอบ 2) | ✅ เสร็จ |
+| 7 | สร้าง useProjects | ✅ เสร็จ |
+| 8 | Rate Limiting (Gateway) | ✅ เสร็จ |
+| 9 | Security Headers (Gateway) | ✅ เสร็จ |
 | 10 | ทดสอบ e2e | ⏳ รอ user test |
 
 ---
