@@ -631,6 +631,10 @@ class RagService:
             config = self._get_generation_config(temperature=0.1)
             response = self._generate_content(extraction_prompt, config)
             
+            # 🆕 DEBUG: Log LLM response for troubleshooting
+            logger.info(f"📤 LLM extraction response length: {len(response)} chars")
+            logger.debug(f"📤 LLM response (first 500): {response[:500]}")
+            
             # Parse JSON from response
             import re
             json_match = re.search(r'\{[\s\S]*\}', response)
@@ -638,7 +642,15 @@ class RagService:
                 extracted = json.loads(json_match.group())
                 # เก็บ original query ไว้สำหรับ auto-fill checks
                 extracted["original_query"] = normalized_query
-                logger.info(f"Extracted loads: {len(extracted.get('loads', []))} items")
+                
+                # 🆕 Validation: Check if extraction actually succeeded
+                rooms_count = len(extracted.get('rooms', []))
+                loads_count = len(extracted.get('loads', []))
+                logger.info(f"✅ Extracted: {rooms_count} rooms, {loads_count} loads")
+                
+                if rooms_count == 0 and loads_count == 0:
+                    logger.warning("⚠️ LLM returned empty rooms AND loads - extraction likely failed")
+                
                 return extracted
             else:
                 logger.warning("No JSON found in LLM response")
@@ -1751,7 +1763,12 @@ class RagService:
                 # Extract loads from natural language
                 loads = self._extract_loads_from_text(req.query)
                 
-                if loads:
+                # 🆕 FIX: Proper validation - check for actual data, not just truthy dict
+                has_rooms = loads and loads.get("rooms")
+                has_loads = loads and loads.get("loads")
+                has_error = loads and "error" in loads
+                
+                if (has_rooms or has_loads) and not has_error:
                     logger.info(f"📦 Extracted: {json.dumps(loads.get('rooms', []), ensure_ascii=False)[:200]}")
                     
                     # Convert to structured ProjectRequirements
@@ -1802,9 +1819,14 @@ class RagService:
                 else:
                     # 🆕 FIX: Return helpful error instead of falling back to Q&A
                     # Q&A fallback caused empty Load Schedule (only spare circuits)
-                    logger.warning("⚠️ Design intent detected but no loads extracted - returning extraction error")
+                    error_detail = loads.get("error", "Unknown") if loads else "No response"
+                    rooms_found = len(loads.get("rooms", [])) if loads else 0
+                    loads_found = len(loads.get("loads", [])) if loads else 0
+                    logger.warning(f"⚠️ Extraction failed - error: {error_detail}, rooms: {rooms_found}, loads: {loads_found}")
                     return StandardResponse(
-                        answer="""⚠️ ไม่สามารถดึงข้อมูลจากคำขอได้
+                        answer=f"""⚠️ ไม่สามารถดึงข้อมูลจากคำขอได้
+
+🔍 Debug: พบ {rooms_found} ห้อง, {loads_found} โหลด, error: {error_detail}
 
 ระบบตรวจพบว่าคุณต้องการออกแบบระบบไฟฟ้า แต่ไม่สามารถดึงรายละเอียดห้องและอุปกรณ์ได้
 
