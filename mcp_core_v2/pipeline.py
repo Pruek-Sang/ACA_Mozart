@@ -100,11 +100,15 @@ class DesignPipeline:
             # Get site_context directly from request (sent by RAG via Adapter)
             site_context = request.site_context or {}
             
+            # 🆕 LOGGING: Verify site_context received
+            logger.info(f"[INJECT] site_context received: {site_context}")
+            
             # Apply Derating to loads in request
             # This modifies the load objects in place, affecting subsequent steps (Wire Sizing)
             # Note: Load Calculation (Step 2) is already done, so reported "Connected Load" is based on original values.
             # This is PERFECT. We want reported load to be real, but wire sizing to be derated.
             self.derating_injector.inject(request.loads, site_context)
+            logger.info(f"[INJECT] Derating applied with context: area={site_context.get('installation_area', 'N/A')}, grouping={site_context.get('conduit_grouping', 'N/A')}")
             
             # Step 3: Size wires
             logger.info("Step 3: Sizing conductors")
@@ -152,9 +156,11 @@ class DesignPipeline:
             
             # 1. Enforce kA Ratings
             result = self.ka_rating_injector.inject(result, site_context)
+            logger.info(f"[INJECT] kA rating check: distance={site_context.get('distance_to_transformer', 'N/A')}")
             
             # 2. Enforce N-G Link Rules
             result = self.ng_link_injector.inject(result, site_context)
+            logger.info(f"[INJECT] N-G Link check: panel_type={site_context.get('panel_type', 'N/A')}")
             
             logger.info(f"Design pipeline completed for session {request.session_id}")
             return result
