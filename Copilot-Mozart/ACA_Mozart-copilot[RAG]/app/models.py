@@ -131,6 +131,45 @@ class LoadInput(BaseModel):
     floor: int = Field(default=1, description="Floor number for circuit grouping")
 
 
+# =============================================================================
+# Site Context - Required for Safe Electrical Calculations
+# =============================================================================
+
+class SiteContext(BaseModel):
+    """
+    Site & Installation context for advanced calculations.
+    
+    CRITICAL: These fields affect safety calculations!
+    - distance_to_transformer: Affects kA rating of main breaker
+    - installation_area: Affects wire derating (temperature)
+    - conduit_grouping: Affects wire derating (heat buildup)
+    - panel_type: Affects grounding (N-G link rules)
+    
+    Philosophy: "ถ้าไม่รู้ ห้ามเดา - ต้องถาม!"
+    """
+    # หมวด 1: สภาพแวดล้อมและการติดตั้ง
+    distance_to_transformer: str = Field(
+        ...,  # Required!
+        description="Distance to utility transformer: 'less_than_50m', '50_100m', 'more_than_100m'"
+    )
+    installation_area: str = Field(
+        ...,  # Required!
+        description="Installation area: 'indoor', 'high_temp', 'outdoor', 'underground'"
+    )
+    
+    # หมวด 2: โครงสร้างตู้ไฟ
+    panel_type: str = Field(
+        ...,  # Required!
+        description="Panel type: 'main' (MDB) or 'sub' (Sub-panel)"
+    )
+    
+    # หมวด 3: วงจรและอุปกรณ์
+    conduit_grouping: str = Field(
+        default="1",  # Default safe value
+        description="Number of circuits in same conduit: '1', '2-3', '4-6'"
+    )
+
+
 class ProjectRequirements(BaseModel):
     """
     Input from engineer/user (human-readable format)
@@ -144,6 +183,12 @@ class ProjectRequirements(BaseModel):
     rooms: List[RoomInput] = Field(default_factory=list, description="List of rooms")
     loads: List[LoadInput] = Field(default_factory=list, description="List of electrical loads")
     user_constraints: List[str] = Field(default_factory=list, description="User constraints e.g., 'split_kitchen_circuit'")
+    
+    # 🆕 Site Context - Required for safe calculations!
+    site_context: Optional[SiteContext] = Field(
+        None, 
+        description="Site & installation context. REQUIRED for /api/v1/design endpoint!"
+    )
 
 
 # --- MCP Contract Models (Strict Schema) ---
@@ -246,6 +291,164 @@ class InsufficientDataError(BaseModel):
     missing_fields: List[str] = Field(default_factory=list, description="Fields that are missing/incomplete")
     questions: List[str] = Field(default_factory=list, description="Clarifying questions for user")
     suggestions: List[str] = Field(default_factory=list, description="Suggestions to fix")
+
+
+# =============================================================================
+# Site Context - Interactive Questions with Options
+# =============================================================================
+
+class SiteContextOption(BaseModel):
+    """
+    Single option for a clarifying question
+    
+    Example: 
+        value="less_than_50m"
+        label="น้อยกว่า 50 เมตร"
+        hint="อาจต้องใช้เบรกเกอร์ 10kA"
+    """
+    value: str = Field(..., description="Machine-readable value to store")
+    label: str = Field(..., description="Human-readable label (Thai)")
+    hint: Optional[str] = Field(None, description="Additional hint/warning")
+
+
+class SiteContextQuestion(BaseModel):
+    """
+    A clarifying question with predefined options
+    
+    Philosophy: 
+    - User picks from options (no free-text confusion)
+    - Each option has clear engineering implications
+    - Hints explain why this matters
+    """
+    field_name: str = Field(..., description="Which SiteContext field this fills")
+    question_th: str = Field(..., description="Question in Thai")
+    question_en: str = Field(..., description="Question in English")
+    options: List[SiteContextOption] = Field(..., description="Available options")
+    required: bool = Field(default=True, description="Is this field required?")
+    current_value: Optional[str] = Field(None, description="Current value if already answered")
+
+
+class SiteContextQuestionnaire(BaseModel):
+    """
+    Full questionnaire for site context
+    Returned when session needs site info
+    """
+    session_id: str = Field(..., description="Session ID")
+    questions: List[SiteContextQuestion] = Field(..., description="Questions to answer")
+    answered_count: int = Field(default=0, description="How many already answered")
+    total_count: int = Field(..., description="Total questions")
+    can_proceed: bool = Field(default=False, description="Can proceed to calculation?")
+    message: str = Field(..., description="Status message")
+
+
+class SiteContextAnswer(BaseModel):
+    """
+    User's answer to a site context question
+    """
+    field_name: str = Field(..., description="Which field is being answered")
+    value: str = Field(..., description="Selected option value")
+
+
+class SiteContextBatchAnswer(BaseModel):
+    """
+    Batch answer multiple site context questions at once
+    """
+    answers: List[SiteContextAnswer] = Field(..., description="List of answers")
+
+
+# Pre-defined Questions (Singleton pattern for reuse)
+SITE_CONTEXT_QUESTIONS: List[Dict[str, Any]] = [
+    {
+        "field_name": "distance_to_transformer",
+        "question_th": "ระยะห่างจากหม้อแปลงไฟฟ้า?",
+        "question_en": "Distance from transformer?",
+        "required": True,
+        "options": [
+            {"value": "less_than_50m", "label": "น้อยกว่า 50 เมตร", "hint": "⚠️ ต้องใช้เบรกเกอร์ 10kA ขึ้นไป"},
+            {"value": "50_100m", "label": "50-100 เมตร", "hint": "ใช้เบรกเกอร์ 6kA ได้"},
+            {"value": "more_than_100m", "label": "มากกว่า 100 เมตร", "hint": "ใช้เบรกเกอร์ทั่วไปได้"}
+        ]
+    },
+    {
+        "field_name": "installation_area",
+        "question_th": "พื้นที่ติดตั้งสายไฟ?",
+        "question_en": "Cable installation area?",
+        "required": True,
+        "options": [
+            {"value": "indoor", "label": "ภายในอาคาร (ปกติ)", "hint": "ไม่ต้อง Derate"},
+            {"value": "high_temp", "label": "อุณหภูมิสูง (>35°C)", "hint": "⚠️ Derate 20%"},
+            {"value": "outdoor", "label": "กลางแจ้ง", "hint": "⚠️ ต้องใช้สายกลางแจ้ง"},
+            {"value": "underground", "label": "ใต้ดิน", "hint": "⚠️ Derate 30%, ใช้สาย NYY"}
+        ]
+    },
+    {
+        "field_name": "panel_type",
+        "question_th": "ประเภทตู้ไฟ?",
+        "question_en": "Panel type?",
+        "required": True,
+        "options": [
+            {"value": "main", "label": "ตู้เมน (Main Panel)", "hint": "มี N-G Link ได้"},
+            {"value": "sub", "label": "ตู้ย่อย (Sub Panel)", "hint": "⚠️ ห้ามต่อ N-G Link!"}
+        ]
+    },
+    {
+        "field_name": "conduit_grouping",
+        "question_th": "เดินสายในท่อกี่เส้น?",
+        "question_en": "How many cables in conduit?",
+        "required": False,
+        "options": [
+            {"value": "1", "label": "1 เส้น (ท่อเดี่ยว)", "hint": "ไม่ต้อง Derate"},
+            {"value": "2-3", "label": "2-3 เส้น", "hint": "⚠️ Derate 20%"},
+            {"value": "4-6", "label": "4-6 เส้น", "hint": "⚠️ Derate 30%"}
+        ]
+    }
+]
+
+
+def build_site_context_questionnaire(
+    session_id: str,
+    current_values: Optional[Dict[str, str]] = None
+) -> SiteContextQuestionnaire:
+    """
+    Build questionnaire showing which fields are answered vs pending
+    """
+    current = current_values or {}
+    questions = []
+    answered = 0
+    
+    for q_def in SITE_CONTEXT_QUESTIONS:
+        current_val = current.get(q_def["field_name"])
+        if current_val:
+            answered += 1
+        
+        question = SiteContextQuestion(
+            field_name=q_def["field_name"],
+            question_th=q_def["question_th"],
+            question_en=q_def["question_en"],
+            required=q_def["required"],
+            current_value=current_val,
+            options=[SiteContextOption(**opt) for opt in q_def["options"]]
+        )
+        questions.append(question)
+    
+    # Can proceed if all required fields answered
+    required_fields = [q.field_name for q in questions if q.required]
+    all_required_answered = all(current.get(f) for f in required_fields)
+    
+    if all_required_answered:
+        message = "✅ ข้อมูลครบแล้ว พร้อมคำนวณ!"
+    else:
+        missing = [f for f in required_fields if not current.get(f)]
+        message = f"⏳ ยังขาดข้อมูล {len(missing)} รายการ"
+    
+    return SiteContextQuestionnaire(
+        session_id=session_id,
+        questions=questions,
+        answered_count=answered,
+        total_count=len(questions),
+        can_proceed=all_required_answered,
+        message=message
+    )
 
 
 # =============================================================================

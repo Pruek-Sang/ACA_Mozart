@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
-from app.models import ProjectInputSpec, LoadSpec, RoomSpec
+from app.models import ProjectInputSpec, LoadSpec, RoomSpec, SiteContext
 
 logger = logging.getLogger("Aura.McpAdapter")
 
@@ -117,10 +117,11 @@ class McpDesignRequest:
     service_voltage: VoltageType
     utility_service_size: int = 100  # Default 100A service
     project_number: Optional[str] = None
+    site_context: Optional[Dict] = None  # 🆕 Site context for Injectors
     
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization"""
-        return {
+        result = {
             "session_id": self.session_id,
             "project_name": self.project_name,
             "project_number": self.project_number,
@@ -129,6 +130,10 @@ class McpDesignRequest:
             "service_voltage": self.service_voltage.value,
             "utility_service_size": self.utility_service_size
         }
+        # 🆕 Include site_context if present
+        if self.site_context:
+            result["site_context"] = self.site_context
+        return result
 
 
 # =============================================================================
@@ -239,19 +244,20 @@ class McpAdapter:
     
     Usage:
         adapter = McpAdapter()
-        mcp_request = adapter.convert(rag_spec)
+        mcp_request = adapter.convert(rag_spec, site_context)
         response = mcp_client.design(mcp_request)
     """
     
     def __init__(self):
         self.unknown_devices: List[str] = []  # Track unknown devices for logging
     
-    def convert(self, spec: ProjectInputSpec) -> McpDesignRequest:
+    def convert(self, spec: ProjectInputSpec, site_context: Optional[SiteContext] = None) -> McpDesignRequest:
         """
         Main conversion: RAG spec -> MCP request
         
         Args:
             spec: ProjectInputSpec from RAG service
+            site_context: Optional site context for safety calculations
             
         Returns:
             McpDesignRequest ready for MCP Core
@@ -278,7 +284,12 @@ class McpAdapter:
         if self.unknown_devices:
             logger.warning(f"Unknown device codes (using defaults): {self.unknown_devices}")
         
-        # 6. Build request
+        # 6. Convert site_context to dict (for MCP)
+        site_context_dict = None
+        if site_context:
+            site_context_dict = site_context.model_dump()
+        
+        # 7. Build request
         return McpDesignRequest(
             session_id=f"rag_{uuid.uuid4().hex[:12]}",
             project_name=spec.project_info.project_name,
@@ -286,7 +297,8 @@ class McpAdapter:
             loads=mcp_loads,
             panels=[panel],
             service_voltage=service_voltage,
-            utility_service_size=self._estimate_service_size(mcp_loads)
+            utility_service_size=self._estimate_service_size(mcp_loads),
+            site_context=site_context_dict  # 🆕 Pass site_context to MCP
         )
     
     def _map_voltage(self, voltage_system: str) -> VoltageType:

@@ -67,6 +67,11 @@ class DesignRequestInput(BaseModel):
     panels: List[PanelInput]
     service_voltage: str
     utility_service_size: int = 100
+    # 🆕 Site context for safety calculations (Derating, kA, N-G Link)
+    site_context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Site & installation context: distance_to_transformer, installation_area, panel_type, conduit_grouping"
+    )
 
 class DesignResultOutput(BaseModel):
     """Output to RAG"""
@@ -324,7 +329,8 @@ def _convert_to_internal(request: DesignRequestInput):
         loads=internal_loads,
         panels=internal_panels,
         service_voltage=service_voltage,
-        utility_service_size=request.utility_service_size
+        utility_service_size=request.utility_service_size,
+        site_context=request.site_context  # 🆕 Pass site_context to pipeline!
     )
 
 def _convert_to_output(result) -> DesignResultOutput:
