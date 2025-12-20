@@ -242,6 +242,118 @@ class ServiceProxy:
     async def close(self):
         await self.client.aclose()
     
+    def _extract_site_context(self, text: str) -> Optional[Dict[str, str]]:
+        """
+        Extract site_context from natural language Thai text.
+        
+        Returns dict with fields if detected, None if nothing found.
+        """
+        import re
+        
+        context = {}
+        
+        # 1. Distance to transformer (ระยะหม้อแปลง)
+        if re.search(r'(?:หม้อแปลง|transformer).*(?:น้อยกว่า|ใกล้|<)\s*50', text):
+            context['distance_to_transformer'] = 'less_than_50m'
+        elif re.search(r'(?:หม้อแปลง|transformer).*(?:50|ห้าสิบ).*(?:100|ร้อย)', text):
+            context['distance_to_transformer'] = '50_100m'
+        elif re.search(r'(?:หม้อแปลง|transformer).*(?:มากกว่า|ไกล|>)\s*100', text):
+            context['distance_to_transformer'] = 'more_than_100m'
+        elif re.search(r'\d+\s*(?:เมตร|m)', text):
+            # Try to extract number
+            match = re.search(r'(\d+)\s*(?:เมตร|m)', text)
+            if match:
+                distance = int(match.group(1))
+                if distance < 50:
+                    context['distance_to_transformer'] = 'less_than_50m'
+                elif distance <= 100:
+                    context['distance_to_transformer'] = '50_100m'
+                else:
+                    context['distance_to_transformer'] = 'more_than_100m'
+        
+        # 2. Installation area (พื้นที่ติดตั้ง)
+        if re.search(r'(?:ภายใน|indoor|ในบ้าน|ในอาคาร)', text):
+            context['installation_area'] = 'indoor'
+        elif re.search(r'(?:ใต้หลังคา|หลังคา|ร้อน|อุณหภูมิสูง|high.?temp)', text):
+            context['installation_area'] = 'high_temp'
+        elif re.search(r'(?:กลางแจ้ง|outdoor|นอกบ้าน|นอกอาคาร)', text):
+            context['installation_area'] = 'outdoor'
+        elif re.search(r'(?:ฝังดิน|underground|ใต้ดิน)', text):
+            context['installation_area'] = 'underground'
+        
+        # 3. Panel type (ประเภทตู้)
+        if re.search(r'(?:ตู้เมน|main\s*panel|mdb|ตู้หลัก)', text):
+            context['panel_type'] = 'main'
+        elif re.search(r'(?:ตู้ย่อย|sub\s*panel|db|ตู้รอง)', text):
+            context['panel_type'] = 'sub'
+        
+        # 4. Conduit grouping (optional - default to 1)
+        if re.search(r'(?:รวมท่อ|ท่อรวม|grouping|bundle)', text):
+            if re.search(r'(?:4|5|6|สี่|ห้า|หก)\s*(?:วงจร|circuit)', text):
+                context['conduit_grouping'] = '4-6'
+            elif re.search(r'(?:2|3|สอง|สาม)\s*(?:วงจร|circuit)', text):
+                context['conduit_grouping'] = '2-3'
+        
+        return context if context else None
+    
+    def _is_new_project(self, text: str) -> bool:
+        """
+        Detect if user is starting a new project (should start fresh session).
+        
+        Returns True for:
+        - "ออกแบบบ้าน 2 ชั้น" (new design)
+        - "project ใหม่", "เริ่มใหม่" (explicit new)
+        """
+        import re
+        
+        new_project_patterns = [
+            r'ออกแบบ.*(บ้าน|อาคาร|คอนโด|โรงงาน)',  # Design + building type
+            r'(project|โปรเจค|งาน)\s*(ใหม่|new)',     # Explicit new project
+            r'(เริ่ม|start)\s*(ใหม่|new|fresh)',      # Start fresh
+            r'reset|ล้าง|ยกเลิก',                    # Reset keywords
+        ]
+        
+        for pattern in new_project_patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        
+        return False
+    
+    def _is_site_context_answer(self, text: str) -> bool:
+        """
+        Detect if user is answering site context questions (should continue session).
+        
+        Returns True for:
+        - "หม้อแปลง 80 เมตร" (transformer distance)
+        - "ติดตั้งในบ้าน" (installation area)
+        - "ตู้เมน" (panel type)
+        """
+        import re
+        
+        # If text contains site_context keywords but NOT design keywords
+        site_keywords = [
+            r'หม้อแปลง|transformer',
+            r'เมตร|meter|m\b',
+            r'ภายใน|indoor|ในบ้าน',
+            r'กลางแจ้ง|outdoor|นอกบ้าน',
+            r'ใต้หลังคา|ร้อน|high.?temp',
+            r'ตู้เมน|main\s*panel|mdb',
+            r'ตู้ย่อย|sub\s*panel',
+            r'ฝังดิน|underground',
+        ]
+        
+        design_keywords = [
+            r'ออกแบบ|design',
+            r'ห้อง\s*\d+|bedroom|ห้องนอน',
+            r'ชั้น\s*\d+|floor'
+        ]
+        
+        has_site = any(re.search(p, text, re.IGNORECASE) for p in site_keywords)
+        has_design = any(re.search(p, text, re.IGNORECASE) for p in design_keywords)
+        
+        # Site context answer = has site keywords but NO new design request
+        return has_site and not has_design
+    
     async def call_mozart(self, request: GatewayRequest, trace_id: str) -> Dict[str, Any]:
         """
         Call MOZART (RAG Service)
@@ -287,13 +399,92 @@ class ServiceProxy:
                     "loads": []
                 })
             else:
-                # General question - use ask endpoint
-                endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
-                payload = {
-                    "query": request.input,
-                    "context_hint": [],
-                    "language": "th"
-                }
+                # =====================================================================
+                # 🆕 SESSION-AWARE NLP FLOW
+                # =====================================================================
+                
+                # 1. Check if user is answering site_context AND has session
+                if request.session_id and self._is_site_context_answer(user_input_lower):
+                    logger.info(f"[{trace_id}] Site context answer detected - using session design flow")
+                    
+                    # Extract site_context and update session
+                    site_context = self._extract_site_context(user_input_lower)
+                    
+                    if site_context:
+                        # Update session's site_context
+                        await self.client.post(
+                            f"{MOZART_ENDPOINT}/api/v1/session/{request.session_id}/site",
+                            json={"answers": [
+                                {"field_name": k, "value": v} 
+                                for k, v in site_context.items()
+                            ]},
+                            headers={"X-Trace-ID": trace_id}
+                        )
+                    
+                    # Get session's remembered requirements and design
+                    endpoint = f"{MOZART_ENDPOINT}/api/v1/session/{request.session_id}"
+                    session_resp = await self.client.get(endpoint)
+                    
+                    if session_resp.status_code == 200:
+                        session_data = session_resp.json()
+                        partial_req = session_data.get("partial_requirements", {})
+                        
+                        if partial_req.get("rooms") or partial_req.get("loads"):
+                            # Has remembered data - proceed to design
+                            # TODO: Call /session/{id}/design with partial_req
+                            logger.info(f"[{trace_id}] Session has remembered data, proceeding to design")
+                    
+                    # For now, pass to ask endpoint (will get site_context error → trigger design)
+                    endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
+                    payload = {
+                        "query": request.input,
+                        "context_hint": [],
+                        "language": "th"
+                    }
+                    if site_context:
+                        payload["site_context"] = site_context
+                
+                # 2. Check if new project (should start fresh session)
+                elif self._is_new_project(user_input_lower):
+                    logger.info(f"[{trace_id}] New project detected - starting fresh session")
+                    
+                    # Start new session
+                    session_resp = await self.client.post(
+                        f"{MOZART_ENDPOINT}/api/v1/session/start",
+                        headers={"X-Trace-ID": trace_id}
+                    )
+                    
+                    if session_resp.status_code == 200:
+                        session_data = session_resp.json()
+                        new_session_id = session_data.get("session_id")
+                        logger.info(f"[{trace_id}] Created session: {new_session_id}")
+                    
+                    # Pass to ask endpoint for design extraction
+                    endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
+                    site_context = self._extract_site_context(user_input_lower)
+                    
+                    payload = {
+                        "query": request.input,
+                        "context_hint": [],
+                        "language": "th"
+                    }
+                    if site_context:
+                        payload["site_context"] = site_context
+                
+                # 3. Regular question (no session needed)
+                else:
+                    endpoint = f"{MOZART_ENDPOINT}/api/v1/ask"
+                    site_context = self._extract_site_context(user_input_lower)
+                    
+                    payload = {
+                        "query": request.input,
+                        "context_hint": [],
+                        "language": "th"
+                    }
+                    
+                    if site_context:
+                        payload["site_context"] = site_context
+                        logger.info(f"[{trace_id}] Extracted site_context: {site_context}")
             
             logger.info(f"[{trace_id}] Calling {endpoint}")
             
