@@ -1,0 +1,74 @@
+# 💰 Daily Price Scraper
+# Scrapes electrical equipment prices and commits to prices.csv
+
+name: 💰 Daily Price Scraper
+
+on:
+  schedule:
+    # 00:00 Thailand Time (UTC+7) = 17:00 UTC previous day
+    - cron: '0 17 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  scrape-prices:
+    name: 🔍 Scrape Prices
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: 📦 Install dependencies
+        run: |
+          pip install requests beautifulsoup4
+      
+      - name: 🔍 Run Price Scraper
+        run: |
+          cd mcp_core_v2
+          
+          # Check if prices.csv exists, if not skip scraping
+          if [ ! -f catalog/prices.csv ]; then
+            echo "⚠️ prices.csv not found - creating empty file"
+            echo "device_code,source,price_thb,unit,url,last_updated" > catalog/prices.csv
+          fi
+          
+          # Run scraper in mock mode (change to real mode when selectors are ready)
+          python -m core.price_scraper --update-all --mock --output catalog/prices.csv
+          
+          echo "📊 Scraping complete!"
+          cat catalog/prices.csv | head -20
+      
+      - name: 📤 Commit & Push prices.csv
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add mcp_core_v2/catalog/prices.csv
+          
+          # Only commit if there are changes
+          if git diff --staged --quiet; then
+            echo "📋 No price changes detected"
+          else
+            git commit -m "📊 Update prices $(date +'%Y-%m-%d %H:%M') TH"
+            git push
+            echo "✅ Prices updated and pushed!"
+          fi
+
+  notify-failure:
+    name: 🚨 Notify on Failure
+    runs-on: ubuntu-latest
+    needs: scrape-prices
+    if: failure()
+    
+    steps:
+      - name: 🚨 Log Failure
+        run: |
+          echo "❌ Price scraper failed!"
+          echo "Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
