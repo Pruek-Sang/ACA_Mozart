@@ -482,13 +482,36 @@ class RagService:
    - หลังบ้าน/backyard/ไฟหลังบ้าน → name="หลังบ้าน", type="exterior"
    - สวน/garden → name="สวน", type="exterior"
 
+🔌 กฎนับเต้ารับ (สำคัญมาก! ตาม วสท. 2564):
+8. "คู่" และ "เดี่ยว" หมายถึง **ประเภท** ของเต้ารับ ไม่ใช่ตัวคูณ!
+   - "เต้ารับคู่ 6 จุด" หรือ "คู่×6" → quantity: 6 (ไม่ใช่ 12!)
+   - "เต้ารับเดี่ยว 1 จุด" หรือ "เดี่ยว×1" → quantity: 1
+   - "จุด" = outlet box = 1 unit ตาม วสท. 2564 (ไม่ใช่จำนวนช่องเสียบ)
+   - ทุกเต้ารับไม่ว่าคู่หรือเดี่ยว ใช้ device="SOCKET-16A" เสมอ
+9. ตัวอย่างการนับ:
+   - "ห้องนอน เต้ารับคู่ 4 จุด" → {{"room_name": "ห้องนอน", "device": "SOCKET-16A", "quantity": 4}}
+   - "ห้องครัว คู่×6 + คู่×2" → {{"room_name": "ห้องครัว", "device": "SOCKET-16A", "quantity": 8}}
+   - "ห้องน้ำ เดี่ยว×1" → {{"room_name": "ห้องน้ำ", "device": "SOCKET-16A", "quantity": 1}}
+
+🔧 กฎอุปกรณ์พิเศษ:
+10. เครื่องทำน้ำอุ่น/เต้ารับกันน้ำ (ห้องน้ำ/ภายนอก) → ต้องใช้ RCBO (ระบบจะกำหนดให้อัตโนมัติ)
+11. EV Charger → ต้องเผื่อสาย 25% (Continuous Load) - ระบุ device="EV-CHARGER-7KW" หรือ "EV-CHARGER-22KW"
+12. มอเตอร์/ปั๊มน้ำ → มี Inrush Current สูง - ใช้ device="PUMP-750W" หรือ "PUMP-1500W"
+
 รหัสอุปกรณ์ที่ใช้ได้:
 - แอร์: AC-9000BTU, AC-12000BTU, AC-18000BTU, AC-24000BTU
 - น้ำอุ่น: HEATER-3500W, HEATER-4500W
 - ไฟ LED: LIGHT-LED-10W, LIGHT-LED-20W
-- เต้ารับ: SOCKET-16A
+- เต้ารับ: SOCKET-16A (ใช้สำหรับทั้งคู่และเดี่ยว)
 - ปั๊มน้ำ: PUMP-750W, PUMP-1500W
 - เตา: INDUCTION-3000W
+- EV Charger: EV-CHARGER-7KW, EV-CHARGER-22KW (ถ้าระบุ)
+- พัดลมเพดาน: FAN-CEILING-60W
+- พัดลมดูดอากาศ: FAN-EXHAUST-25W
+- ไมโครเวฟ: MICROWAVE-1500W
+- ตู้เย็น: REFRIG-300W
+- กาต้มน้ำ: KETTLE-2200W
+- หม้อหุงข้าว: RICECOOK-800W
 
 🔥 กฎ Auto-fill (One-Shot Mode):
 - ถ้าไม่ระบุห้อง ให้สร้างห้องมาตรฐาน (ห้องนั่งเล่น, ห้องนอน, ห้องครัว, ห้องน้ำ)
