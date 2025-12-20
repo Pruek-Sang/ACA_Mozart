@@ -19,12 +19,17 @@ from app.models import (
     QueryRequest, StandardResponse,
     ProjectRequirements, McpSpecResponse,
     RawRetrieveRequest,
-    IngestRequest, DeleteRequest
+    IngestRequest, DeleteRequest,
+    SiteContext,
+    SiteContextBatchAnswer,
+    SiteContextQuestionnaire,
+    build_site_context_questionnaire
 )
 from app.service import RagService
 from app.config import settings
 from app.mcp_adapter import McpAdapter, convert_to_mcp
 from app.mcp_client import McpClient, McpDesignResponse
+from app.session_store import session_store
 from core.ingest import IngestionEngine
 from core.vector_adapter import get_vector_db
 
@@ -138,18 +143,34 @@ async def design_electrical_system(req: ProjectRequirements):
     Returns combined result with both spec and calculations.
     
     Errors:
-    - 400: Invalid/incomplete requirements
+    - 400: Invalid/incomplete requirements (including missing site_context!)
     - 422: Spec generation failed
     - 503: MCP Core unavailable
     - 504: Timeout (RAG or MCP)
     """
+    # 🆕 Step 0: Validate site_context (REQUIRED for safety!)
+    if not req.site_context:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Missing site_context - required for safe electrical calculations!",
+                "required_fields": [
+                    "distance_to_transformer: 'less_than_50m' | '50_100m' | 'more_than_100m'",
+                    "installation_area: 'indoor' | 'high_temp' | 'outdoor' | 'underground'",
+                    "panel_type: 'main' | 'sub'",
+                    "conduit_grouping: '1' | '2-3' | '4-6' (optional, default='1')"
+                ],
+                "message": "กรุณาระบุข้อมูลสภาพแวดล้อมและการติดตั้ง เพื่อความปลอดภัยในการคำนวณ"
+            }
+        )
+    
     # Step 1: Generate spec via RAG
     logger.info(f"Design request for: {req.project_name}")
     spec_response = await rag_service.generate_mcp_spec(req)
     
-    # Step 2: Convert to MCP format
+    # Step 2: Convert to MCP format (with site_context!)
     adapter = McpAdapter()
-    mcp_request = adapter.convert(spec_response.project_input)
+    mcp_request = adapter.convert(spec_response.project_input, req.site_context)
     
     # Log any unknown devices
     if adapter.unknown_devices:
@@ -252,6 +273,215 @@ async def delete_doc(req: DeleteRequest):
         "source_path": req.source_path
     }
 
+
+# =============================================================================
+# Session-Based Site Context Endpoints (Memory + Interactive Questions)
+# =============================================================================
+
+@app.post("/api/v1/session/start")
+async def start_session():
+    """
+    Start a new conversation session
+    
+    Returns session_id for subsequent calls.
+    Session remembers user's answers across turns.
+    """
+    session = session_store.create_session()
+    
+    # Return questionnaire immediately
+    questionnaire = build_site_context_questionnaire(session.session_id)
+    
+    return {
+        "session_id": session.session_id,
+        "message": "Session created. Please answer site context questions.",
+        "site_context": questionnaire.model_dump()
+    }
+
+
+@app.get("/api/v1/session/{session_id}/site", response_model=SiteContextQuestionnaire)
+async def get_site_context_questions(session_id: str):
+    """
+    Get site context questionnaire for session
+    
+    Shows which questions are answered and which are pending.
+    Use this to display form/radio buttons to user.
+    """
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(404, f"Session not found or expired: {session_id}")
+    
+    # Get current site_context from partial_requirements
+    current_site = session.partial_requirements.get("site_context", {})
+    
+    return build_site_context_questionnaire(session_id, current_site)
+
+
+@app.post("/api/v1/session/{session_id}/site")
+async def update_site_context(session_id: str, answers: SiteContextBatchAnswer):
+    """
+    Update site context with user's answers
+    
+    Accepts batch of answers (can answer multiple questions at once).
+    Values are REMEMBERED for this session.
+    
+    Example:
+        POST /api/v1/session/{session_id}/site
+        {
+            "answers": [
+                {"field_name": "distance_to_transformer", "value": "less_than_50m"},
+                {"field_name": "installation_area", "value": "indoor"}
+            ]
+        }
+    """
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(404, f"Session not found or expired: {session_id}")
+    
+    # Get or create site_context in partial_requirements
+    if "site_context" not in session.partial_requirements:
+        session.partial_requirements["site_context"] = {}
+    
+    site_ctx = session.partial_requirements["site_context"]
+    
+    # Apply answers
+    for ans in answers.answers:
+        site_ctx[ans.field_name] = ans.value
+        logger.info(f"Session {session_id}: set {ans.field_name} = {ans.value}")
+    
+    # Return updated questionnaire
+    questionnaire = build_site_context_questionnaire(session_id, site_ctx)
+    
+    return {
+        "status": "updated",
+        "site_context": questionnaire.model_dump()
+    }
+
+
+@app.get("/api/v1/session/{session_id}")
+async def get_session_status(session_id: str):
+    """
+    Get full session status including all accumulated data
+    """
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(404, f"Session not found or expired: {session_id}")
+    
+    site_ctx = session.partial_requirements.get("site_context", {})
+    questionnaire = build_site_context_questionnaire(session_id, site_ctx)
+    
+    return {
+        "session_id": session_id,
+        "stage": session.stage,
+        "partial_requirements": session.partial_requirements,
+        "site_context_status": questionnaire.model_dump(),
+        "current_spec": session.current_spec,
+        "created_at": session.created_at.isoformat(),
+        "updated_at": session.updated_at.isoformat()
+    }
+
+
+@app.post("/api/v1/session/{session_id}/design")
+async def design_with_session(session_id: str, req: ProjectRequirements):
+    """
+    Design electrical system using session's remembered site_context
+    
+    If site_context not in request, uses values stored in session.
+    This allows user to answer site questions ONCE and reuse across designs.
+    """
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(404, f"Session not found or expired: {session_id}")
+    
+    # Merge site_context: request takes priority, fallback to session
+    session_site = session.partial_requirements.get("site_context", {})
+    
+    if req.site_context:
+        # Use request's site_context (explicit)
+        final_site_context = req.site_context
+    elif session_site:
+        # Use session's remembered site_context
+        final_site_context = SiteContext(
+            distance_to_transformer=session_site.get("distance_to_transformer", "more_than_100m"),
+            installation_area=session_site.get("installation_area", "indoor"),
+            panel_type=session_site.get("panel_type", "main"),
+            conduit_grouping=session_site.get("conduit_grouping", "1")
+        )
+        logger.info(f"Using session's remembered site_context for {session_id}")
+    else:
+        # Neither provided - return questionnaire
+        questionnaire = build_site_context_questionnaire(session_id, {})
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Site context not provided",
+                "message": "กรุณาตอบคำถามเกี่ยวกับสถานที่ติดตั้งก่อน",
+                "questionnaire": questionnaire.model_dump()
+            }
+        )
+    
+    # Override request's site_context with final value
+    req.site_context = final_site_context
+    
+    # Now proceed with design (same as /api/v1/design)
+    logger.info(f"Session {session_id}: Design request for {req.project_name}")
+    spec_response = await rag_service.generate_mcp_spec(req)
+    
+    # Store spec in session
+    session_store.set_spec(session_id, spec_response.model_dump())
+    
+    # Convert to MCP format
+    adapter = McpAdapter()
+    mcp_request = adapter.convert(spec_response.project_input, req.site_context)
+    
+    # Call MCP Core
+    mcp_client = McpClient()
+    
+    if not await mcp_client.health_check():
+        logger.warning("MCP Core not available")
+        return {
+            "status": "partial",
+            "session_id": session_id,
+            "message": "MCP Core not available - returning spec only",
+            "spec": spec_response.model_dump(),
+            "design_result": None
+        }
+    
+    mcp_response = await mcp_client.design(mcp_request)
+    
+    if mcp_response.success:
+        session_store.complete_session(session_id, mcp_response.to_dict())
+        return {
+            "status": "complete",
+            "session_id": session_id,
+            "spec": spec_response.model_dump(),
+            "design_result": mcp_response.to_dict()
+        }
+    else:
+        return {
+            "status": "partial",
+            "session_id": session_id,
+            "message": f"MCP calculation failed: {mcp_response.error_message}",
+            "spec": spec_response.model_dump(),
+            "design_result": mcp_response.to_dict()
+        }
+
+
+@app.delete("/api/v1/session/{session_id}")
+async def delete_session(session_id: str):
+    """
+    Delete a session and forget all remembered values
+    """
+    session = session_store.get_session(session_id)
+    if not session:
+        raise HTTPException(404, f"Session not found: {session_id}")
+    
+    session_store.delete_session(session_id)
+    return {"status": "deleted", "session_id": session_id}
+
+
+# =============================================================================
+# MCP Protocol Endpoints
+# =============================================================================
 
 @app.get("/mcp/manifest")
 async def mcp_manifest():

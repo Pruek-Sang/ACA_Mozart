@@ -16,6 +16,8 @@ from core.room_defaults import get_room_defaults_manager
 from models.catalog_models import BreakerPoles, ConductorMaterial, BreakerType
 from config import get_settings
 from exceptions import InvalidSpecError, UnsupportedProjectError
+# [NEXIA EXTENSION] Import Context Injectors
+from context import DeratingInjector, KaRatingInjector, NgLinkInjector
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,11 @@ class DesignPipeline:
         # to ensure correct building floor context and state isolation.
         self.lighting_calculator = get_lighting_calculator()
         self.room_defaults = get_room_defaults_manager()
+        
+        # [NEXIA EXTENSION] Initialize Injectors
+        self.derating_injector = DeratingInjector()
+        self.ka_rating_injector = KaRatingInjector()
+        self.ng_link_injector = NgLinkInjector()
     
     def _validate_request(self, request: DesignRequest):
         """Validate design request before processing.
@@ -89,6 +96,16 @@ class DesignPipeline:
             logger.info("Step 2: Calculating electrical loads")
             calculations = self._calculate_loads(request)
             
+            # [NEXIA EXTENSION] Inject Derating Factors (Pre-Wire Sizing)
+            # Get site_context directly from request (sent by RAG via Adapter)
+            site_context = request.site_context or {}
+            
+            # Apply Derating to loads in request
+            # This modifies the load objects in place, affecting subsequent steps (Wire Sizing)
+            # Note: Load Calculation (Step 2) is already done, so reported "Connected Load" is based on original values.
+            # This is PERFECT. We want reported load to be real, but wire sizing to be derated.
+            self.derating_injector.inject(request.loads, site_context)
+            
             # Step 3: Size wires
             logger.info("Step 3: Sizing conductors")
             wire_sizing = self._size_wires(request, calculations)
@@ -128,6 +145,16 @@ class DesignPipeline:
                 autolisp_code=autolisp_code,
                 grouped_circuits=grouped_circuits  # Pass grouped circuits
             )
+            
+            # [NEXIA EXTENSION] Post-Process Injection (Safety & Compliance)
+            # Get site_context directly from request
+            site_context = request.site_context or {}
+            
+            # 1. Enforce kA Ratings
+            result = self.ka_rating_injector.inject(result, site_context)
+            
+            # 2. Enforce N-G Link Rules
+            result = self.ng_link_injector.inject(result, site_context)
             
             logger.info(f"Design pipeline completed for session {request.session_id}")
             return result

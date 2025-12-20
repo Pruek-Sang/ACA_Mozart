@@ -82,6 +82,11 @@ class DesignRequest(BaseModel):
     utility_service_size: int
     created_at: datetime = Field(default_factory=_utc_now)
     metadata: Optional[Dict[str, Any]] = None
+    # 🆕 Site context for safety calculations (Derating, kA, N-G Link)
+    site_context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Site & installation context: distance_to_transformer, installation_area, panel_type, conduit_grouping"
+    )
 
 
 class DesignResult(BaseModel):
