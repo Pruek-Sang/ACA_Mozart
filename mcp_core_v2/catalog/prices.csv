@@ -1,14 +1,195 @@
-device_code,source,price_thb,unit,url,last_updated
-COMP-OUTLET-16A,ThaiWatsadu,120.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-21
-COMP-OUTLET-16A,HomePro,135.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-21
-COMP-OUTLET-16A,Lazada,89.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-21
-COMP-OUTLET-16A,Shopee,95.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-21
-COMP-DOWNLIGHT-9W,ThaiWatsadu,250.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2025-12-21
-COMP-DOWNLIGHT-9W,HomePro,280.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2025-12-21
-COMP-DOWNLIGHT-9W,Shopee,199.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2025-12-21
-CB-1P-16A,Schneider Official,150.0,set,https://mock.example.com/CB-1P-16A,2025-12-21
-CB-1P-16A,ABB Official,148.0,set,https://mock.example.com/CB-1P-16A,2025-12-21
-CB-1P-16A,Lazada,120.0,set,https://mock.example.com/CB-1P-16A,2025-12-21
-WIRE-THW-2.5,Yazaki,12.5,meter,https://mock.example.com/WIRE-THW-2.5,2025-12-21
-WIRE-THW-2.5,Phelps Dodge,14.0,meter,https://mock.example.com/WIRE-THW-2.5,2025-12-21
-WIRE-THW-2.5,BCC,11.8,meter,https://mock.example.com/WIRE-THW-2.5,2025-12-21
+device_code,category,description,source,price_thb,unit,url,last_updated
+# === AIR CONDITIONERS (from DEVICE_CODES.md) ===
+AC-9000BTU,HVAC,Air Conditioner 9000 BTU,HomePro,12900,set,https://www.homepro.co.th,2025-12-20
+AC-12000BTU,HVAC,Air Conditioner 12000 BTU,HomePro,15900,set,https://www.homepro.co.th,2025-12-20
+AC-18000BTU,HVAC,Air Conditioner 18000 BTU,HomePro,22900,set,https://www.homepro.co.th,2025-12-20
+AC-24000BTU,HVAC,Air Conditioner 24000 BTU,HomePro,29900,set,https://www.homepro.co.th,2025-12-20
+# === OUTLETS (from DEVICE_CODES.md) ===
+SOCKET-16A,OUTLET,Socket Outlet 16A,Thai Watsadu,45,set,https://www.thaiwatsadu.com,2025-12-20
+SOCKET-20A,OUTLET,Socket Outlet 20A,Thai Watsadu,65,set,https://www.thaiwatsadu.com,2025-12-20
+# === KITCHEN APPLIANCES (from DEVICE_CODES.md) ===
+INDUCTION-3000W,KITCHEN,Induction Cooker 3000W,HomePro,3500,set,https://www.homepro.co.th,2025-12-20
+MICROWAVE-1500W,KITCHEN,Microwave Oven 1500W,HomePro,2990,set,https://www.homepro.co.th,2025-12-20
+RICECOOK-800W,KITCHEN,Rice Cooker 800W,HomePro,1290,set,https://www.homepro.co.th,2025-12-20
+REFRIG-300W,KITCHEN,Refrigerator 300W,HomePro,8900,set,https://www.homepro.co.th,2025-12-20
+DISHWASH-2000W,KITCHEN,Dishwasher 2000W,HomePro,15900,set,https://www.homepro.co.th,2025-12-20
+# === WATER HEATERS (from DEVICE_CODES.md) ===
+HEATER-3500W,BATHROOM,Water Heater 3500W,HomePro,2990,set,https://www.homepro.co.th,2025-12-20
+HEATER-4500W,BATHROOM,Water Heater 4500W Heavy Duty,HomePro,3990,set,https://www.homepro.co.th,2025-12-20
+# === LIGHTING (from DEVICE_CODES.md) ===
+LIGHT-LED-10W,LIGHTING,LED Light 10W,Thai Watsadu,95,set,https://www.thaiwatsadu.com,2025-12-20
+LIGHT-LED-20W,LIGHTING,LED Light 20W,Thai Watsadu,145,set,https://www.thaiwatsadu.com,2025-12-20
+LIGHT-FLUOR-40W,LIGHTING,Fluorescent Light 40W,Thai Watsadu,185,set,https://www.thaiwatsadu.com,2025-12-20
+# === FANS (from DEVICE_CODES.md) ===
+FAN-CEILING-60W,FAN,Ceiling Fan 60W,HomePro,1990,set,https://www.homepro.co.th,2025-12-20
+FAN-STAND-50W,FAN,Stand Fan 50W,HomePro,890,set,https://www.homepro.co.th,2025-12-20
+# === MISCELLANEOUS (from DEVICE_CODES.md) ===
+TV-200W,ENTERTAINMENT,Television 200W,HomePro,12900,set,https://www.homepro.co.th,2025-12-20
+COMPUTER-300W,OFFICE,Desktop Computer 300W,IT City,15900,set,https://www.itcity.co.th,2025-12-20
+WASHER-2000W,LAUNDRY,Washing Machine 2000W,HomePro,9900,set,https://www.homepro.co.th,2025-12-20
+DRYER-3000W,LAUNDRY,Clothes Dryer 3000W,HomePro,12900,set,https://www.homepro.co.th,2025-12-20
+# === PUMPS (from DEVICE_CODES.md) ===
+PUMP-750W,UTILITY,Water Pump 750W,Thai Watsadu,3500,set,https://www.thaiwatsadu.com,2025-12-20
+PUMP-1500W,UTILITY,Water Pump 1500W Heavy Duty,Thai Watsadu,5900,set,https://www.thaiwatsadu.com,2025-12-20
+# === EV CHARGER (from DEVICE_CODES.md) ===
+EVCHARGER-7KW,EV,EV Charger 7kW Level 2,Delta Electronics,35000,set,https://www.deltaww.com,2025-12-20
+# === APPLIANCES (from catalog_rows.csv) ===
+APP001-TV-55IN,ENTERTAINMENT,โทรทัศน์ LED 55 นิ้ว,HomePro,12900,set,https://www.homepro.co.th,2025-12-20
+APP002-FRIDGE-2DOOR,KITCHEN,ตู้เย็น 2 ประตู 10 คิว,HomePro,8900,set,https://www.homepro.co.th,2025-12-20
+APP003-MICROWAVE-20L,KITCHEN,ไมโครเวฟ 20 ลิตร,HomePro,2990,set,https://www.homepro.co.th,2025-12-20
+APP004-AIR-9000BTU,HVAC,เครื่องปรับอากาศ 9000 BTU,HomePro,12900,set,https://www.homepro.co.th,2025-12-20
+APP005-WASHER-8KG,LAUNDRY,เครื่องซักผ้า 8 กิโลกรัม,HomePro,9900,set,https://www.homepro.co.th,2025-12-20
+APP006-WATER-HEATER-4_5KW,BATHROOM,เครื่องทำน้ำอุ่น 4.5 kW,HomePro,3990,set,https://www.homepro.co.th,2025-12-20
+APP007-RICE-COOKER-1L,KITCHEN,หม้อหุงข้าว 1 ลิตร,HomePro,890,set,https://www.homepro.co.th,2025-12-20
+APP008-KETTLE-1_7L,KITCHEN,กาต้มน้ำไฟฟ้า 1.7 ลิตร,HomePro,590,set,https://www.homepro.co.th,2025-12-20
+APP009-PC-GAMING,OFFICE,คอมพิวเตอร์เกมมิ่ง,IT City,25900,set,https://www.itcity.co.th,2025-12-20
+APP010-HAIR-DRYER-2000W,BATHROOM,ไดร์เป่าผม 2000W,HomePro,890,set,https://www.homepro.co.th,2025-12-20
+APP011-WATER-PUMP-1HP,UTILITY,ปั๊มน้ำ 1 HP,Thai Watsadu,4500,set,https://www.thaiwatsadu.com,2025-12-20
+APP012-WASHER-8KG,LAUNDRY,เครื่องซักผ้า 8 kg,HomePro,9900,set,https://www.homepro.co.th,2025-12-20
+APP013-DRYER-4000W,LAUNDRY,เครื่องอบผ้า 4000W,HomePro,15900,set,https://www.homepro.co.th,2025-12-20
+# === COMPONENTS (from catalog_rows.csv) ===
+COMP-AC-12000BTU,HVAC,Air conditioner 1.1 kW component,HomePro,15900,set,https://www.homepro.co.th,2025-12-20
+COMP-CEILING-24W,LIGHTING,โคมไฟดาวน์ไลท์ LED 24W,Thai Watsadu,295,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-CEILING-FAN-60W,FAN,Ceiling fan 60W,HomePro,1990,set,https://www.homepro.co.th,2025-12-20
+COMP-DIMMER,SWITCH,Dimmer switch,Thai Watsadu,350,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-DOORBELL,LOW_VOLTAGE,Doorbell,Thai Watsadu,290,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-DOWNLIGHT-9W,LIGHTING,โคมไฟดาวน์ไลท์ LED 9W,Thai Watsadu,195,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-EMT-1/2IN,CONDUIT,Conduit EMT 1/2 inch,Thai Watsadu,35,meter,https://www.thaiwatsadu.com,2025-12-20
+COMP-EXHAUST-25W,VENTILATION,Exhaust fan 25W,HomePro,590,set,https://www.homepro.co.th,2025-12-20
+COMP-GATE-MOTOR,AUTOMATION,Gate motor,HomePro,8900,set,https://www.homepro.co.th,2025-12-20
+COMP-GROUND-ROD,EARTHING,Ground rod 2.4m,Thai Watsadu,450,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-HANDY-BOX,BOX,Handy box,Thai Watsadu,25,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-INDUCTION-3.5kW,KITCHEN,Induction hob 3.5 kW,HomePro,5900,set,https://www.homepro.co.th,2025-12-20
+COMP-JUNCTION-BOX,BOX,Junction box ceiling,Thai Watsadu,35,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-KWH-METER,METER,KWh meter utility,PEA,1200,set,https://www.pea.co.th,2025-12-20
+COMP-LOAD-CENTER,PANEL,Load center panel,Thai Watsadu,1890,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-MAIN-MCB,BREAKER,Main MCB breaker,Thai Watsadu,890,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OUTLET-16A,OUTLET,เต้ารับ 2 ช่อง 16A,Thai Watsadu,45,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OUTLET-20A-SINGLE,OUTLET,Single outlet 20A dedicated,Thai Watsadu,65,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OUTLET-RJ45,DATA,LAN outlet RJ45,Thai Watsadu,85,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OUTLET-TV,DATA,TV outlet coax,Thai Watsadu,75,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OUTLET-WATERPROOF,OUTLET,Weatherproof outlet IP54,Thai Watsadu,195,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OUTLET-WP,OUTLET,Weatherproof outlet IP54,Thai Watsadu,195,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-OVEN-3.0kW,KITCHEN,Electric oven 3.0 kW,HomePro,8900,set,https://www.homepro.co.th,2025-12-20
+COMP-PUMP-750W,UTILITY,Water pump 0.75 kW,Thai Watsadu,3500,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-SPD,PROTECTION,Surge protection device,Thai Watsadu,1290,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-SURFACE-BOX,BOX,Surface box,Thai Watsadu,35,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-SW-1WAY,SWITCH,Light switch 1-way,Thai Watsadu,35,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-SW-2WAY,SWITCH,Light switch 2-way,Thai Watsadu,55,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-SWITCH-1GANG,SWITCH,สวิตช์ 1 ทาง,Thai Watsadu,35,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-WALLLAMP-12W,LIGHTING,Wall lamp 12W 1000 lm,Thai Watsadu,390,set,https://www.thaiwatsadu.com,2025-12-20
+COMP-WATER-HEATER-3.5kW,BATHROOM,Instant water heater 3.5 kW,HomePro,2990,set,https://www.homepro.co.th,2025-12-20
+# === CABLES (from catalog_rows.csv) - unit: meter ===
+CABLE-THHN-1.5-MM2,CABLE,สาย THHN 1.5 sq.mm,Thai Watsadu,6.5,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-1.5-MM2,CABLE,สายเดี่ยว THW 1.5 sq.mm,Thai Watsadu,5.5,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-1C-2.5sqmm,CABLE,สาย THW 1C 2.5 sq.mm,Thai Watsadu,8.5,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-1C-4.0sqmm,CABLE,สาย THW 1C 4.0 sq.mm,Thai Watsadu,13,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-2.5-MM2,CABLE,สายเดี่ยว THW 2.5 sq.mm,Thai Watsadu,8.5,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-4.0-MM2,CABLE,สายเดี่ยว THW 4.0 sq.mm,Thai Watsadu,13,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-VAF-2x2.5sqmm,CABLE,VAF 2x2.5 mm² flat,Thai Watsadu,15,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-XLPE-10-MM2,CABLE,สาย XLPE 10 sq.mm,Thai Watsadu,45,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-XLPE-10.0-MM2,CABLE,สายไฟ XLPE 10.0 ตร.มม.,Thai Watsadu,35,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-6.0-MM2,CABLE,สายเดี่ยว THW 6.0 sq.mm,Thai Watsadu,22,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-10.0-MM2,CABLE,สายเดี่ยว THW 10.0 sq.mm,Thai Watsadu,38,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-16.0-MM2,CABLE,สายเดี่ยว THW 16.0 sq.mm,Thai Watsadu,58,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-25.0-MM2,CABLE,สายเดี่ยว THW 25.0 sq.mm,Thai Watsadu,95,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-35.0-MM2,CABLE,สายเดี่ยว THW 35.0 sq.mm,Thai Watsadu,135,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-THW-50.0-MM2,CABLE,สายเดี่ยว THW 50.0 sq.mm,Thai Watsadu,185,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-NYY-2x2.5sqmm,CABLE,สาย NYY 2x2.5 sq.mm,Thai Watsadu,28,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-NYY-2x4.0sqmm,CABLE,สาย NYY 2x4.0 sq.mm,Thai Watsadu,42,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-NYY-3x2.5sqmm,CABLE,สาย NYY 3x2.5 sq.mm,Thai Watsadu,38,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-NYY-3x4.0sqmm,CABLE,สาย NYY 3x4.0 sq.mm,Thai Watsadu,55,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-NYY-4x2.5sqmm,CABLE,สาย NYY 4x2.5 sq.mm,Thai Watsadu,48,meter,https://www.thaiwatsadu.com,2025-12-20
+CABLE-NYY-4x4.0sqmm,CABLE,สาย NYY 4x4.0 sq.mm,Thai Watsadu,72,meter,https://www.thaiwatsadu.com,2025-12-20
+# === CIRCUIT TEMPLATES (from catalog_rows.csv) - unit: circuit ===
+CKT-AC-01,CIRCUIT,Air conditioner circuit 1.1 kW,Labor,350,circuit,N/A,2025-12-20
+CKT-BATHROOM-01,CIRCUIT,วงจรห้องน้ำ 20A + RCBO,Labor,450,circuit,N/A,2025-12-20
+CKT-KITCHEN-HEAVY,CIRCUIT,Kitchen heavy loads circuit,Labor,550,circuit,N/A,2025-12-20
+CKT-LIGHT-01,CIRCUIT,General lighting circuit,Labor,250,circuit,N/A,2025-12-20
+CKT-OUTLET-01,CIRCUIT,General outlet circuit,Labor,300,circuit,N/A,2025-12-20
+CKT-PUMP-01,CIRCUIT,Water pump circuit 0.75 kW,Labor,400,circuit,N/A,2025-12-20
+CKT-WET-HEATER,CIRCUIT,Water heater circuit RCBO,Labor,500,circuit,N/A,2025-12-20
+# === ZONE BUNDLES (from catalog_rows.csv) - unit: bundle ===
+BUNDLE-3CIR,BUNDLE,Bundle 3 circuits,Package,2500,bundle,N/A,2025-12-20
+BUNDLE-BATHROOM-LIGHT-v1,BUNDLE,ชุดไฟห้องน้ำ,Package,1200,bundle,N/A,2025-12-20
+BUNDLE-BATHROOM-OUTLET-v1,BUNDLE,ชุดเต้ารับห้องน้ำ,Package,1500,bundle,N/A,2025-12-20
+BUNDLE-BEDROOM-LIGHT-v1,BUNDLE,ชุดไฟห้องนอน,Package,1000,bundle,N/A,2025-12-20
+BUNDLE-BEDROOM-OUTLET-v1,BUNDLE,ชุดเต้ารับห้องนอน,Package,800,bundle,N/A,2025-12-20
+BUNDLE-KITCHEN-LIGHT-v1,BUNDLE,ชุดไฟครัว,Package,1200,bundle,N/A,2025-12-20
+BUNDLE-KITCHEN-OUTLET-v1,BUNDLE,ชุดเต้ารับครัว,Package,1500,bundle,N/A,2025-12-20
+BUNDLE-LIVING-LIGHT-v1,BUNDLE,ชุดไฟห้องนั่งเล่น,Package,1500,bundle,N/A,2025-12-20
+BUNDLE-LIVING-OUTLET-v1,BUNDLE,ชุดเต้ารับห้องนั่งเล่น,Package,1200,bundle,N/A,2025-12-20
+BUNDLE-OFFICE-LIGHT-v1,BUNDLE,ชุดไฟห้องทำงาน,Package,1200,bundle,N/A,2025-12-20
+# === ROOM TEMPLATES (from catalog_rows.csv) - unit: room ===
+RT-BATHROOM-STD,ROOM_TEMPLATE,Template ห้องน้ำมาตรฐาน,Package,5500,room,N/A,2025-12-20
+RT-BEDROOM-STD,ROOM_TEMPLATE,Template ห้องนอนมาตรฐาน,Package,4500,room,N/A,2025-12-20
+RT-KITCHEN-STD,ROOM_TEMPLATE,Template ห้องครัวมาตรฐาน,Package,8500,room,N/A,2025-12-20
+RT-LIVING-STD,ROOM_TEMPLATE,Template ห้องนั่งเล่นมาตรฐาน,Package,6500,room,N/A,2025-12-20
+RT005-UTILITY-ROOM,ROOM_TEMPLATE,Template ห้องยูทิลิตี้ / ปั๊มน้ำ,Package,3500,room,N/A,2025-12-20
+RT006-LAUNDRY-ROOM,ROOM_TEMPLATE,Template ห้องซักผ้า,Package,4500,room,N/A,2025-12-20
+# === BREAKERS & PROTECTION (additional) ===
+MCB-1P-6A,BREAKER,MCB 1 Pole 6A,Thai Watsadu,120,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-1P-10A,BREAKER,MCB 1 Pole 10A,Thai Watsadu,120,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-1P-16A,BREAKER,MCB 1 Pole 16A,Thai Watsadu,125,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-1P-20A,BREAKER,MCB 1 Pole 20A,Thai Watsadu,130,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-1P-25A,BREAKER,MCB 1 Pole 25A,Thai Watsadu,135,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-1P-32A,BREAKER,MCB 1 Pole 32A,Thai Watsadu,145,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-2P-16A,BREAKER,MCB 2 Pole 16A,Thai Watsadu,280,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-2P-20A,BREAKER,MCB 2 Pole 20A,Thai Watsadu,290,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-2P-32A,BREAKER,MCB 2 Pole 32A,Thai Watsadu,320,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-3P-16A,BREAKER,MCB 3 Pole 16A,Thai Watsadu,450,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-3P-20A,BREAKER,MCB 3 Pole 20A,Thai Watsadu,480,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-3P-32A,BREAKER,MCB 3 Pole 32A,Thai Watsadu,520,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-3P-50A,BREAKER,MCB 3 Pole 50A,Thai Watsadu,680,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-3P-63A,BREAKER,MCB 3 Pole 63A,Thai Watsadu,780,set,https://www.thaiwatsadu.com,2025-12-20
+MCB-3P-100A,BREAKER,MCB 3 Pole 100A,Thai Watsadu,1290,set,https://www.thaiwatsadu.com,2025-12-20
+RCBO-1P-16A-30mA,PROTECTION,RCBO 1P 16A 30mA,Thai Watsadu,890,set,https://www.thaiwatsadu.com,2025-12-20
+RCBO-1P-20A-30mA,PROTECTION,RCBO 1P 20A 30mA,Thai Watsadu,920,set,https://www.thaiwatsadu.com,2025-12-20
+RCBO-1P-25A-30mA,PROTECTION,RCBO 1P 25A 30mA,Thai Watsadu,950,set,https://www.thaiwatsadu.com,2025-12-20
+RCBO-1P-32A-30mA,PROTECTION,RCBO 1P 32A 30mA,Thai Watsadu,990,set,https://www.thaiwatsadu.com,2025-12-20
+RCCB-2P-25A-30mA,PROTECTION,RCCB 2P 25A 30mA,Thai Watsadu,650,set,https://www.thaiwatsadu.com,2025-12-20
+RCCB-2P-40A-30mA,PROTECTION,RCCB 2P 40A 30mA,Thai Watsadu,720,set,https://www.thaiwatsadu.com,2025-12-20
+RCCB-4P-40A-30mA,PROTECTION,RCCB 4P 40A 30mA,Thai Watsadu,1450,set,https://www.thaiwatsadu.com,2025-12-20
+RCCB-4P-63A-30mA,PROTECTION,RCCB 4P 63A 30mA,Thai Watsadu,1690,set,https://www.thaiwatsadu.com,2025-12-20
+# === CONDUITS & FITTINGS (additional) ===
+EMT-1/2IN,CONDUIT,Conduit EMT 1/2 inch 3m,Thai Watsadu,95,length,https://www.thaiwatsadu.com,2025-12-20
+EMT-3/4IN,CONDUIT,Conduit EMT 3/4 inch 3m,Thai Watsadu,125,length,https://www.thaiwatsadu.com,2025-12-20
+EMT-1IN,CONDUIT,Conduit EMT 1 inch 3m,Thai Watsadu,165,length,https://www.thaiwatsadu.com,2025-12-20
+PVC-20MM,CONDUIT,PVC conduit 20mm 3m,Thai Watsadu,35,length,https://www.thaiwatsadu.com,2025-12-20
+PVC-25MM,CONDUIT,PVC conduit 25mm 3m,Thai Watsadu,45,length,https://www.thaiwatsadu.com,2025-12-20
+PVC-32MM,CONDUIT,PVC conduit 32mm 3m,Thai Watsadu,65,length,https://www.thaiwatsadu.com,2025-12-20
+FLEX-1/2IN,CONDUIT,Flexible conduit 1/2 inch,Thai Watsadu,25,meter,https://www.thaiwatsadu.com,2025-12-20
+FLEX-3/4IN,CONDUIT,Flexible conduit 3/4 inch,Thai Watsadu,35,meter,https://www.thaiwatsadu.com,2025-12-20
+CONNECTOR-EMT-1/2IN,FITTING,EMT connector 1/2 inch,Thai Watsadu,8,set,https://www.thaiwatsadu.com,2025-12-20
+CONNECTOR-EMT-3/4IN,FITTING,EMT connector 3/4 inch,Thai Watsadu,12,set,https://www.thaiwatsadu.com,2025-12-20
+ELBOW-EMT-1/2IN,FITTING,EMT elbow 1/2 inch,Thai Watsadu,15,set,https://www.thaiwatsadu.com,2025-12-20
+ELBOW-EMT-3/4IN,FITTING,EMT elbow 3/4 inch,Thai Watsadu,22,set,https://www.thaiwatsadu.com,2025-12-20
+# === PANELS & ENCLOSURES (additional) ===
+DB-4WAY,PANEL,Consumer unit 4 way,Thai Watsadu,590,set,https://www.thaiwatsadu.com,2025-12-20
+DB-6WAY,PANEL,Consumer unit 6 way,Thai Watsadu,750,set,https://www.thaiwatsadu.com,2025-12-20
+DB-8WAY,PANEL,Consumer unit 8 way,Thai Watsadu,890,set,https://www.thaiwatsadu.com,2025-12-20
+DB-12WAY,PANEL,Consumer unit 12 way,Thai Watsadu,1290,set,https://www.thaiwatsadu.com,2025-12-20
+DB-18WAY,PANEL,Consumer unit 18 way,Thai Watsadu,1890,set,https://www.thaiwatsadu.com,2025-12-20
+DB-24WAY,PANEL,Consumer unit 24 way,Thai Watsadu,2490,set,https://www.thaiwatsadu.com,2025-12-20
+METER-BOX-1PH,ENCLOSURE,Meter box single phase,Thai Watsadu,350,set,https://www.thaiwatsadu.com,2025-12-20
+METER-BOX-3PH,ENCLOSURE,Meter box three phase,Thai Watsadu,590,set,https://www.thaiwatsadu.com,2025-12-20
+# === GROUNDING (additional) ===
+GROUND-ROD-5/8x8FT,EARTHING,Ground rod 5/8 x 8 ft copper bonded,Thai Watsadu,450,set,https://www.thaiwatsadu.com,2025-12-20
+GROUND-ROD-3/4x10FT,EARTHING,Ground rod 3/4 x 10 ft copper bonded,Thai Watsadu,650,set,https://www.thaiwatsadu.com,2025-12-20
+GROUND-CLAMP-5/8,EARTHING,Ground clamp 5/8 inch,Thai Watsadu,45,set,https://www.thaiwatsadu.com,2025-12-20
+GROUND-CLAMP-3/4,EARTHING,Ground clamp 3/4 inch,Thai Watsadu,55,set,https://www.thaiwatsadu.com,2025-12-20
+GROUND-BAR-6WAY,EARTHING,Ground bar 6 way,Thai Watsadu,85,set,https://www.thaiwatsadu.com,2025-12-20
+GROUND-BAR-12WAY,EARTHING,Ground bar 12 way,Thai Watsadu,120,set,https://www.thaiwatsadu.com,2025-12-20
+# === WIRE ACCESSORIES (additional) ===
+WIRE-NUT-SMALL,ACCESSORY,Wire nut connector small,Thai Watsadu,2,set,https://www.thaiwatsadu.com,2025-12-20
+WIRE-NUT-MEDIUM,ACCESSORY,Wire nut connector medium,Thai Watsadu,3,set,https://www.thaiwatsadu.com,2025-12-20
+WIRE-NUT-LARGE,ACCESSORY,Wire nut connector large,Thai Watsadu,5,set,https://www.thaiwatsadu.com,2025-12-20
+TERMINAL-BLOCK-3P,ACCESSORY,Terminal block 3 pole,Thai Watsadu,25,set,https://www.thaiwatsadu.com,2025-12-20
+TERMINAL-BLOCK-6P,ACCESSORY,Terminal block 6 pole,Thai Watsadu,45,set,https://www.thaiwatsadu.com,2025-12-20
+CABLE-TIE-100MM,ACCESSORY,Cable tie 100mm pack/100,Thai Watsadu,35,pack,https://www.thaiwatsadu.com,2025-12-20
+CABLE-TIE-200MM,ACCESSORY,Cable tie 200mm pack/100,Thai Watsadu,55,pack,https://www.thaiwatsadu.com,2025-12-20
+CABLE-CLIP-8MM,ACCESSORY,Cable clip 8mm pack/100,Thai Watsadu,25,pack,https://www.thaiwatsadu.com,2025-12-20
+CABLE-CLIP-10MM,ACCESSORY,Cable clip 10mm pack/100,Thai Watsadu,30,pack,https://www.thaiwatsadu.com,2025-12-20
+ELECTRICAL-TAPE-BLACK,ACCESSORY,Electrical tape black 18mm,Thai Watsadu,25,roll,https://www.thaiwatsadu.com,2025-12-20
+ELECTRICAL-TAPE-RED,ACCESSORY,Electrical tape red 18mm,Thai Watsadu,25,roll,https://www.thaiwatsadu.com,2025-12-20
+ELECTRICAL-TAPE-YELLOW,ACCESSORY,Electrical tape yellow 18mm,Thai Watsadu,25,roll,https://www.thaiwatsadu.com,2025-12-20
