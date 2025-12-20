@@ -1262,6 +1262,11 @@ class RagService:
         Returns:
             ProjectRequirements ready for MCP chain
         """
+        # [CP4] Checkpoint: Conversion Input
+        input_rooms = len(extracted.get("rooms", []))
+        input_loads = len(extracted.get("loads", []))
+        logger.info(f"[CP4-IN] Converting: {input_rooms} rooms, {input_loads} loads from LLM")
+        
         # Get number of floors
         num_floors = extracted.get("num_floors", 1)
         
@@ -1447,6 +1452,9 @@ class RagService:
                 ))
                 logger.info(f"🔧 Auto-added: ไฟ LED หน้าบ้าน 10W x 2 ใน {er.name}")
         
+        # [CP4] Checkpoint: Conversion Output
+        logger.info(f"[CP4-OUT] Result: {len(rooms)} rooms, {len(loads)} loads ready for MCP")
+        
         return ProjectRequirements(
             project_name=extracted.get("project_name", "บ้านพักอาศัย"),
             building_type=extracted.get("building_type", "residential"),
@@ -1547,6 +1555,13 @@ class RagService:
         """
         from app.mcp_adapter import McpAdapter
         from app.mcp_client import McpClient
+        
+        # [CP6] Checkpoint: Build Design Response Entry
+        rooms_count = len(req.rooms) if req.rooms else 0
+        loads_count = len(req.loads) if req.loads else 0
+        site_ctx = getattr(req, 'site_context', None)
+        logger.info(f"[CP6] Building design: {rooms_count} rooms, {loads_count} loads")
+        logger.info(f"[CP6] site_context: {site_ctx}")
         
         try:
             # 🆕 VALIDATION: Check if rooms/loads are empty before proceeding
