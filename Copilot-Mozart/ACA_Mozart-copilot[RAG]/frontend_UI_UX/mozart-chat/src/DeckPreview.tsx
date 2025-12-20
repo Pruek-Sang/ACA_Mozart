@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+// Deck UI component - for local development only
 import { DeckContainer } from './components/deck/DeckContainer';
 import { MagicalCard } from './components/deck/MagicalCard';
 import { MousePointer2, Zap, FileText, Component, LayoutTemplate } from 'lucide-react';
