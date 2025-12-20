@@ -44,7 +44,12 @@ class BoqService:
             with open(prices_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    device_code = row['device_code']
+                    device_code = row.get('device_code', '')
+                    
+                    # Skip comment lines (start with #) and empty rows
+                    if not device_code or device_code.startswith('#'):
+                        continue
+                    
                     source = row.get('source', 'Unknown')
                     
                     if device_code not in prices:
