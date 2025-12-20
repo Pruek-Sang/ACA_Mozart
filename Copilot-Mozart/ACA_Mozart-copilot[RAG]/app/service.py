@@ -549,13 +549,27 @@ class RagService:
         
         extraction_prompt = f'''คุณเป็น parser สำหรับแปลงคำขอออกแบบไฟฟ้าเป็น JSON
 
+🌍 **รับทุกภาษา (Multilingual):**
+ผู้ใช้อาจพิมพ์ภาษาไทย, English, 中文, 日本語, Deutsch, Español หรือผสมหลายภาษา
+คุณต้องเข้าใจและแปลงเป็น JSON ได้ทุกกรณี
+
+📝 ตัวอย่างที่ต้องเข้าใจ:
+- "2-story house with AC" = บ้าน 2 ชั้น มีแอร์
+- "บ้าน2ชึ้น มีair 3ตัว" = บ้าน 2 ชั้น แอร์ 3 ตัว
+- "heater 4500w" = น้ำอุ่น 4500W
+- "kitchen induction" = ห้องครัวมีเตาแม่เหล็กไฟฟ้า
+
 จากข้อความ: "{normalized_query}"
 
-⚠️ คำที่ต้องระวัง (Fuzzy Matching):
-- "แอ", "แอ์", "เเอร์", "แอร", "ac", "เครื่องปรับอากาศ" → หมายถึง "แอร์"
-- "น้ำร้อน", "เครื่องทำน้ำร้อน", "ฮีทเตอร์", "water heater" → หมายถึง "น้ำอุ่น"
-- "ปั้มน้ำ", "ปั้ม", "pump" → หมายถึง "ปั๊มน้ำ"
-- "เตาไฟฟ้า", "เตาแม่เหล็ก", "induction" → หมายถึง "เตาแม่เหล็กไฟฟ้า"
+⚠️ คำที่ต้องระวัง (Fuzzy Matching หลายภาษา):
+- "แอ", "แอ์", "เเอร์", "แอร", "ac", "air", "aircon", "เครื่องปรับอากาศ", "空调", "エアコン" → หมายถึง "แอร์"
+- "น้ำร้อน", "เครื่องทำน้ำร้อน", "ฮีทเตอร์", "water heater", "heater", "热水器" → หมายถึง "น้ำอุ่น"
+- "ปั้มน้ำ", "ปั้ม", "pump", "water pump" → หมายถึง "ปั๊มน้ำ"
+- "เตาไฟฟ้า", "เตาแม่เหล็ก", "induction", "electric stove" → หมายถึง "เตาแม่เหล็กไฟฟ้า"
+- "bedroom", "ห้องนอน", "寝室" → ห้องนอน
+- "bathroom", "ห้องน้ำ", "toilet" → ห้องน้ำ
+- "kitchen", "ห้องครัว", "厨房" → ห้องครัว
+- "living", "living room", "ห้องนั่งเล่น" → ห้องนั่งเล่น
 
 ให้ตอบเป็น JSON เท่านั้น (ไม่มีคำอธิบาย):
 {{
@@ -1779,11 +1793,63 @@ class RagService:
                 loads = self._extract_loads_from_text(req.query)
                 
                 # 🆕 FIX: Proper validation - check for actual data, not just truthy dict
-                has_rooms = loads and loads.get("rooms")
-                has_loads = loads and loads.get("loads")
+                has_rooms = loads and loads.get("rooms") and len(loads.get("rooms", [])) > 0
+                has_loads = loads and loads.get("loads") and len(loads.get("loads", [])) > 0
                 has_error = loads and "error" in loads
                 
-                if (has_rooms or has_loads) and not has_error:
+                # 🆕 ASK-BACK: ถ้าได้ข้อมูลไม่ครบ ให้ถามกลับแทนการ auto-fill
+                if loads and not has_error:
+                    if has_rooms and not has_loads:
+                        # มีห้อง แต่ไม่มีอุปกรณ์ → ถามหาอุปกรณ์
+                        room_names = [r.get("name", "?") for r in loads.get("rooms", [])]
+                        logger.info(f"[ASK-BACK] Has rooms ({room_names}) but no loads - asking for loads")
+                        return StandardResponse(
+                            answer=f"""✅ ได้รับข้อมูลห้องแล้ว: {', '.join(room_names)}
+
+❓ **กรุณาระบุอุปกรณ์ไฟฟ้าในแต่ละห้อง:**
+
+ตัวอย่าง:
+• "ห้องนั่งเล่น มีเต้ารับคู่ 6 จุด, ไฟ LED 20W 4 ดวง"
+• "ห้องนอนทุกห้องมีแอร์ 12000BTU"
+• "ห้องน้ำมีเครื่องทำน้ำอุ่น 4500W"
+• "ห้องครัวมีเตาไฟฟ้า 3000W, ตู้เย็น, ไมโครเวฟ"
+""",
+                            sources=[],
+                            confidence="Medium",
+                            grounding_status="PARTIAL_DATA_NEED_LOADS",
+                            metadata=AnswerMetadata(
+                                llm_model=settings.MODEL_NAME_ANSWER,
+                                retrieved_docs=[],
+                                retrieval_group="mcp"
+                            )
+                        )
+                    
+                    if has_loads and not has_rooms:
+                        # มีอุปกรณ์ แต่ไม่มีห้อง → ถามหาห้อง
+                        load_devices = [l.get("device", "?") for l in loads.get("loads", [])[:5]]
+                        logger.info(f"[ASK-BACK] Has loads ({load_devices}) but no rooms - asking for rooms")
+                        return StandardResponse(
+                            answer=f"""✅ ได้รับข้อมูลอุปกรณ์แล้ว: {', '.join(load_devices)}...
+
+❓ **กรุณาระบุห้องในบ้าน:**
+
+ตัวอย่าง:
+• "บ้าน 2 ชั้น"
+• "ชั้น 1 มี ห้องนั่งเล่น, ห้องครัว, ห้องน้ำ"
+• "ชั้น 2 มี ห้องนอน 3 ห้อง, ห้องน้ำ"
+""",
+                            sources=[],
+                            confidence="Medium",
+                            grounding_status="PARTIAL_DATA_NEED_ROOMS",
+                            metadata=AnswerMetadata(
+                                llm_model=settings.MODEL_NAME_ANSWER,
+                                retrieved_docs=[],
+                                retrieval_group="mcp"
+                            )
+                        )
+                
+                # ผ่านได้เมื่อมีทั้ง rooms และ loads
+                if has_rooms and has_loads and not has_error:
                     logger.info(f"📦 Extracted: {json.dumps(loads.get('rooms', []), ensure_ascii=False)[:200]}")
                     
                     # Convert to structured ProjectRequirements
