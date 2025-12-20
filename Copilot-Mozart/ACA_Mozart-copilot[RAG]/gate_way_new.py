@@ -499,13 +499,28 @@ class ServiceProxy:
                 headers={"X-Trace-ID": trace_id}
             )
             response.raise_for_status()
-            return response.json()
+            
+            # [CP1] Validate response before returning
+            result = response.json()
+            
+            # Check if response indicates an error from RAG
+            if isinstance(result, dict):
+                if result.get("grounding_status") == "EXTRACTION_FAILED":
+                    logger.warning(f"[{trace_id}] RAG extraction failed - check CP3/CP4 logs")
+                elif result.get("grounding_status") == "NEEDS_SITE_CONTEXT":
+                    logger.info(f"[{trace_id}] RAG needs site_context - returning prompt")
+                elif not result.get("answer"):
+                    logger.warning(f"[{trace_id}] RAG returned empty answer")
+                else:
+                    logger.info(f"[{trace_id}] RAG returned valid response")
+            
+            return result
             
         except httpx.HTTPStatusError as e:
-            logger.error(f"MOZART HTTP error: {e}")
+            logger.error(f"[{trace_id}] MOZART HTTP error: {e}")
             return {"error": str(e), "status_code": e.response.status_code}
         except Exception as e:
-            logger.error(f"MOZART call failed: {e}")
+            logger.error(f"[{trace_id}] MOZART call failed: {e}")
             return {"error": str(e)}
     
     async def call_amadeus(self, request: GatewayRequest, trace_id: str) -> Dict[str, Any]:
