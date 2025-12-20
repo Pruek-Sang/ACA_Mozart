@@ -333,3 +333,107 @@ for load in loads:
 2. **ห้าม silent fallback** เมื่อเกิดปัญหา - ต้อง return error message ที่ชัดเจน
 3. **LLM extraction อาจล้มเหลว** ต้องมี fallback plan ที่เหมาะสม
 
+---
+
+## 🔴 ความผิดพลาดที่ 13: LLM Extraction ไม่ Robust (21 ธ.ค. 2024 02:00)
+
+**อาการ:**
+- ผู้ใช้ส่ง input ยาว (3000+ chars) ละเอียด แต่ได้ Load Schedule เปล่า
+- LLM อาจ return `{"rooms": [], "loads": []}` โดยไม่มี error
+- Code ตรวจแค่ `if loads:` → True (เพราะ {} ก็ truthy)
+
+**สาเหตุหลายจุด:**
+
+### 1. Validation ไม่รัดกุม
+```python
+# ❌ ก่อน (ผิด)
+if loads:  # {} = truthy = ผ่าน!
+
+# ✅ หลัง (ถูก)
+if loads and loads.get("rooms") and not loads.get("error"):
+```
+
+### 2. ไม่มี Checkpoint Logging
+- ไม่รู้ว่า LLM extract ได้กี่ rooms/loads
+- ไม่รู้ว่าหลุดตรงไหน
+
+### 3. LLM Prompt ไม่ Multilingual
+- รับแค่ไทย ถ้าผู้ใช้ผสมหลายภาษาอาจล้มเหลว
+
+### 4. Gateway ไม่ Validate Response
+- Return `response.json()` ตรงๆ โดยไม่เช็ค
+
+**วิธีแก้:** (Commit: 1fef3c7, 4c967e2, 7db7dd7, f42aa75, 5f79f10)
+
+1. **เพิ่ม Checkpoint Logging:**
+   - [CP1] Gateway entry
+   - [CP3] LLM extraction result
+   - [CP4] Conversion input/output
+   - [CP6] Build design entry
+   - [CP7] Pipeline entry/circuits
+
+2. **แก้ Validation ให้เข้มงวด:**
+   ```python
+   has_rooms = loads and loads.get("rooms")
+   has_loads = loads and loads.get("loads")
+   has_error = loads and "error" in loads
+   
+   if (has_rooms or has_loads) and not has_error:
+       # proceed
+   else:
+       # return error with debug info
+   ```
+
+3. **Gateway Validate Response:**
+   - Check grounding_status
+   - Log warning ถ้า EXTRACTION_FAILED
+   - Log warning ถ้า empty answer
+
+**บทเรียน:**
+
+1. **`if obj:` ไม่เพียงพอ** - ต้อง check content ด้วย
+2. **ทุก function ต้องมี checkpoint log** เพื่อ debug
+3. **Error ต้องไม่เงียบ** - ต้องมี message กลับมาเสมอ
+4. **LLM ไม่ 100% reliable** - ต้องมี validation + default
+
+---
+
+## 🔴 ความผิดพลาดที่ 14: ไม่ Multilingual (21 ธ.ค. 2024 05:00)
+
+**อาการ:**
+- User พิมพ์ผสม Thai/English/typos
+- LLM extraction ล้มเหลวหรือได้ผลไม่ถูกต้อง
+
+**สาเหตุ:**
+- LLM prompt สอนแค่ภาษาไทย
+- ไม่มี fuzzy matching หลายภาษา
+
+**วิธีแก้:**
+1. เพิ่มคำสั่งใน prompt ให้รับทุกภาษา
+2. เพิ่มตัวอย่าง multilingual
+3. เพิ่ม fuzzy matching keywords หลายภาษา
+
+**บทเรียน:**
+
+1. **User ไม่พิมพ์สะอาด** - ต้อง handle typos
+2. **Mixed language เป็นเรื่องปกติ** - AC, bedroom, ห้องนอน
+3. **LLM (Gemini) รับหลายภาษาได้** - แค่สอนใน prompt
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 21 ธ.ค. 2024)
+
+6. **ห้าม `if obj:` โดยไม่เช็ค content** - ใช้ `if obj and obj.get("key")`
+7. **ทุก function ต้องมี checkpoint log** - [CPx] format
+8. **LLM extraction ต้องมี:
+   - Logging ก่อน/หลัง
+   - Validation เข้มงวด
+   - Default fallback
+   - Multilingual support
+9. **Debug info ต้องอยู่ใน error message** - ไม่ใช่แค่ "ผิดพลาด"
+10. **ก่อนแก้ต้องทำ plan** - impact analysis + regression check
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-21 05:30*
+*กู จะ ไม่ ทำ ผิด แบบ เดิม อีก!*
