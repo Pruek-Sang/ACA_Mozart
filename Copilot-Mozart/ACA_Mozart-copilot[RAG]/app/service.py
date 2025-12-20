@@ -1433,6 +1433,99 @@ class RagService:
         from app.mcp_client import McpClient
         
         try:
+            # 🆕 VALIDATION: Check if rooms/loads are empty before proceeding
+            # This prevents sending empty data to MCP which results in only spare circuits
+            if not req.rooms or len(req.rooms) == 0:
+                logger.warning("❌ Empty rooms in design request - LLM extraction may have failed")
+                missing_info = []
+                if not req.rooms:
+                    missing_info.append("ห้อง (rooms)")
+                if not req.loads:
+                    missing_info.append("อุปกรณ์ไฟฟ้า (loads)")
+                
+                return StandardResponse(
+                    answer=f"""⚠️ ข้อมูลไม่ครบถ้วน - ไม่สามารถคำนวณได้
+
+ข้อมูลที่ขาดหายไป: {', '.join(missing_info)}
+
+กรุณาระบุข้อมูลให้ชัดเจน เช่น:
+• ห้องแต่ละห้องมีอะไรบ้าง (ห้องนอน, ห้องครัว, ห้องน้ำ)
+• อุปกรณ์ไฟฟ้าในแต่ละห้อง (แอร์, น้ำอุ่น, เตา, เต้ารับ)
+• จำนวนชิ้นของอุปกรณ์แต่ละชนิด
+
+ตัวอย่าง: "ออกแบบบ้าน 2 ชั้น มีห้องนอน 3 ห้อง แต่ละห้องมีแอร์ 1 ตัว เต้ารับ 3 จุด ห้องครัวมีเตาไฟฟ้า 1 เครื่อง"
+""",
+                    sources=[],
+                    confidence="Low",
+                    grounding_status="INSUFFICIENT_DATA",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=[],
+                        retrieval_group="mcp"
+                    )
+                )
+            
+            if not req.loads or len(req.loads) == 0:
+                logger.warning("❌ Empty loads in design request - LLM extraction may have failed")
+                return StandardResponse(
+                    answer=f"""⚠️ ไม่พบอุปกรณ์ไฟฟ้า - ไม่สามารถคำนวณได้
+
+พบห้อง {len(req.rooms)} ห้อง แต่ไม่มีอุปกรณ์ไฟฟ้า
+
+กรุณาระบุอุปกรณ์ไฟฟ้าในแต่ละห้อง เช่น:
+• จำนวนหลอดไฟ LED
+• จำนวนเต้ารับ (คู่/เดี่ยว)
+• แอร์ (ถ้ามี) พร้อม BTU
+• เครื่องทำน้ำอุ่น (ถ้ามี) พร้อมวัตต์
+• เตาไฟฟ้า, ไมโครเวฟ, ตู้เย็น ฯลฯ
+
+ตัวอย่าง: "ห้องนอนมีแอร์ 12000BTU 1 ตัว เต้ารับคู่ 3 จุด ไฟ LED 3 ดวง"
+""",
+                    sources=[],
+                    confidence="Low",
+                    grounding_status="INSUFFICIENT_DATA",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=[],
+                        retrieval_group="mcp"
+                    )
+                )
+            
+            # 🆕 VALIDATION: Check if site_context is missing
+            # This ensures Context Injectors (Derating, kA, N-G Link) work properly
+            if not req.site_context:
+                logger.warning("⚠️ Missing site_context in design request")
+                return StandardResponse(
+                    answer="""⚠️ กรุณาตอบคำถามเกี่ยวกับสถานที่ติดตั้ง
+
+เพื่อความปลอดภัยในการคำนวณ กรุณาระบุข้อมูลต่อไปนี้:
+
+1️⃣ **ระยะห่างจากหม้อแปลงไฟฟ้า**
+   • น้อยกว่า 50 เมตร (ต้องใช้เบรกเกอร์ 10kA)
+   • 50-100 เมตร
+   • มากกว่า 100 เมตร
+
+2️⃣ **พื้นที่ติดตั้งสายไฟ**
+   • ภายในอาคาร (ปกติ)
+   • อุณหภูมิสูง/ใต้หลังคา (Derate 20%)
+   • กลางแจ้ง/ฝังดิน (Derate 30%)
+
+3️⃣ **ประเภทตู้ไฟ**
+   • ตู้เมน (Main Panel) - มี N-G Link
+   • ตู้ย่อย (Sub Panel) - ห้าม N-G Link
+
+ตัวอย่าง: "บ้าน 2 ชั้น ห้างหม้อแปลง 80 เมตร ติดตั้งภายในบ้าน เป็นตู้เมน"
+""",
+                    sources=[],
+                    confidence="Low",
+                    grounding_status="NEEDS_SITE_CONTEXT",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=[],
+                        retrieval_group="mcp"
+                    )
+                )
+            
             # Direct conversion to ProjectInputSpec (no LLM, preserves floor)
             project_input = self._convert_req_to_spec(req)
             logger.info(f"📦 Direct conversion: {len(project_input.rooms)} rooms, {len(project_input.loads)} loads")
@@ -1444,9 +1537,9 @@ class RagService:
                 floor_counts[f] = floor_counts.get(f, 0) + 1
             logger.info(f"📊 Loads by floor: {floor_counts}")
             
-            # Convert to MCP format
+            # Convert to MCP format (🆕 now with site_context!)
             adapter = McpAdapter()
-            mcp_request = adapter.convert(project_input)
+            mcp_request = adapter.convert(project_input, req.site_context)
             
             # Call MCP Core
             mcp_client = McpClient()
@@ -1570,12 +1663,49 @@ class RagService:
                     logger.info("✅ Design response built successfully via NLP→MCP chain")
                     return result
                 else:
-                    # Could not extract loads, fall back to Q&A
-                    logger.warning("⚠️ Design intent detected but no loads extracted, falling back to Q&A")
+                    # 🆕 FIX: Return helpful error instead of falling back to Q&A
+                    # Q&A fallback caused empty Load Schedule (only spare circuits)
+                    logger.warning("⚠️ Design intent detected but no loads extracted - returning extraction error")
+                    return StandardResponse(
+                        answer="""⚠️ ไม่สามารถดึงข้อมูลจากคำขอได้
+
+ระบบตรวจพบว่าคุณต้องการออกแบบระบบไฟฟ้า แต่ไม่สามารถดึงรายละเอียดห้องและอุปกรณ์ได้
+
+กรุณาระบุข้อมูลให้ชัดเจนขึ้น เช่น:
+• "ออกแบบบ้าน 2 ชั้น"
+• "ชั้น 1: ห้องนั่งเล่น 30 ตร.ม., ห้องครัว 15 ตร.ม., ห้องน้ำ 1 ห้อง"
+• "ห้องนั่งเล่น มีเต้ารับคู่ 6 จุด, ไฟ LED 20W 4 ดวง"
+• "ห้องครัวมีเตาไฟฟ้า 3000W, ไมโครเวฟ 1500W, ตู้เย็น 300W"
+• "ห้องน้ำมีเครื่องทำน้ำอุ่น 4500W"
+
+หรือใช้รูปแบบ: "บ้าน 2 ชั้น มีห้องนอน 3 ห้อง ทุกห้องมีแอร์ 12000BTU น้ำอุ่น 2 ตัว"
+""",
+                        sources=[],
+                        confidence="Low",
+                        grounding_status="EXTRACTION_FAILED",
+                        metadata=AnswerMetadata(
+                            llm_model=settings.MODEL_NAME_ANSWER,
+                            retrieved_docs=[],
+                            retrieval_group="mcp"
+                        )
+                    )
                     
             except Exception as e:
-                logger.error(f"❌ Design chain failed: {e}, falling back to Q&A")
-                # Continue to regular Q&A flow
+                logger.error(f"❌ Design chain failed: {e}")
+                # 🆕 FIX: Return error message instead of silent fallback
+                return StandardResponse(
+                    answer=f"""❌ เกิดข้อผิดพลาดในการประมวลผล: {str(e)}
+
+กรุณาลองใหม่อีกครั้ง หรือติดต่อผู้ดูแลระบบ""",
+                    sources=[],
+                    confidence="Low",
+                    grounding_status="PROCESSING_ERROR",
+                    metadata=AnswerMetadata(
+                        llm_model=settings.MODEL_NAME_ANSWER,
+                        retrieved_docs=[],
+                        retrieval_group="mcp"
+                    )
+                )
         
         # =====================================================================
         # PHASE 1: REGULAR Q&A FLOW (Original logic)
