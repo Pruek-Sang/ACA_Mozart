@@ -1,13 +1,51 @@
 # Secrets - NEVER commit
 .env
+.env.local
 .env_ACA
 Docker/.env_ACA
 *.key
 *credentials*.json
+service-account*.json
 
-# Python cache
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.venv/
+venv/
+ENV/
+env/
+my_env/
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+frontend-dist/
+*.local
+
+# IDE / Editor
+.obsidian/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
 
 # Note: vector_db/ is NOT ignored - it's pre-built and committed
 # This allows Local and Docker to use pre-ingested knowledge
