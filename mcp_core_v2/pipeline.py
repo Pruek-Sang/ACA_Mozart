@@ -78,7 +78,10 @@ class DesignPipeline:
     
     def execute(self, request: DesignRequest) -> DesignResult:
         """Execute the complete design pipeline."""
-        logger.info(f"Starting design pipeline for session {request.session_id}")
+        # [CP7] Checkpoint: Pipeline Entry
+        loads_count = len(request.loads) if request.loads else 0
+        rooms_count = len(request.rooms) if hasattr(request, 'rooms') and request.rooms else 0
+        logger.info(f"[CP7-IN] Pipeline start: {rooms_count} rooms, {loads_count} loads, session={request.session_id}")
         
         try:
             # Validate input
@@ -91,6 +94,7 @@ class DesignPipeline:
             # Step 1.5: Group circuits (NEW - consolidate loads into proper circuits)
             logger.info("Step 1.5: Grouping circuits (lighting/receptacle by floor)")
             grouped_circuits = self._group_circuits(request)
+            logger.info(f"[CP7] Grouped into {len(grouped_circuits)} circuits")
             
             # Step 2: Calculate loads
             logger.info("Step 2: Calculating electrical loads")
