@@ -10,9 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for caching
-COPY Docker/requirements_light.txt .
-RUN pip install --no-cache-dir -r requirements_light.txt
+# Copy Gateway-specific requirements (lightweight - no ML libs!)
+# Gateway เป็นแค่ Router ไม่ต้องการ FAISS/sentence-transformers
+COPY Docker/requirements_gateway.txt .
+RUN pip install --no-cache-dir -r requirements_gateway.txt
 
 # Copy gateway code
 COPY gate_way_new.py .

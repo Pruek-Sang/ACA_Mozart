@@ -1,0 +1,24 @@
+# ═══════════════════════════════════════════════════════════════════
+# Mozart Gateway - Lightweight Requirements
+# ═══════════════════════════════════════════════════════════════════
+# Gateway เป็นแค่ Router ไม่ต้องการ FAISS/sentence-transformers!
+# Image size: ~50MB (vs ~4GB with ML libs)
+# ═══════════════════════════════════════════════════════════════════
+
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+
+# HTTP Client (for calling RAG/Amadeus/MCP)
+httpx>=0.26.0
+
+# Rate Limiting (Security)
+slowapi>=0.1.9
+
+# Utilities
+python-dotenv>=1.0.0
+
+# Logging (optional but useful)
+python-json-logger>=2.0.0
