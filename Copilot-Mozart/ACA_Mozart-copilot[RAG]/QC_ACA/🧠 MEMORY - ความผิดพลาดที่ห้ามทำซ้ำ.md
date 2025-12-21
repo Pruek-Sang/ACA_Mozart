@@ -586,3 +586,87 @@ gcloud artifacts repositories set-cleanup-policies mozart \
 *สรุป: ปัญหาวันนี้อยู่ที่ระบบ (mirror.gcr.io cache) + AI (ไม่รู้ว่า no-cache ไม่พอ + ลืมตั้ง cleanup)*
 *User ไม่มีความผิด - ทำตามที่ AI แนะนำ*
 
+---
+
+## 🔴 ความผิดพลาดที่ 18: GitHub Actions Build แต่ไม่ Deploy (22 ธ.ค. 2024 01:08)
+
+**อาการ:**
+- ย้าย RAG ไป Artifact Registry แล้ว ✅
+- GitHub Actions build + push สำเร็จ ✅
+- **แต่ Cloud Run ยังใช้ image เก่า!** ❌
+- ต้อง manual deploy ถึงจะได้ image ใหม่
+
+**หลักฐาน:**
+```bash
+# Cloud Run ใช้ (เก่า)
+asia-southeast1-docker.pkg.dev/.../mozart-rag:b11e2fb...
+
+# Artifact Registry มี (ใหม่)
+asia-southeast1-docker.pkg.dev/.../mozart-rag:0a07975...
+```
+
+**สาเหตุที่แท้จริง:**
+
+1. **Workflow มี `needs: [build-gateway, build-frontend, build-mcp-core, build-rag]`**
+   - ถ้า build ตัวใดตัวหนึ่ง fail → deploy job ไม่รันเลย!
+
+2. **Deploy jobs มี `continue-on-error: true`**
+   - ถ้า deploy fail ก็ไม่แจ้ง error!
+   - Workflow ยัง show "Success" ทั้งที่ deploy ไม่ได้!
+
+3. **Commit ที่แก้ MEMORY/docs ไม่ได้ trigger rebuild ทุก service**
+   - Workflow มี `paths:` filter
+   - ถ้าแก้เฉพาะ docs → อาจไม่ trigger build
+
+**ผู้รับผิดชอบ:**
+- **AI (Valida):** ไม่ได้ตรวจสอบว่า workflow deploy job ทำงานจริงไหม
+- **Workflow Design:** `continue-on-error: true` ปิดบัง error
+
+**วิธีแก้:**
+
+```yaml
+# ลบ continue-on-error หรือเปลี่ยนเป็น false
+- name: 🚀 Deploy Mozart RAG to Cloud Run
+  id: deploy-rag
+  # continue-on-error: true  ← ลบออก!
+  run: |
+    gcloud run deploy mozart-rag ...
+```
+
+**บทเรียน:**
+
+1. **`continue-on-error: true` = ปิดบัง failure!** → ใช้อย่างระวัง
+2. **ตรวจ Cloud Run revision ทุกครั้งหลัง deploy** ไม่ใช่แค่ดู workflow status
+3. **Artifact Registry แก้ได้แค่ cache issue** ไม่ได้แก้ deploy failure!
+4. **Manual deploy ยังจำเป็น** ถ้า workflow มีปัญหา
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 22 ธ.ค. 2024 01:10)
+
+16. **หลัง push ต้องตรวจ:**
+    - [ ] GitHub Actions workflow สำเร็จ?
+    - [ ] Deploy job รันหรือเปล่า?
+    - [ ] Cloud Run revision ใหม่หรือยัง?
+    - [ ] Image tag ตรงกับ commit SHA?
+
+17. **`continue-on-error: true` = อันตราย!**
+    - Fail silently = ไม่รู้ว่าพัง
+    - ใช้เมื่อจำเป็นจริงๆ เท่านั้น
+
+18. **คำสั่งยืนยัน deployment:**
+    ```bash
+    # ตรวจ image ที่ Cloud Run ใช้
+    gcloud run services describe <service> --region=asia-southeast1 \
+      --format="value(spec.template.spec.containers[0].image)"
+    
+    # เปรียบเทียบกับ commit ล่าสุด
+    git log --oneline -1
+    ```
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-22 01:10*
+*สรุป: Artifact Registry แก้ cache issue แต่ไม่ได้แก้ deploy failure!*
+*ต้องตรวจสอบ Cloud Run revision ทุกครั้ง ไม่ใช่แค่ดู workflow status*
+

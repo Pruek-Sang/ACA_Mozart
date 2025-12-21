@@ -209,7 +209,7 @@ jobs:
     name: 🚀 Deploy to Cloud Run
     runs-on: ubuntu-latest
     needs: [build-gateway, build-frontend, build-mcp-core, build-rag]
-    if: success()  # Only deploy if ALL builds succeed
+    if: always()  # Always run to show which deploys succeeded/failed
     
     # Environment variables for easy debugging
     env:
@@ -234,7 +234,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       - name: 🚀 Deploy Frontend to Cloud Run
         id: deploy-frontend
-        continue-on-error: true
+        if: needs.build-frontend.result == 'success'
         run: |
           echo "📦 Deploying Frontend..."
           echo "   Image: ${{ env.FRONTEND_AR_IMAGE }}:${{ github.sha }}"
@@ -244,13 +244,17 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 80
+      
+      - name: ⏭️ Skip Frontend (build failed)
+        if: needs.build-frontend.result != 'success'
+        run: echo "⚠️ Skipping Frontend deploy - build failed or skipped"
 
       # ─────────────────────────────────────────────────────────────────────
-      # Deploy Gateway (from Docker Hub)
+      # Deploy Gateway (from Docker Hub) - ⚠️ May have cache issues
       # ─────────────────────────────────────────────────────────────────────
       - name: 🚀 Deploy Gateway to Cloud Run
         id: deploy-gateway
-        continue-on-error: true
+        if: needs.build-gateway.result == 'success'
         run: |
           echo "📦 Deploying Gateway..."
           echo "   Image: docker.io/acatest01/mozart-gateway:${{ github.sha }}"
@@ -260,13 +264,17 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8000
+      
+      - name: ⏭️ Skip Gateway (build failed)
+        if: needs.build-gateway.result != 'success'
+        run: echo "⚠️ Skipping Gateway deploy - build failed or skipped"
 
       # ─────────────────────────────────────────────────────────────────────
-      # Deploy MCP Core (from Docker Hub)
+      # Deploy MCP Core (from Docker Hub) - ⚠️ May have cache issues
       # ─────────────────────────────────────────────────────────────────────
       - name: 🚀 Deploy MCP Core to Cloud Run
         id: deploy-mcp
-        continue-on-error: true
+        if: needs.build-mcp-core.result == 'success'
         run: |
           echo "📦 Deploying MCP Core..."
           echo "   Image: docker.io/acatest01/mcp-core:${{ github.sha }}"
@@ -276,13 +284,17 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 5001
+      
+      - name: ⏭️ Skip MCP Core (build failed)
+        if: needs.build-mcp-core.result != 'success'
+        run: echo "⚠️ Skipping MCP Core deploy - build failed or skipped"
 
       # ─────────────────────────────────────────────────────────────────────
       # Deploy Mozart RAG (from Artifact Registry - avoids cache!)
       # ─────────────────────────────────────────────────────────────────────
       - name: 🚀 Deploy Mozart RAG to Cloud Run
         id: deploy-rag
-        continue-on-error: true
+        if: needs.build-rag.result == 'success'
         run: |
           echo "📦 Deploying Mozart RAG..."
           echo "   Image: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:${{ github.sha }}"
@@ -292,6 +304,10 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8080
+      
+      - name: ⏭️ Skip Mozart RAG (build failed)
+        if: needs.build-rag.result != 'success'
+        run: echo "⚠️ Skipping Mozart RAG deploy - build failed or skipped"
 
       # ─────────────────────────────────────────────────────────────────────
       # 🔗 POST-DEPLOY: Update Service URLs + Health Checks
