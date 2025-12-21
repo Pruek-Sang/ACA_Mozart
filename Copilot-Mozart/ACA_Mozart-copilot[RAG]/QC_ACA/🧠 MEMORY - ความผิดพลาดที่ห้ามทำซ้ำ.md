@@ -478,3 +478,111 @@ mirror.gcr.io/acatest01/mozart-rag@sha256:8e56bc30... # ← image เก่า!
 3. **ตรวจ image digest** ด้วย `gcloud run revisions describe`
 4. **Artifact Registry ไม่มีปัญหานี้** (อยู่ GCP เดียวกัน)
 
+---
+
+## 🔴 ความผิดพลาดที่ 16: `no-cache: true` ไม่แก้ปัญหา mirror.gcr.io (22 ธ.ค. 2024 00:20)
+
+**อาการ:**
+- ใส่ `no-cache: true` ใน docker-build.yml แล้ว (commit 045258b)
+- GitHub Actions build ใหม่ + push สำเร็จ ✅
+- **แต่ Cloud Run ยังใช้ image เก่าเหมือนเดิม!** ❌
+
+**สาเหตุที่แท้จริง:**
+- `no-cache: true` แก้แค่ **Docker build layer cache** (ฝั่ง GitHub Actions)
+- **ไม่ได้แก้** Cloud Run pulling cache จาก `mirror.gcr.io`
+- `mirror.gcr.io` เป็น Google proxy cache สำหรับ Docker Hub
+- Cache level นี้อยู่นอกเหนือการควบคุมของ workflow
+
+**หลักฐาน:**
+```bash
+# Docker Hub (ล่าสุด)
+sha256:33c5e96399fb3237154bd911d961c919e01569115be6bd9ba4436ebbda0d7214
+
+# Cloud Run (ใช้จริง) - ยังเป็นตัวเก่า!
+mirror.gcr.io/acatest01/mozart-rag@sha256:cfbd991f436c8c1bfc8ea15e7e707fe88d09070c38b0b1ffbf41dc2f0b49ce74
+```
+
+**วิธีแก้ที่ถูกต้อง:** (Commit: b11e2fb)
+```yaml
+# ย้ายจาก Docker Hub → Artifact Registry
+# ก่อน (Docker Hub - มีปัญหา cache):
+docker.io/acatest01/mozart-rag
+
+# หลัง (Artifact Registry - ไม่มีปัญหา):
+asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag
+```
+
+**ผู้รับผิดชอบ:**
+- **ระบบ (Google):** mirror.gcr.io cache behavior ไม่ documented ชัดเจน
+- **AI (Valida):** ไม่เข้าใจว่า `no-cache` แก้ได้แค่ build time ไม่ใช่ pull time
+- **User:** ไม่มีความผิด - เชื่อตามที่ AI แนะนำ
+
+**บทเรียน:**
+
+1. **`no-cache: true` แก้ได้แค่ build cache ไม่ใช่ registry cache**
+2. **Docker Hub + Cloud Run = ให้ใช้ Artifact Registry แทนเสมอ!**
+3. **ต้องตรวจ image digest ทุกครั้ง** หลัง deploy
+4. **อย่าเชื่อว่า "deploy สำเร็จ" = ใช้ code ใหม่**
+
+---
+
+## 🔴 ความผิดพลาดที่ 17: ไม่ตั้ง Cleanup Policy สำหรับ Artifact Registry (22 ธ.ค. 2024 00:45)
+
+**อาการ:**
+- Push images ไป Artifact Registry หลายครั้ง
+- Repository size: 1,046 MB (1 GB) - เกิน Free Tier (500 MB)!
+- ไม่มี auto-delete สำหรับ images เก่า
+
+**สาเหตุ:**
+- ย้ายไป Artifact Registry แต่ **ลืมตั้ง Cleanup Policy**
+- ทุก build push image ใหม่ แต่ไม่ลบอันเก่า
+- Images สะสมไปเรื่อยๆ
+
+**ผู้รับผิดชอบ:**
+- **AI (Valida):** ลืมคิดเรื่อง storage management ตอนย้าย registry
+- **User:** ไม่มีความผิด - ถามตามหลัง
+
+**วิธีแก้:**
+```bash
+# สร้าง cleanup-policy.json
+[
+  {"name": "keep-minimum-versions", "action": {"type": "Keep"}, 
+   "mostRecentVersions": {"keepCount": 5}},
+  {"name": "delete-old-untagged", "action": {"type": "Delete"},
+   "condition": {"olderThan": "604800s", "tagState": "UNTAGGED"}}
+]
+
+# Apply policy
+gcloud artifacts repositories set-cleanup-policies mozart \
+  --location=asia-southeast1 --policy=cleanup-policy.json
+```
+
+**บทเรียน:**
+
+1. **ย้าย registry ต้องคิดเรื่อง cleanup ด้วย!**
+2. **Artifact Registry ไม่มี default cleanup** - ต้องตั้งเอง
+3. **ตรวจ repository size** หลังใช้งานสักพัก
+4. **กฎ: keep 5 + delete untagged after 7 days** = ประหยัดเงิน
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 22 ธ.ค. 2024)
+
+11. **Docker Hub + Cloud Run = ห้ามใช้!** → ใช้ Artifact Registry เสมอ
+12. **`no-cache: true` ไม่แก้ปัญหา mirror cache** → ต้องย้าย registry
+13. **ย้าย registry ต้องตั้ง Cleanup Policy ทันที**
+14. **ตรวจ image digest ทุกครั้งหลัง deploy:**
+    ```bash
+    gcloud run revisions describe <revision> --format="value(spec.containers[0].image)"
+    ```
+15. **Check repository size เป็นประจำ:**
+    ```bash
+    gcloud artifacts repositories describe mozart --location=asia-southeast1
+    ```
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-22 00:50*
+*สรุป: ปัญหาวันนี้อยู่ที่ระบบ (mirror.gcr.io cache) + AI (ไม่รู้ว่า no-cache ไม่พอ + ลืมตั้ง cleanup)*
+*User ไม่มีความผิด - ทำตามที่ AI แนะนำ*
+
