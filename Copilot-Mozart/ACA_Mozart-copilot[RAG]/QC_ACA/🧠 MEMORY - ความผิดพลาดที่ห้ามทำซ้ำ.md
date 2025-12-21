@@ -437,3 +437,44 @@ if loads and loads.get("rooms") and not loads.get("error"):
 
 *เพิ่มเติมเมื่อ: 2025-12-21 05:30*
 *กู จะ ไม่ ทำ ผิด แบบ เดิม อีก!*
+
+---
+
+## 🔴 ความผิดพลาดที่ 15: Cloud Run Cache Docker Hub Images (21 ธ.ค. 2024 23:00)
+
+**อาการ:**
+- GitHub Actions build+deploy "สำเร็จ" ✅
+- แต่ Cloud Run ใช้ **image เดิม** ❌
+- Code ใหม่ไม่ทำงาน
+
+**สาเหตุ:**
+- Cloud Run ดึง Docker Hub ผ่าน `mirror.gcr.io` (proxy cache)
+- Cache ไม่ invalidate ทันทีเมื่อ push ใหม่
+- Deploy บอกสำเร็จ แต่ดึง image เก่ามา!
+
+**หลักฐาน:**
+```bash
+# Deploy command ใช้
+docker.io/acatest01/mozart-rag:383bbaa...
+
+# Cloud Run ดึงจริง
+mirror.gcr.io/acatest01/mozart-rag@sha256:8e56bc30... # ← image เก่า!
+```
+
+**วิธีแก้:** (Commit: 045258b)
+```yaml
+# docker-build.yml
+- name: Build and push
+  uses: docker/build-push-action@v5
+  with:
+    no-cache: true  # ← บังคับ fresh build ทุกครั้ง!
+    # ลบ cache-from / cache-to ออก
+```
+
+**บทเรียน:**
+
+1. **Docker Hub + Cloud Run = อาจมี cache issue**
+2. **Deploy "สำเร็จ" ไม่ได้หมายความว่า ใช้ image ใหม่!**
+3. **ตรวจ image digest** ด้วย `gcloud run revisions describe`
+4. **Artifact Registry ไม่มีปัญหานี้** (อยู่ GCP เดียวกัน)
+
