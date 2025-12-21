@@ -670,3 +670,84 @@ asia-southeast1-docker.pkg.dev/.../mozart-rag:0a07975...
 *สรุป: Artifact Registry แก้ cache issue แต่ไม่ได้แก้ deploy failure!*
 *ต้องตรวจสอบ Cloud Run revision ทุกครั้ง ไม่ใช่แค่ดู workflow status*
 
+---
+
+## 🔴🔴🔴 ความผิดพลาดที่ 19: สร้าง Folder ใหม่แต่ลืม COPY เข้า Docker!
+
+> **วันที่:** 2025-12-22 02:24 (ค้นพบ Root Cause!)
+> **ความรุนแรง:** 💀 CRITICAL - ทำให้ features หายไปใน Production
+
+### อาการ:
+
+```
+User ส่ง request ครบถ้วน (มี site_context: "หม้อแปลง 50 เมตร ติดตั้งในบ้าน เป็นตู้เมน")
+                ↓
+แต่ได้ผลลัพธ์แค่ Spare Circuits เปล่าๆ!
+                ↓
+Injectors (Derating, kA Rating, N-G Link) ไม่ทำงาน
+```
+
+### สาเหตุ:
+
+**สร้าง `mcp_core_v2/context/` folder ใหม่ที่มี inject files:**
+```
+context/
+├── __init__.py
+├── derating_injector.py
+├── ka_rating_injector.py
+└── ng_link_injector.py
+```
+
+**แต่ลืมแก้ `Dockerfile` ให้ COPY folder นี้เข้าไป!**
+
+```dockerfile
+# มีแค่:
+COPY models/ ./models/
+COPY core/ ./core/
+COPY dal/ ./dal/
+COPY db/ ./db/
+COPY cad/ ./cad/
+# ❌ ขาด: COPY context/ ./context/
+```
+
+**Docker image ไม่มี context/ folder** → **Python ImportError หรือ skip inject logic!**
+
+### ผู้รับผิดชอบ:
+
+| ใคร | ความผิด |
+|-----|---------|
+| **AI (Nexia)** | สร้าง folder ใหม่ แต่ไม่ได้ update Dockerfile |
+| **Human** | ไม่ได้ตรวจสอบว่า files ใหม่ถูก include ใน Docker หรือไม่ |
+| **AI (Valida)** | ตรวจ logs นานแต่ไม่เช็ค Dockerfile เลย (2 ชม.+!) |
+
+### วิธีแก้:
+
+```dockerfile
+# เพิ่มใน mcp_core_v2/Docker/Dockerfile:
+COPY context/ ./context/
+```
+
+### 💀 บทเรียน (กฎเหล็กใหม่):
+
+19. **ทุกครั้งที่สร้าง folder/module ใหม่ → ต้อง update Dockerfile!**
+    ```bash
+    # ตรวจสอบ:
+    grep "COPY.*/" Dockerfile
+    ls -la <project>/
+    # ถ้า folder ใน ls ไม่มีใน COPY → ต้องเพิ่ม!
+    ```
+
+20. **Python ImportError บน Cloud Run = ลืม COPY ใน Docker**
+    - Local ทำงานได้ ≠ Docker ทำงานได้
+    - ต้องทดสอบ Docker image ก่อน deploy!
+
+21. **Checklist ก่อน push:**
+    - [ ] สร้าง folder ใหม่หรือไม่?
+    - [ ] ถ้าใช่ → update Dockerfile แล้วหรือยัง?
+    - [ ] Build Docker local แล้วทดสอบหรือยัง?
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-22 02:24*
+*สรุป: สร้าง folder ใหม่แต่ลืม COPY ใน Dockerfile = Features หายไปทั้ง Production!*
+*2 ชั่วโมง+ หาสาเหตุ เพราะมัวแต่ดู logs/code ไม่ได้ดู Dockerfile!*

@@ -62,6 +62,11 @@ COPY core/ ./core/
 COPY dal/ ./dal/
 COPY db/ ./db/
 COPY cad/ ./cad/
+# 🆕 CRITICAL: Context Injectors (Derating, kA Rating, N-G Link)
+# Without this, Site Context features won't work!
+COPY context/ ./context/
+# 🆕 Catalog data (prices.csv for BOQ pricing)
+COPY catalog/ ./catalog/
 
 # Create directories for logs and output
 RUN mkdir -p logs output
