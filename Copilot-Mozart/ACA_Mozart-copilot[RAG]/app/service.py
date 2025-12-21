@@ -876,25 +876,29 @@ class RagService:
                     # Ground wire (วสท.: same as phase for ≤16mm², 50% for larger)
                     ground_wire = main_wire.replace("THW", "THW-G")
                     
-                    # [NEXIA] Get kA rating from injector or determine from distance
-                    ka_rating = "6kA"  # Default
-                    ka_note = ""
-                    distance = site_context.get("distance_to_transformer", "")
-                    if distance == "less_than_50m" or (isinstance(distance, (int, float)) and distance < 50):
-                        ka_rating = "10kA"
-                        ka_note = " ⚡ใกล้หม้อแปลง"
-                    elif distance == "50_100m":
-                        ka_rating = "6kA (แนะนำ 10kA)"
+                    # [NEXIA] Default kA rating (calculated value)
+                    ka_rating = "6kA"  # Default for normal distance
                     
-                    # Check if main breaker was adjusted by injector
-                    main_ka_info = breakers.get("MDP_main", {}) or breakers.get("panel_main", {})
-                    if isinstance(main_ka_info, dict) and main_ka_info.get("ka_adjusted"):
-                        ka_rating = f"{main_ka_info.get('ka_rating', 10)}kA"
-                        ka_note = " ⚡" + (main_ka_info.get("ka_adjustment_reason", "")[:20] if main_ka_info.get("ka_adjustment_reason") else "ปรับแล้ว")
+                    # Check if injector has a recommendation (parse from warnings)
+                    ka_injector_note = None
+                    for warn in design_warnings:
+                        if isinstance(warn, str) and "kA" in warn and "upgraded" in warn.lower():
+                            # Extract kA value from warning like "[Safety] ... upgraded to 10kA ..."
+                            import re
+                            match = re.search(r'(\d+)kA', warn)
+                            if match:
+                                recommended_ka = match.group(1)
+                                ka_injector_note = f"⚠️ Injector แนะนำ: ใช้ {recommended_ka}kA (ใกล้หม้อแปลง)"
+                            break
                     
                     lines.append(f"│  มิเตอร์ไฟฟ้า      : {meter_size:<20} (การไฟฟ้าฯ)          │")
                     lines.append(f"│  สายเมน (L-N-G)    : {main_wire:<20} ท่อ EMT 1\"           │")
-                    lines.append(f"│  Main Breaker      : {main_breaker} {ka_rating:<12} ตู้ MDB{ka_note:<10}│")
+                    lines.append(f"│  Main Breaker      : {main_breaker} {ka_rating:<12} ตู้ MDB             │")
+                    
+                    # Show injector recommendation if different from default
+                    if ka_injector_note:
+                        lines.append(f"│  └─ {ka_injector_note:<55}│")
+                    
                     lines.append(f"│  สายดิน            : {ground_wire:<20} (เขียว/เหลือง)      │")
                     lines.append(f"│  หลักดิน           : 5/8\" x 8 ฟุต           ค่าดิน ≤5Ω       │")
                     lines.append("└─────────────────────────────────────────────────────────────────┘")
