@@ -776,6 +776,10 @@ class RagService:
         compliance = design.get("compliance_report", {})
         calculations = design.get("calculations", {})
         
+        # [NEXIA] Get injector results
+        design_warnings = design.get("warnings", [])  # From injectors
+        site_context = result.get("site_context", {})  # Original site context
+        
         # Group loads by floor and type for details
         lighting_by_floor = {}  # floor -> [(room, device, qty)]
         outlets_by_floor = {}   # floor -> [(room, qty)]
@@ -872,9 +876,25 @@ class RagService:
                     # Ground wire (วสท.: same as phase for ≤16mm², 50% for larger)
                     ground_wire = main_wire.replace("THW", "THW-G")
                     
+                    # [NEXIA] Get kA rating from injector or determine from distance
+                    ka_rating = "6kA"  # Default
+                    ka_note = ""
+                    distance = site_context.get("distance_to_transformer", "")
+                    if distance == "less_than_50m" or (isinstance(distance, (int, float)) and distance < 50):
+                        ka_rating = "10kA"
+                        ka_note = " ⚡ใกล้หม้อแปลง"
+                    elif distance == "50_100m":
+                        ka_rating = "6kA (แนะนำ 10kA)"
+                    
+                    # Check if main breaker was adjusted by injector
+                    main_ka_info = breakers.get("MDP_main", {}) or breakers.get("panel_main", {})
+                    if isinstance(main_ka_info, dict) and main_ka_info.get("ka_adjusted"):
+                        ka_rating = f"{main_ka_info.get('ka_rating', 10)}kA"
+                        ka_note = " ⚡" + (main_ka_info.get("ka_adjustment_reason", "")[:20] if main_ka_info.get("ka_adjustment_reason") else "ปรับแล้ว")
+                    
                     lines.append(f"│  มิเตอร์ไฟฟ้า      : {meter_size:<20} (การไฟฟ้าฯ)          │")
                     lines.append(f"│  สายเมน (L-N-G)    : {main_wire:<20} ท่อ EMT 1\"           │")
-                    lines.append(f"│  Main Breaker      : {main_breaker:<20} ตู้ MDB             │")
+                    lines.append(f"│  Main Breaker      : {main_breaker} {ka_rating:<12} ตู้ MDB{ka_note:<10}│")
                     lines.append(f"│  สายดิน            : {ground_wire:<20} (เขียว/เหลือง)      │")
                     lines.append(f"│  หลักดิน           : 5/8\" x 8 ฟุต           ค่าดิน ≤5Ω       │")
                     lines.append("└─────────────────────────────────────────────────────────────────┘")
@@ -1154,12 +1174,48 @@ class RagService:
             lines.append("└─────────────────────────────────────────────────────────────────┘")
             
             # Show warnings
+            # [NEXIA] Combine compliance warnings with injector warnings
+            all_warnings = []
             if compliance:
-                # Show warnings translated to Thai (no truncation)
+                all_warnings.extend(compliance.get("warnings", []))
+            if design_warnings:
+                all_warnings.extend(design_warnings)
+            
+            if all_warnings:
+                lines.append("")
+                lines.append("📌 หมายเหตุ:")
+                
+                # [NEXIA] Show injector-specific warnings first (they're more important)
+                injector_shown = set()
+                for warn in design_warnings:
+                    if isinstance(warn, str):
+                        if "[Safety]" in warn:
+                            # N-G Link or kA warning
+                            if "SUB-PANEL" in warn:
+                                msg = "🚨 ตู้ย่อย: ห้ามต่อสาย N-G (Neutral-Ground) ที่ตู้นี้!"
+                            elif "kA" in warn:
+                                msg = f"⚡ {warn}"
+                            else:
+                                msg = f"⚠️ {warn}"
+                            if msg not in injector_shown:
+                                lines.append(f"• {msg}")
+                                injector_shown.add(msg)
+                
+                # Show derating info if applied
+                installation_area = site_context.get("installation_area", "")
+                if installation_area and installation_area != "indoor":
+                    area_names = {"outdoor": "กลางแดด", "high_temp": "ใต้หลังคาร้อน", "underground": "ใต้ดิน"}
+                    area_th = area_names.get(installation_area, installation_area)
+                    lines.append(f"• 🌡️ Derating Factor ใช้งาน: พื้นที่ {area_th} (สายไฟขนาดใหญ่ขึ้น)")
+            
+            # Now show compliance warnings (append to existing section, no new header)
+            if compliance:
                 warnings = compliance.get("warnings", [])
                 if warnings:
-                    lines.append("")
-                    lines.append("📌 หมายเหตุ:")
+                    # If no injector warnings were shown, add header now
+                    if not all_warnings:
+                        lines.append("")
+                        lines.append("📌 หมายเหตุ:")
                     
                     # Translate common warnings to Thai
                     warning_translations = {
