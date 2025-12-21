@@ -129,7 +129,7 @@ jobs:
 
 
   # ═══════════════════════════════════════════════════════════════════════
-  # Build MCP Core Image
+  # Build MCP Core Image (Artifact Registry - avoids cache issue!)
   # ═══════════════════════════════════════════════════════════════════════
   build-mcp-core:
     name: ⚡ Build MCP Core
@@ -140,28 +140,31 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔐 Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: 🏗️ Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: 🔐 Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
 
-      - name: 🐳 Build and push MCP Core
-        uses: docker/build-push-action@v5
-        with:
-          context: ./mcp_core_v2
-          file: ./mcp_core_v2/Docker/Dockerfile
-          push: true
-          tags: |
-            ${{ env.MCP_CORE_IMAGE }}:latest
-            ${{ env.MCP_CORE_IMAGE }}:${{ github.sha }}
-          no-cache: true  # Prevent mirror.gcr.io cache issue
+      - name: 🐳 Build Docker image
+        run: |
+          echo "🏗️ Building MCP Core Docker image..."
+          docker build \
+            -f ./mcp_core_v2/Docker/Dockerfile \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:latest \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }} \
+            ./mcp_core_v2
+          echo "✅ Docker build complete"
+
+      - name: 🚀 Push Docker image
+        run: |
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:latest
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }}
 
       - name: ✅ MCP Core build complete
-        run: echo "MCP Core image pushed to ${{ env.MCP_CORE_IMAGE }}:latest"
+        run: echo "MCP Core image pushed to Artifact Registry"
 
   # ═══════════════════════════════════════════════════════════════════════
   # Build Mozart RAG Image (Artifact Registry - avoids cache issue!)
@@ -270,16 +273,16 @@ jobs:
         run: echo "⚠️ Skipping Gateway deploy - build failed or skipped"
 
       # ─────────────────────────────────────────────────────────────────────
-      # Deploy MCP Core (from Docker Hub) - ⚠️ May have cache issues
+      # Deploy MCP Core (from Artifact Registry - avoids cache!)
       # ─────────────────────────────────────────────────────────────────────
       - name: 🚀 Deploy MCP Core to Cloud Run
         id: deploy-mcp
         if: needs.build-mcp-core.result == 'success'
         run: |
           echo "📦 Deploying MCP Core..."
-          echo "   Image: docker.io/acatest01/mcp-core:${{ github.sha }}"
+          echo "   Image: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }}"
           gcloud run deploy mcp-core \
-            --image docker.io/acatest01/mcp-core:${{ github.sha }} \
+            --image asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }} \
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
