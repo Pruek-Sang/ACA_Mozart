@@ -27,8 +27,9 @@ class ResultBuilder:
         conduit_sizing: Dict[str, Any],
         compliance_report: Dict[str, Any],
         autolisp_code: str = None,
-        grouped_circuits: List[Dict[str, Any]] = None
+        grouped_circuits: List[Dict[str, Any]] = None  # Reserved for future circuit grouping
     ) -> DesignResult:
+        # Note: grouped_circuits is reserved for future use (SonarQube: intentionally unused)
         """Build complete design result."""
         errors = []
         warnings = []
