@@ -130,10 +130,19 @@ class MarkdownFormatter(BaseFormatter):
     
     def _create_load_summary(self, summary: Dict) -> List[str]:
         """Create load summary section."""
-        total_watts = summary.get('total_watts', 0)
-        demand_current = summary.get('demand_current', 0)
+        # 🆕 FIX: MCP Core sends 'total_load_va', not 'total_watts'
+        total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
+        
+        # 🆕 FIX: Calculate demand_current if not provided (I = P / V, assuming 230V Thai)
+        demand_current = summary.get('demand_current')
+        if demand_current is None:
+            demand_current = total_watts / 230 if total_watts else 0
+        
         design_current = demand_current * 1.25
-        num_loads = summary.get('num_loads', 0)
+        
+        # 🆕 FIX: MCP Core sends num_loads in 'component_count.loads'
+        component_count = summary.get('component_count') or {}
+        num_loads = summary.get('num_loads') or component_count.get('loads', 0)
         
         return [
             "## 📊 สรุปโหลดไฟฟ้า",
@@ -151,7 +160,11 @@ class MarkdownFormatter(BaseFormatter):
     
     def _create_meter_section(self, summary: Dict) -> List[str]:
         """Create meter and main breaker section."""
-        demand_current = summary.get('demand_current', 0)
+        # 🆕 FIX: Calculate demand_current from total_load_va if not provided
+        demand_current = summary.get('demand_current')
+        if demand_current is None:
+            total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
+            demand_current = total_watts / 230 if total_watts else 0
         
         # Determine meter size
         if demand_current <= 15:
