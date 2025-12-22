@@ -772,7 +772,7 @@ class RagService:
         
         design = result.get("design_result", {})
         breakers = design.get("breaker_selections", {})
-        wire_sizing = design.get("wire_sizing", {})
+        # wire_sizing removed - unused (SonarQube)
         conduit_sizing = design.get("conduit_sizing", {})
         compliance = design.get("compliance_report", {})
         calculations = design.get("calculations", {})
@@ -818,8 +818,8 @@ class RagService:
             lines.append("")
             lines.append(f"📋 โครงการ: {project_name}")
             lines.append(f"📅 วันที่: {__import__('datetime').datetime.now().strftime('%d/%m/%Y')}")
-            lines.append(f"👷 ออกแบบโดย: ACA Mozart - AI Electrical Design System")
-            lines.append(f"📐 มาตรฐาน: วสท. 2001-56 / NEC 2023 / IEC 60364")
+            lines.append("👷 ออกแบบโดย: ACA Mozart - AI Electrical Design System")
+            lines.append("📐 มาตรฐาน: วสท. 2001-56 / NEC 2023 / IEC 60364")
             lines.append("")
             lines.append("─" * 65)
             
@@ -901,7 +901,7 @@ class RagService:
                         lines.append(f"│  └─ {ka_injector_note:<55}│")
                     
                     lines.append(f"│  สายดิน            : {ground_wire:<20} (เขียว/เหลือง)      │")
-                    lines.append(f"│  หลักดิน           : 5/8\" x 8 ฟุต           ค่าดิน ≤5Ω       │")
+                    lines.append("│  หลักดิน           : 5/8\" x 8 ฟุต           ค่าดิน ≤5Ω       │")
                     lines.append("└─────────────────────────────────────────────────────────────────┘")
             
             # ═══════════════════════════════════════════
@@ -1012,7 +1012,7 @@ class RagService:
                             circuit_suffix = int(circuit_num_match.group(1)) if circuit_num_match else 1
                             
                             # Use circuit's notes for summary (already calculated correctly by circuit_grouper)
-                            circuit_notes = b.get("circuit_info", {}).get("notes", [])
+                            # circuit_notes removed - unused (SonarQube)
                             
                             # If we have outlets_by_floor, show them ONLY ONCE (first circuit for that floor)
                             # Track which floors we've displayed with a flag
@@ -1159,8 +1159,8 @@ class RagService:
                     bathroom_load_w = bathroom_outlet_count * 180  # 180 VA per outlet per วสท. 2564
                     load_without_bathroom = total_load - bathroom_load_w
                     current_without_bathroom = load_without_bathroom / 230
-                    lines.append(f"├─────────────────────────────────────────────────────────────────┤")
-                    lines.append(f"│  💡 หากไม่ใส่เต้ารับในห้องน้ำ:                                  │")
+                    lines.append("├─────────────────────────────────────────────────────────────────┤")
+                    lines.append("│  💡 หากไม่ใส่เต้ารับในห้องน้ำ:                                  │")
                     lines.append(f"│     โหลดรวม: {load_without_bathroom:>6,.0f} W (-{bathroom_load_w}W)                                │")
                     lines.append(f"│     กระแส: {current_without_bathroom:>5.1f}A (-{bathroom_load_w/230:.1f}A)                                         │")
 
@@ -1193,18 +1193,17 @@ class RagService:
                 # [NEXIA] Show injector-specific warnings first (they're more important)
                 injector_shown = set()
                 for warn in design_warnings:
-                    if isinstance(warn, str):
-                        if "[Safety]" in warn:
-                            # N-G Link or kA warning
-                            if "SUB-PANEL" in warn:
-                                msg = "🚨 ตู้ย่อย: ห้ามต่อสาย N-G (Neutral-Ground) ที่ตู้นี้!"
-                            elif "kA" in warn:
-                                msg = f"⚡ {warn}"
-                            else:
-                                msg = f"⚠️ {warn}"
-                            if msg not in injector_shown:
-                                lines.append(f"• {msg}")
-                                injector_shown.add(msg)
+                    if isinstance(warn, str) and "[Safety]" in warn:
+                        # N-G Link or kA warning
+                        if "SUB-PANEL" in warn:
+                            msg = "🚨 ตู้ย่อย: ห้ามต่อสาย N-G (Neutral-Ground) ที่ตู้นี้!"
+                        elif "kA" in warn:
+                            msg = f"⚡ {warn}"
+                        else:
+                            msg = f"⚠️ {warn}"
+                        if msg not in injector_shown:
+                            lines.append(f"• {msg}")
+                            injector_shown.add(msg)
                 
                 # Show derating info if applied
                 installation_area = site_context.get("installation_area", "")

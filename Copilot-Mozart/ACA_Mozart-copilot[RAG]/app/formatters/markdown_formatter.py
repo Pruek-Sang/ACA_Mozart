@@ -12,6 +12,9 @@ Design Principles:
 from typing import Dict, Any, List, Optional
 from .base_formatter import BaseFormatter
 
+# Constants for duplicate literals (SonarQube compliance)
+NOT_SPECIFIED = 'ไม่ระบุ'
+
 
 class MarkdownFormatter(BaseFormatter):
     """Formats MCP design results as Markdown with Card-style layout."""
@@ -46,7 +49,7 @@ class MarkdownFormatter(BaseFormatter):
         lines = []
         
         # Extract data
-        project_name = mcp_result.get('project_name', 'ไม่ระบุ')
+        project_name = mcp_result.get('project_name', NOT_SPECIFIED)
         summary = mcp_result.get('summary', {})
         wire_sizing = mcp_result.get('wire_sizing', {})
         breaker_selections = mcp_result.get('breaker_selections', {})
@@ -211,7 +214,7 @@ class MarkdownFormatter(BaseFormatter):
         rooms: Dict[str, List[Dict]] = {}
         for load in loads:
             location = load.get('location', {})
-            room = location.get('room', 'ไม่ระบุ')
+            room = location.get('room', NOT_SPECIFIED)
             if room not in rooms:
                 rooms[room] = []
             rooms[room].append(load)
@@ -237,7 +240,7 @@ class MarkdownFormatter(BaseFormatter):
             
             for load in room_loads:
                 lid = load.get('id', '')
-                name = load.get('name', 'ไม่ระบุ')
+                name = load.get('name', NOT_SPECIFIED)
                 power = load.get('power_watts', 0) * load.get('quantity', 1)
                 
                 # Get sizing info
