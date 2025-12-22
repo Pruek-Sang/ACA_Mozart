@@ -41,6 +41,10 @@ class McpDesignResponse:
     success: bool
     session_id: Optional[str] = None
     
+    # Project info (from MCP DesignResult)
+    project_name: Optional[str] = None
+    project_number: Optional[str] = None
+    
     # Calculation results (from MCP DesignResult)
     calculations: Optional[Dict[str, Any]] = None
     wire_sizing: Optional[Dict[str, Any]] = None
@@ -50,6 +54,10 @@ class McpDesignResponse:
     autolisp_code: Optional[str] = None
     readable_report: Optional[str] = None  # MCP human-readable report (Markdown)
     standards_markdown: Optional[str] = None  # Design standards summary
+    
+    # 🆕 FIX: Include request and summary for formatter
+    request: Optional[Dict[str, Any]] = None  # Original request with loads
+    summary: Optional[Dict[str, Any]] = None  # Load summary
     
     # Errors/warnings from MCP
     errors: Optional[list] = None
@@ -70,6 +78,8 @@ class McpDesignResponse:
         return {
             "success": self.success,
             "session_id": self.session_id,
+            "project_name": self.project_name,
+            "project_number": self.project_number,
             "calculations": self.calculations,
             "wire_sizing": self.wire_sizing,
             "breaker_selections": self.breaker_selections,
@@ -78,6 +88,8 @@ class McpDesignResponse:
             "autolisp_code": self.autolisp_code,
             "readable_report": self.readable_report,
             "standards_markdown": self.standards_markdown,
+            "request": self.request,  # 🆕 FIX: Include for formatter
+            "summary": self.summary,  # 🆕 FIX: Include for formatter
             "errors": self.errors,
             "warnings": self.warnings,
             "error_message": self.error_message
@@ -150,6 +162,8 @@ class McpClient:
                     return McpDesignResponse(
                         success=True,
                         session_id=data.get("session_id"),
+                        project_name=data.get("project_name"),  # 🆕 FIX
+                        project_number=data.get("project_number"),  # 🆕 FIX
                         calculations=data.get("calculations"),
                         wire_sizing=data.get("wire_sizing"),
                         breaker_selections=data.get("breaker_selections"),
@@ -158,6 +172,8 @@ class McpClient:
                         autolisp_code=data.get("autolisp_code"),
                         readable_report=data.get("readable_report"),
                         standards_markdown=data.get("standards_markdown"),
+                        request=data.get("request"),  # 🆕 FIX: Include for formatter
+                        summary=data.get("summary"),  # 🆕 FIX: Include for formatter
                         errors=data.get("errors", []),
                         warnings=data.get("warnings", [])
                     )
