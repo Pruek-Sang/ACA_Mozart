@@ -751,3 +751,80 @@ COPY context/ ./context/
 *เพิ่มเติมเมื่อ: 2025-12-22 02:24*
 *สรุป: สร้าง folder ใหม่แต่ลืม COPY ใน Dockerfile = Features หายไปทั้ง Production!*
 *2 ชั่วโมง+ หาสาเหตุ เพราะมัวแต่ดู logs/code ไม่ได้ดู Dockerfile!*
+
+---
+
+## 🔴 ความผิดพลาดที่ 20: F-String Escape ใน Prompt - `{` vs `{{`
+
+> **วันที่เกิด:** 2025-12-22 23:11
+> **ผู้ทำผิด:** AI (Sophia/Antigravity)
+> **Commit ที่พัง:** 2c2d830
+> **Hotfix:** d782239
+
+### อาการ:
+
+```
+❌ Invalid format specifier ' "ชื่อห้อง", "type": "ประเภท..." ' for object of type 'str'
+```
+
+ระบบพังทันทีเมื่อ user ส่ง request!
+
+### สาเหตุ:
+
+AI แก้ไข JSON example ใน **f-string prompt** ของ `service.py`:
+
+```python
+# ❌ ทำไปผิด (ใช้ single brace)
+extraction_prompt = f"""
+...
+"rooms": [
+    {
+      "name": "ชื่อห้อง",   # <-- Python คิดว่านี่คือ variable format!
+      "type": "..."
+    }
+]
+"""
+
+# ✅ ที่ถูก (ต้อง escape double brace)
+extraction_prompt = f"""
+...
+"rooms": [
+    {{"name": "ชื่อห้อง", "type": "..."}}  # <-- Escaped braces
+]
+"""
+```
+
+### ทำไมถึงเกิด:
+
+1. AI ต้องการทำให้ JSON example อ่านง่ายขึ้น → แยกเป็นหลายบรรทัด
+2. **ลืมว่าอยู่ใน f-string** → ไม่ได้ escape `{` เป็น `{{`
+3. Python ตีความ `{"name": ...}` เป็น format specifier → Error!
+
+### วิธีป้องกัน:
+
+22. **ทุกครั้งที่แก้ไข f-string ที่มี JSON/dict:**
+    - ต้องใช้ `{{` และ `}}` แทน `{` และ `}`
+    - หรือใช้ `str.format()` / Template strings แทน f-string
+    
+23. **ก่อน commit code ที่มี f-string:**
+    ```bash
+    # ทดสอบ syntax ก่อน
+    python -c "from app.service import RagService"
+    ```
+    
+24. **Rule: ถ้า f-string มี JSON example → ย่อเป็นบรรทัดเดียว**
+    - หลายบรรทัด = หลาย `{` = หลายโอกาสลืม escape
+
+### บทเรียน:
+
+| สิ่งที่ต้องจำ | เหตุผล |
+|--------------|--------|
+| `{` ใน f-string = variable | Python syntax rule |
+| `{{` ใน f-string = literal `{` | Escape sequence |
+| แก้ prompt = ต้อง test ทันที | ไม่มี compile-time check |
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-22 23:14*
+*สรุป: แก้ JSON example ใน f-string prompt แต่ลืม escape braces = ระบบพังทั้ง Production!*
+*แก้ภายใน 3 นาที แต่ไม่ควรเกิดตั้งแต่แรก!*
