@@ -247,29 +247,40 @@ class ServiceProxy:
         Extract site_context from natural language Thai text.
         
         Returns dict with fields if detected, None if nothing found.
+        
+        Supports fuzzy matching for units:
+        - ม., m, เมตร, เมด, เมดร, meter, meters, metre, metres
         """
         import re
         
         context = {}
         
+        # ============================================================
+        # Fuzzy Matching Pattern for distance units
+        # Supports: ม. / m / เมตร / เมด / เมดร / meter / meters / metre
+        # ============================================================
+        DISTANCE_UNIT_PATTERN = r'(?:ม\.?|m\.?|เมตร|เมด(?:ร)?|meter[s]?|metre[s]?)'
+        
         # 1. Distance to transformer (ระยะหม้อแปลง)
-        if re.search(r'(?:หม้อแปลง|transformer).*(?:น้อยกว่า|ใกล้|<)\s*50', text):
+        if re.search(r'(?:หม้อแปลง|transformer).*(?:น้อยกว่า|ใกล้|<)\s*50', text, re.IGNORECASE):
             context['distance_to_transformer'] = 'less_than_50m'
-        elif re.search(r'(?:หม้อแปลง|transformer).*(?:50|ห้าสิบ).*(?:100|ร้อย)', text):
+        elif re.search(r'(?:หม้อแปลง|transformer).*(?:50|ห้าสิบ).*(?:100|ร้อย)', text, re.IGNORECASE):
             context['distance_to_transformer'] = '50_100m'
-        elif re.search(r'(?:หม้อแปลง|transformer).*(?:มากกว่า|ไกล|>)\s*100', text):
+        elif re.search(r'(?:หม้อแปลง|transformer).*(?:มากกว่า|ไกล|>)\s*100', text, re.IGNORECASE):
             context['distance_to_transformer'] = 'more_than_100m'
-        elif re.search(r'\d+\s*(?:เมตร|m)', text):
-            # Try to extract number
-            match = re.search(r'(\d+)\s*(?:เมตร|m)', text)
+        elif re.search(r'\d+(?:\.\d+)?\s*' + DISTANCE_UNIT_PATTERN, text, re.IGNORECASE):
+            # Try to extract number with fuzzy unit matching
+            match = re.search(r'(\d+(?:\.\d+)?)\s*' + DISTANCE_UNIT_PATTERN, text, re.IGNORECASE)
             if match:
-                distance = int(match.group(1))
+                distance = float(match.group(1))
                 if distance < 50:
                     context['distance_to_transformer'] = 'less_than_50m'
                 elif distance <= 100:
                     context['distance_to_transformer'] = '50_100m'
                 else:
                     context['distance_to_transformer'] = 'more_than_100m'
+                # Also store the actual distance for VD calculation
+                context['service_distance_m'] = distance
         
         # 2. Installation area (พื้นที่ติดตั้ง)
         if re.search(r'(?:ภายใน|indoor|ในบ้าน|ในอาคาร)', text):
@@ -327,13 +338,19 @@ class ServiceProxy:
         - "หม้อแปลง 80 เมตร" (transformer distance)
         - "ติดตั้งในบ้าน" (installation area)
         - "ตู้เมน" (panel type)
+        
+        Supports fuzzy matching for distance units:
+        - ม. / m / เมตร / เมด / เมดร / meter / meters
         """
         import re
         
         # If text contains site_context keywords but NOT design keywords
+        # Fuzzy distance unit pattern
+        FUZZY_DISTANCE_UNIT = r'(?:ม\.?|m\.?|เมตร|เมด(?:ร)?|meter[s]?|metre[s]?)'
+        
         site_keywords = [
             r'หม้อแปลง|transformer',
-            r'เมตร|meter|m\b',
+            FUZZY_DISTANCE_UNIT,  # Fuzzy unit matching
             r'ภายใน|indoor|ในบ้าน',
             r'กลางแจ้ง|outdoor|นอกบ้าน',
             r'ใต้หลังคา|ร้อน|high.?temp',

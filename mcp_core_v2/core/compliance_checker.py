@@ -19,8 +19,17 @@ class ComplianceChecker:
         self.issues: List[Dict[str, Any]] = []
         self.warnings: List[Dict[str, Any]] = []
     
-    def check_design(self, request: DesignRequest) -> Dict[str, Any]:
-        """Perform complete compliance check on design."""
+    def check_design(
+        self,
+        request: DesignRequest,
+        wire_sizing: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Perform complete compliance check on design including VD limits.
+        
+        Args:
+            request: Design request with loads and panels
+            wire_sizing: Wire sizing results with voltage_drop_percent per load
+        """
         self.issues = []
         self.warnings = []
         
@@ -30,20 +39,31 @@ class ComplianceChecker:
         self._check_load_calculations(request.loads)
         self._check_special_requirements(request.loads)
         
+        # ============================================================
+        # VD Limit Check per วสท. 2564 Standard
+        # Service Entrance ≤ 2%, Branch Circuit ≤ 3%, Total ≤ 5%
+        # ============================================================
+        if wire_sizing:
+            self._check_voltage_drop_limits(wire_sizing)
+        
         # Determine overall compliance
         compliant = len(self.issues) == 0
+        
+        checks_performed = [
+            'circuit_requirements',
+            'panel_requirements',
+            'load_calculations',
+            'special_requirements'
+        ]
+        if wire_sizing:
+            checks_performed.append('voltage_drop_limits')
         
         return {
             'compliant': compliant,
             'nec_version': self.settings.nec_version,
             'issues': self.issues,
             'warnings': self.warnings,
-            'checks_performed': [
-                'circuit_requirements',
-                'panel_requirements',
-                'load_calculations',
-                'special_requirements'
-            ]
+            'checks_performed': checks_performed
         }
     
     def _check_circuit_requirements(self, loads: List[ElectricalLoad]):
@@ -167,6 +187,67 @@ class ComplianceChecker:
                     'message': f'Motor load {load.name} requires overload protection per NEC Article 430'
                 })
     
+    def _check_voltage_drop_limits(self, wire_sizing: Dict[str, Any]):
+        """Check voltage drop limits per วสท. 2564 Standard.
+        
+        Limits:
+        - Service Entrance (Feeder): ≤ 2%
+        - Branch Circuit: ≤ 3%
+        - Total: ≤ 5%
+        
+        Args:
+            wire_sizing: Wire sizing results with voltage_drop_percent per load
+        """
+        vd_limit_branch = getattr(self.settings, 'vd_limit_branch_percent', 3.0)
+        
+        # Check for metadata warning (default distance used)
+        metadata = wire_sizing.get('_metadata', {})
+        if metadata.get('used_default_distance'):
+            self.warnings.append({
+                'code': 'VD_DEFAULT_DISTANCE',
+                'severity': 'warning',
+                'message': metadata.get('warning', '⚠️ ค่า Voltage Drop คำนวณจากระยะ Default')
+            })
+        
+        # Check VD for each load
+        for load_id, wire_result in wire_sizing.items():
+            # Skip metadata
+            if load_id.startswith('_'):
+                continue
+            
+            if not isinstance(wire_result, dict):
+                continue
+            
+            vd_percent = wire_result.get('voltage_drop_percent', 0)
+            distance_m = wire_result.get('distance_m', 0)
+            used_default = wire_result.get('used_default_distance', False)
+            
+            # Check if VD exceeds branch limit
+            if vd_percent > vd_limit_branch:
+                self.issues.append({
+                    'code': 'VD_BRANCH_EXCEEDED',
+                    'severity': 'error',
+                    'load_id': load_id,
+                    'message': f'❌ Voltage Drop {vd_percent:.1f}% เกินมาตรฐาน วสท. (ไม่เกิน {vd_limit_branch}%) ที่ระยะ {distance_m:.1f}m'
+                })
+            elif vd_percent > (vd_limit_branch * 0.8):
+                # Warning if approaching limit (> 80% of limit)
+                self.warnings.append({
+                    'code': 'VD_BRANCH_WARNING',
+                    'severity': 'warning',
+                    'load_id': load_id,
+                    'message': f'⚠️ Voltage Drop {vd_percent:.1f}% ใกล้ถึงขีดจำกัด ({vd_limit_branch}%) ที่ระยะ {distance_m:.1f}m'
+                })
+            
+            # Add info if default distance was used
+            if used_default and vd_percent > 0:
+                self.warnings.append({
+                    'code': 'VD_DEFAULT_USED',
+                    'severity': 'info',
+                    'load_id': load_id,
+                    'message': f'ℹ️ VD {vd_percent:.1f}% คำนวณจากระยะ Default {distance_m:.1f}m (ควรระบุระยะจริงเพื่อความแม่นยำ)'
+                })
+
     def _has_afci_protection(self, load: ElectricalLoad) -> bool:
         """Check if load has AFCI protection (simplified check)."""
         # In actual implementation, this would check the breaker specification
