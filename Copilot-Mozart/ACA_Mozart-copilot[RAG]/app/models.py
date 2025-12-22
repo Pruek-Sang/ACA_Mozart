@@ -89,10 +89,12 @@ class QueryRequest(BaseModel):
     )
     filters: Optional[Dict[str, str]] = Field(None, description="Optional advanced filters for retrieval")
     # 🆕 FIX: Accept site_context from JSON request (not just text extraction)
-    site_context: Optional[Dict[str, str]] = Field(
+    # Changed Dict[str, str] -> Dict[str, Any] to accept numeric values like service_distance_m
+    site_context: Optional[Dict[str, Any]] = Field(
         None,
         description="Site context for design calculations: {distance_to_transformer, installation_area, panel_type}"
     )
+
 
 
 class AnswerMetadata(BaseModel):
