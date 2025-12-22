@@ -56,6 +56,7 @@ from app.models import (
 from app.config import settings
 from app.knowledge_service import KnowledgeService
 from app.trust_log import trust_logger
+from app.formatters import format_design_report  # Card-style Markdown formatter
 from core.privacy import PrivacyGuard
 
 logger = logging.getLogger("Aura.Service")
@@ -1766,13 +1767,11 @@ class RagService:
             mcp_response = await mcp_client.design(mcp_request)
             
             if mcp_response.success:
-                # Format as human-readable text with load details
+                # Format using new Card-style Markdown formatter
                 result = mcp_response.to_dict()
-                formatted_text = self._format_design_result_as_text(
-                    {"status": "complete", "design_result": result},
-                    language,
-                    project_req=req  # Pass project requirements for details
-                )
+                
+                # Use new formatter (Card-style, Legend at top, critical warnings)
+                formatted_text = format_design_report(result)
                 
                 return StandardResponse(
                     answer=formatted_text,
@@ -1789,7 +1788,7 @@ class RagService:
                         retrieved_docs=["mcp_calculation"],
                         retrieval_group="mcp",
                         autolisp_code=mcp_response.autolisp_code,
-                        readable_report=mcp_response.readable_report,
+                        readable_report=formatted_text,  # Use new formatter output
                         standards_markdown=mcp_response.standards_markdown
                     )
                 )
