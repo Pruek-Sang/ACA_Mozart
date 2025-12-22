@@ -9,8 +9,17 @@ Design Principles:
 - Grouped by logical relationship (wire→VD, conduit→fill, breaker→type)
 """
 
+import math
 from typing import Dict, Any, List, Optional
 from .base_formatter import BaseFormatter
+
+
+def round_up(value: float, decimals: int = 0) -> float:
+    """Round up to specified decimal places (ceiling)."""
+    if decimals == 0:
+        return math.ceil(value)
+    multiplier = 10 ** decimals
+    return math.ceil(value * multiplier) / multiplier
 
 # Constants for duplicate literals (SonarQube compliance)
 NOT_SPECIFIED = 'ไม่ระบุ'
@@ -58,8 +67,12 @@ class MarkdownFormatter(BaseFormatter):
         wire_sizing = mcp_result.get('wire_sizing') or {}
         breaker_selections = mcp_result.get('breaker_selections') or {}
         conduit_sizing = mcp_result.get('conduit_sizing') or {}
-        request = mcp_result.get('request') or {}  # 🆕 FIX: Handle None request
+        request = mcp_result.get('request') or {}  # Handle None request
         loads = request.get('loads') or [] if isinstance(request, dict) else []
+        
+        # Extract warnings and errors from MCP result
+        warnings = mcp_result.get('warnings') or []
+        errors = mcp_result.get('errors') or []
 
         
         # Header
@@ -87,6 +100,9 @@ class MarkdownFormatter(BaseFormatter):
         
         # Safety Notes
         lines.extend(self._create_safety_notes())
+        
+        # ⚠️ Warnings & Errors from MCP Core (NEW)
+        lines.extend(self._create_warnings_section(warnings, errors))
         
         # Compliance Status
         lines.extend(self._create_compliance_section(mcp_result))
@@ -129,30 +145,32 @@ class MarkdownFormatter(BaseFormatter):
         ]
     
     def _create_load_summary(self, summary: Dict) -> List[str]:
-        """Create load summary section."""
-        # 🆕 FIX: MCP Core sends 'total_load_va', not 'total_watts'
+        """Create load summary section with ceiling-rounded values."""
+        # MCP Core sends 'total_load_va', not 'total_watts'
         total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
+        total_watts = round_up(total_watts)  # ปัดขึ้นเป็นจำนวนเต็ม
         
-        # 🆕 FIX: Calculate demand_current if not provided (I = P / V, assuming 230V Thai)
+        # Calculate demand_current if not provided (I = P / V, assuming 230V Thai)
         demand_current = summary.get('demand_current')
         if demand_current is None:
             demand_current = total_watts / 230 if total_watts else 0
+        demand_current = round_up(demand_current, 1)  # ปัดขึ้น 1 ตำแหน่ง
         
-        design_current = demand_current * 1.25
+        design_current = round_up(demand_current * 1.25, 1)  # ปัดขึ้น 1 ตำแหน่ง
         
-        # 🆕 FIX: MCP Core sends num_loads in 'component_count.loads'
+        # MCP Core sends num_loads in 'component_count.loads'
         component_count = summary.get('component_count') or {}
         num_loads = summary.get('num_loads') or component_count.get('loads', 0)
         
         return [
-            "## 📊 สรุปโหลดไฟฟ้า",
+            "## สรุปโหลดไฟฟ้า",
             "",
-            "| 🔢 รายการ | 📈 ค่า |",
-            "|-----------|--------|",
-            f"| ⚡ กำลังไฟฟ้ารวม | **{total_watts:,.0f} W** ({total_watts/1000:.2f} kW) |",
-            f"| 🔌 กระแสโหลดรวม | **{demand_current:.1f} A** |",
-            f"| 📐 Design Current (×1.25) | **{design_current:.1f} A** |",
-            f"| 📦 จำนวนวงจร | **{num_loads} วงจร** |",
+            "| รายการ | ค่า |",
+            "|--------|-----|",
+            f"| กำลังไฟฟ้ารวม | **{total_watts:,.0f} W** ({total_watts/1000:.1f} kW) |",
+            f"| กระแสโหลดรวม | **{demand_current:.1f} A** |",
+            f"| Design Current (×1.25) | **{design_current:.1f} A** |",
+            f"| จำนวนวงจร | **{num_loads}** |",
             "",
             "---",
             ""
@@ -395,14 +413,51 @@ class MarkdownFormatter(BaseFormatter):
             "",
             "## ⚠️ ข้อควรระวังและคำแนะนำ",
             "",
-            "| ⚠️ อุปกรณ์ | 📋 ข้อกำหนด | 💡 เหตุผล |",
-            "|------------|-------------|----------|",
-            "| 🚿 เครื่องทำน้ำอุ่น | ต้องใช้ **RCBO 30mA** | ป้องกันไฟดูด |",
-            "| ❄️ แอร์ทุกตัว | **แยกวงจรเฉพาะ** + เบรกเกอร์ 2P | โหลดสูง |",
-            "| 🍳 เตา Induction | วงจรเฉพาะ **20A + สาย 4mm²** | กำลังสูง |",
-            "| 💧 ปั๊มน้ำ | ใช้ **Motor Starter + Overload** | ป้องกันมอเตอร์ |",
+            "| อุปกรณ์ | ข้อกำหนด | เหตุผล |",
+            "|---------|----------|--------|",
+            "| เครื่องทำน้ำอุ่น | ต้องใช้ **RCBO 30mA** | ป้องกันไฟดูด |",
+            "| แอร์ทุกตัว | **แยกวงจรเฉพาะ** + เบรกเกอร์ 2P | โหลดสูง |",
+            "| เตา Induction | วงจรเฉพาะ **20A + สาย 4mm²** | กำลังสูง |",
+            "| ปั๊มน้ำ | ใช้ **Motor Starter + Overload** | ป้องกันมอเตอร์ |",
             ""
         ]
+    
+    def _create_warnings_section(self, warnings: List[str], errors: List[str]) -> List[str]:
+        """Create warnings and errors section from MCP Core output.
+        
+        This displays:
+        - Transformer distance warnings (kA rating adjustments)
+        - Voltage drop warnings (default distance used)
+        - Compliance issues
+        """
+        if not warnings and not errors:
+            return []
+        
+        lines = [
+            "---",
+            "",
+            "## ⚠️ คำเตือนจากระบบ",
+            "",
+        ]
+        
+        # Show errors first (more critical)
+        if errors:
+            lines.append("### ❌ ข้อผิดพลาด")
+            lines.append("")
+            for err in errors[:5]:  # Limit to 5
+                lines.append(f"- {err}")
+            lines.append("")
+        
+        # Show warnings
+        if warnings:
+            lines.append("### ⚠️ ข้อควรระวัง")
+            lines.append("")
+            for warn in warnings[:5]:  # Limit to 5
+                lines.append(f"- {warn}")
+            lines.append("")
+        
+        return lines
+
     
     def _create_compliance_section(self, mcp_result: Dict) -> List[str]:
         """Create compliance status section."""
