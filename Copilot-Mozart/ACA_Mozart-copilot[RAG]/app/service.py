@@ -655,7 +655,7 @@ class RagService:
             
             # 🆕 DEBUG: Log LLM response for troubleshooting
             logger.info(f"📤 LLM extraction response length: {len(response)} chars")
-            logger.debug(f"📤 LLM response (first 500): {response[:500]}")
+            logger.info(f"📤 LLM response (first 300): {response[:300] if response else 'EMPTY'}")
             
             # Parse JSON from response
             import re
