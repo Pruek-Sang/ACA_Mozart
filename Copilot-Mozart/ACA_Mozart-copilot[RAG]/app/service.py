@@ -580,20 +580,10 @@ class RagService:
   "num_floors": จำนวนชั้น (ถ้าไม่ระบุให้ใส่ 1),
   "service_distance_m": ระยะสายเมนเป็นเมตร (ถ้ามี เช่น "หม้อแปลง 50 เมตร" -> 50, ถ้าไม่มีให้ใส่ null),
   "rooms": [
-    {
-      "name": "ชื่อห้อง", 
-      "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", 
-      "floor": ชั้นที่อยู่ (1 หรือ 2), 
-      "area_sqm": พื้นที่ตร.ม. (ถ้าระบุ เช่น "5x5" ให้คำนวณ = 25, ถ้าไม่ระบุให้ใส่ null)
-    }
+    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่, "area_sqm": พื้นที่ตร.ม. (ถ้าไม่ระบุใส่ null)}}
   ],
   "loads": [
-    {
-      "room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", 
-      "device": "รหัสอุปกรณ์", 
-      "quantity": จำนวน,
-      "branch_distance_m": ระยะสายย่อยเป็นเมตร (ถ้ามี เช่น "แอร์ไกล 20 เมตร" -> 20, ถ้าไม่มีให้ใส่ null)
-    }
+    {{"room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", "device": "รหัสอุปกรณ์", "quantity": จำนวน, "branch_distance_m": ระยะสายย่อยเป็นเมตร (ถ้าไม่มีใส่ null)}}
   ],
   "missing_info": ["รายการข้อมูลที่ยังขาด"]
 }}
