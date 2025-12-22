@@ -168,10 +168,10 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     "REFRIG-300W": (300, LoadType.APPLIANCE, True),  # Refrigerator runs continuously
     "DISHWASH-2000W": (2000, LoadType.APPLIANCE, False),
     
-    # Water Heaters (Appliance, non-continuous)
-    "HEATER-3500W": (3500, LoadType.APPLIANCE, False),
-    "HEATER-4500W": (4500, LoadType.APPLIANCE, False),
-    "WATER-HEATER-3500W": (3500, LoadType.APPLIANCE, False),  # Alternative name
+    # Water Heaters (Appliance, CONTINUOUS per NEC - requires 125% sizing)
+    "HEATER-3500W": (3500, LoadType.APPLIANCE, True),   # Fixed: was False
+    "HEATER-4500W": (4500, LoadType.APPLIANCE, True),   # Fixed: was False
+    "WATER-HEATER-3500W": (3500, LoadType.APPLIANCE, True),  # Fixed: was False
     
     # Lighting (Lighting, continuous by NEC)
     "LIGHT-LED-10W": (10, LoadType.LIGHTING, True),
