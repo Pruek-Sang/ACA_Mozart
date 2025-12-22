@@ -1926,9 +1926,15 @@ class RagService:
                     floor_info = {r.name: r.floor for r in project_req.rooms}
                     logger.info(f"🏠 Room floors: {floor_info}")
                     
-                    # 🆕 FIX: Extract site_context from user's query
-                    site_ctx = extract_site_context_from_text(req.query)
-                    logger.info(f"🔍 Extracted site_context: {site_ctx}")
+                    # 🆕 FIX: Prioritize site_context from JSON request, fallback to text extraction
+                    if req.site_context:
+                        # Use site_context directly from request JSON
+                        site_ctx = req.site_context
+                        logger.info(f"✅ Using site_context from request JSON: {site_ctx}")
+                    else:
+                        # Fallback: Extract from query text
+                        site_ctx = extract_site_context_from_text(req.query)
+                        logger.info(f"🔍 Extracted site_context from text: {site_ctx}")
                     
                     # 🆕 FIX: Check if site_context is complete
                     is_complete, missing_fields = is_site_context_complete(site_ctx)
