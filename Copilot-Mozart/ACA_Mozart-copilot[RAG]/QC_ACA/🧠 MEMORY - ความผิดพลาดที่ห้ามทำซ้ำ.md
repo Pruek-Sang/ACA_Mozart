@@ -828,3 +828,81 @@ extraction_prompt = f"""
 *เพิ่มเติมเมื่อ: 2025-12-22 23:14*
 *สรุป: แก้ JSON example ใน f-string prompt แต่ลืม escape braces = ระบบพังทั้ง Production!*
 *แก้ภายใน 3 นาที แต่ไม่ควรเกิดตั้งแต่แรก!*
+
+---
+
+## 🔴 ความผิดพลาดที่ 21: Pydantic Type Mismatch ใน API Request Model (HTTP 422)
+
+**วันที่:** 2025-12-23
+
+### อาการ:
+
+Gateway ส่ง request ไป RAG แล้วได้ **HTTP 422 Unprocessable Entity**:
+```json
+{
+  "error": "Client error '422 unknown' for url '.../api/v1/ask'",
+  "status_code": 422
+}
+```
+
+### สาเหตุ:
+
+ใน `models.py` → `QueryRequest`:
+```python
+# ❌ ที่ผิด - ประกาศ Dict[str, str] (string เท่านั้น)
+site_context: Optional[Dict[str, str]] = Field(...)
+```
+
+แต่ Gateway ส่งค่า **numeric**:
+```python
+# gate_way_new.py line 283
+context['service_distance_m'] = distance  # distance = float!
+```
+
+Pydantic validation fails เพราะ `10.0` ไม่ใช่ `str`!
+
+### วิธีแก้ที่ถูกต้อง:
+
+```python
+# ✅ ที่ถูก - ใช้ Dict[str, Any] รองรับทุก type
+site_context: Optional[Dict[str, Any]] = Field(
+    None,
+    description="Site context for design calculations"
+)
+```
+
+### ทำไมถึงเกิด:
+
+1. เพิ่ม `site_context` field ใหม่ใน `QueryRequest`
+2. **กำหนด type แบบ strict (`Dict[str, str]`)** โดยไม่ตรวจสอบว่า Gateway ส่งอะไรมา
+3. Gateway extract `service_distance_m` เป็น `float` → Pydantic reject ทันที!
+
+### วิธีป้องกัน:
+
+25. **เมื่อเพิ่ม field ใหม่ใน Pydantic model:**
+    - ต้อง **trace ทุก caller** ว่าส่ง data type อะไรมา
+    - ถ้า field รับได้หลาย type → ใช้ `Any` หรือ `Union`
+    
+26. **ก่อน commit model changes:**
+    ```bash
+    # Test with actual Gateway payload
+    curl -X POST .../api/v1/ask -d '{"query": "...", "site_context": {"service_distance_m": 10.0}}'
+    ```
+
+27. **Rule: Dict ใน API model ควรใช้ `Dict[str, Any]` ไม่ใช่ `Dict[str, str]`**
+    - JSON values อาจเป็น string, number, boolean, null, array, object
+    - `Dict[str, str]` = too strict สำหรับ real-world API
+
+### บทเรียน:
+
+| สิ่งที่ต้องจำ | เหตุผล |
+|--------------|--------|
+| `Dict[str, str]` = string only | Pydantic strict validation |
+| `Dict[str, Any]` = flexible | ยอมรับ JSON ทุกชนิด |
+| 422 = Validation error | ไม่ใช่ bug ใน logic แต่เป็น type mismatch |
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-23 00:45*
+*สรุป: เพิ่ม field ใน Models โดยไม่ตรวจสอบ type ที่ Gateway ส่งมา = 422 Error ทั้ง Production!*
+*แก้ภายใน 2 นาที - แค่เปลี่ยน `Dict[str, str]` เป็น `Dict[str, Any]`*
