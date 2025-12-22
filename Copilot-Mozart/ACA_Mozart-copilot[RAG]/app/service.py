@@ -578,11 +578,22 @@ class RagService:
   "building_type": "residential",
   "voltage_system": "TH_1PH_230V",
   "num_floors": จำนวนชั้น (ถ้าไม่ระบุให้ใส่ 1),
+  "service_distance_m": ระยะสายเมนเป็นเมตร (ถ้ามี เช่น "หม้อแปลง 50 เมตร" -> 50, ถ้าไม่มีให้ใส่ null),
   "rooms": [
-    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่ (1 หรือ 2), "area_sqm": พื้นที่ตร.ม. (ถ้าระบุ เช่น "5x5" ให้คำนวณ = 25, ถ้าไม่ระบุให้ใส่ null)}}
+    {
+      "name": "ชื่อห้อง", 
+      "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", 
+      "floor": ชั้นที่อยู่ (1 หรือ 2), 
+      "area_sqm": พื้นที่ตร.ม. (ถ้าระบุ เช่น "5x5" ให้คำนวณ = 25, ถ้าไม่ระบุให้ใส่ null)
+    }
   ],
   "loads": [
-    {{"room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", "device": "รหัสอุปกรณ์", "quantity": จำนวน}}
+    {
+      "room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", 
+      "device": "รหัสอุปกรณ์", 
+      "quantity": จำนวน,
+      "branch_distance_m": ระยะสายย่อยเป็นเมตร (ถ้ามี เช่น "แอร์ไกล 20 เมตร" -> 20, ถ้าไม่มีให้ใส่ null)
+    }
   ],
   "missing_info": ["รายการข้อมูลที่ยังขาด"]
 }}
@@ -599,7 +610,13 @@ class RagService:
    - หน้าบ้าน/front yard/ไฟหน้าบ้าน → name="หน้าบ้าน", type="exterior"
    - ข้างบ้าน/side yard/ไฟข้างบ้าน → name="ข้างบ้าน", type="exterior"
    - หลังบ้าน/backyard/ไฟหลังบ้าน → name="หลังบ้าน", type="exterior"
+   - หลังบ้าน/backyard/ไฟหลังบ้าน → name="หลังบ้าน", type="exterior"
    - สวน/garden → name="สวน", type="exterior"
+   - ระยะสายเมน/เสาไฟ/หม้อแปลง → ใส่ใน service_distance_m (เช่น "ห่างเสาไฟ 30 เมตร")
+
+4. 📏 ระยะทาง (Distance):
+   - ถ้าบอก "หม้อแปลงห่าง 50 เมตร" → service_distance_m: 50
+   - ถ้าบอก "แอร์เดินสาย 20 เมตร" → loads[...].branch_distance_m: 20
 
 🔌 กฎนับเต้ารับ (สำคัญมาก! ตาม วสท. 2564):
 8. "คู่" และ "เดี่ยว" หมายถึง **ประเภท** ของเต้ารับ ไม่ใช่ตัวคูณ!
@@ -700,7 +717,8 @@ class RagService:
             LoadInput(
                 room_name=l["room_name"],
                 device=l["device"],
-                quantity=l.get("quantity") or 1  # Handle None from LLM
+                quantity=l.get("quantity") or 1,  # Handle None from LLM
+                branch_distance_m=l.get("branch_distance_m") # New field
             )
             for l in extracted.get("loads", [])
         ]
@@ -710,6 +728,7 @@ class RagService:
             project_name=extracted.get("project_name", "บ้านพักอาศัย"),
             building_type=extracted.get("building_type", "residential"),
             voltage_system=extracted.get("voltage_system", "TH_1PH_230V"),
+            service_distance_m=extracted.get("service_distance_m"), # New field
             rooms=rooms,
             loads=loads
         )
@@ -2566,6 +2585,9 @@ CRITICAL RULES:
 10. Use rule_profile_id as planned
 11. **IMPORTANT: PRESERVE FLOOR FROM INPUT** - ถ้า rooms มี floor ให้ใส่ใน output ด้วย
 12. **IMPORTANT: LOADS MUST HAVE FLOOR** - ทุก load ต้องมี floor ตาม room ที่อ้างอิง
+13. **MAP DISTANCES (NEW)**:
+    - Map `req.service_distance_m` -> `project_input.project_info.service_distance_m`
+    - Map `req.loads[...].branch_distance_m` -> `project_input.loads[...].branch_distance_m`
 
 {examples}
 
@@ -2578,11 +2600,11 @@ USER REQUIREMENTS:
 OUTPUT JSON (McpSpecResponse):
 {{
   "project_input": {{
-    "project_info": {{"project_name": "...", "building_type": "RESIDENTIAL", "spec_version": "2.0"}},
+    "project_info": {{"project_name": "...", "building_type": "RESIDENTIAL", "spec_version": "2.0", "service_distance_m": 50.0}},
     "electrical_system": {{"voltage_system": "...", "earthing": "TT"}},
     "rooms": [...],
     "loads": [
-      {{"load_id": "L1", "room_id": "R1", "device_code": "...", "qty": 1, "floor": 1}},
+      {{"load_id": "L1", "room_id": "R1", "device_code": "...", "qty": 1, "floor": 1, "branch_distance_m": 20.0}},
       ...
     ],
     "constraints": {{"rule_profile_id": "TH_RESIDENTIAL_LV", "user_constraints": [...]}}

@@ -129,6 +129,7 @@ class LoadInput(BaseModel):
     quantity: int = Field(default=1, description="Number of devices")
     power_kw: Optional[float] = Field(None, description="Total power in kW if known")
     floor: int = Field(default=1, description="Floor number for circuit grouping")
+    branch_distance_m: Optional[float] = Field(None, description="Distance from panel to load (meters)")
 
 
 # =============================================================================
@@ -189,6 +190,12 @@ class ProjectRequirements(BaseModel):
         None, 
         description="Site & installation context. REQUIRED for /api/v1/design endpoint!"
     )
+    
+    # 🆕 Service Distance (VD calculation)
+    service_distance_m: Optional[float] = Field(
+        None,
+        description="Distance from transformer to MDB (meters)"
+    )
 
 
 # --- MCP Contract Models (Strict Schema) ---
@@ -198,6 +205,7 @@ class ProjectInfo(BaseModel):
     project_name: str
     building_type: str  # Normalized: RESIDENTIAL, COMMERCIAL, etc.
     spec_version: str = "2.0"
+    service_distance_m: Optional[float] = None  # 🆕 Service VD
 
 
 class ElectricalSystem(BaseModel):
@@ -229,6 +237,7 @@ class LoadSpec(BaseModel):
     qty: int = Field(default=1, description="Quantity")
     notes: Optional[str] = Field(None, description="Additional notes")
     floor: int = Field(default=1, description="Floor number for circuit grouping")
+    branch_distance_m: Optional[float] = Field(None, description="Distance from panel to load (meters)")
 
 
 class Constraints(BaseModel):

@@ -61,6 +61,7 @@ class McpElectricalLoad:
     location: Optional[McpLocation] = field(default=None)
     is_continuous: bool = False
     notes: Optional[str] = None
+    branch_distance_m: Optional[float] = None  # 🆕 VD Calculation
     
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization"""
@@ -76,7 +77,8 @@ class McpElectricalLoad:
                 "floor": self.location.floor if self.location else None
             },
             "is_continuous": self.is_continuous,
-            "notes": self.notes
+            "notes": self.notes,
+            "branch_distance_m": self.branch_distance_m
         }
 
 
@@ -118,6 +120,8 @@ class McpDesignRequest:
     utility_service_size: int = 100  # Default 100A service
     project_number: Optional[str] = None
     site_context: Optional[Dict] = None  # 🆕 Site context for Injectors
+    building_type: Optional[str] = None  # 🆕 For Default Distance Lookup
+    service_distance_m: Optional[float] = None  # 🆕 Service VD
     
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization"""
@@ -128,7 +132,9 @@ class McpDesignRequest:
             "loads": [load.to_dict() for load in self.loads],
             "panels": [panel.to_dict() for panel in self.panels],
             "service_voltage": self.service_voltage.value,
-            "utility_service_size": self.utility_service_size
+            "utility_service_size": self.utility_service_size,
+            "building_type": self.building_type,
+            "service_distance_m": self.service_distance_m
         }
         # 🆕 Include site_context if present
         if self.site_context:
@@ -298,7 +304,9 @@ class McpAdapter:
             panels=[panel],
             service_voltage=service_voltage,
             utility_service_size=self._estimate_service_size(mcp_loads),
-            site_context=site_context_dict  # 🆕 Pass site_context to MCP
+            site_context=site_context_dict,  # 🆕 Pass site_context to MCP
+            building_type=spec.project_info.building_type,
+            service_distance_m=getattr(spec.project_info, 'service_distance_m', None) # Note: project_info might need update or pass separate
         )
     
     def _map_voltage(self, voltage_system: str) -> VoltageType:
@@ -344,7 +352,8 @@ class McpAdapter:
                 quantity=load.qty,
                 location=McpLocation(room=room_name, floor=floor),
                 is_continuous=is_continuous,
-                notes=load.notes
+                notes=load.notes,
+                branch_distance_m=getattr(load, 'branch_distance_m', None)
             )
             mcp_loads.append(mcp_load)
         
