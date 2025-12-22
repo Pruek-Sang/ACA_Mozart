@@ -207,107 +207,127 @@ class MarkdownFormatter(BaseFormatter):
         breaker_selections: Dict,
         conduit_sizing: Dict
     ) -> List[str]:
-        """Create room-by-room Card-style details."""
+        """Create room-by-room Card-style details, grouped by floor."""
         lines = []
         
-        # Group loads by room
-        rooms: Dict[str, List[Dict]] = {}
+        # Group loads by floor → room
+        floors: Dict[str, Dict[str, List[Dict]]] = {}
         for load in loads:
             location = load.get('location', {})
+            floor = str(location.get('floor', '1'))
             room = location.get('room', NOT_SPECIFIED)
-            if room not in rooms:
-                rooms[room] = []
-            rooms[room].append(load)
-        
-        for room, room_loads in rooms.items():
-            # Find room icon
-            icon = '📍'
-            for key, ico in self.ROOM_ICONS.items():
-                if key in room:
-                    icon = ico
-                    break
             
-            # Calculate room total watts
-            room_watts = sum(
-                load.get('power_watts', 0) * load.get('quantity', 1) 
+            if floor not in floors:
+                floors[floor] = {}
+            if room not in floors[floor]:
+                floors[floor][room] = []
+            floors[floor][room].append(load)
+        
+        # Sort floors numerically
+        sorted_floors = sorted(floors.keys(), key=lambda x: (x.isdigit(), int(x) if x.isdigit() else 999, x))
+        
+        for floor in sorted_floors:
+            rooms = floors[floor]
+            
+            # Floor header
+            floor_display = f"ชั้น {floor}" if floor.isdigit() else floor
+            floor_watts = sum(
+                load.get('power_watts', 0) * load.get('quantity', 1)
+                for room_loads in rooms.values()
                 for load in room_loads
             )
-            
-            lines.append(f"### {icon} {room} ({room_watts:,}W)")
+            lines.append(f"## 🏢 {floor_display} (รวม {floor_watts:,}W)")
             lines.append("")
             
-            has_default_distance = False
-            
-            for load in room_loads:
-                lid = load.get('id', '')
-                name = load.get('name', NOT_SPECIFIED)
-                power = load.get('power_watts', 0) * load.get('quantity', 1)
+            for room, room_loads in rooms.items():
+                # Find room icon
+                icon = '📍'
+                for key, ico in self.ROOM_ICONS.items():
+                    if key in room:
+                        icon = ico
+                        break
                 
-                # Get sizing info
-                w = wire_sizing.get(lid, {})
-                b = breaker_selections.get(lid, {})
-                c = conduit_sizing.get(lid, {})
+                # Calculate room total watts
+                room_watts = sum(
+                    load.get('power_watts', 0) * load.get('quantity', 1) 
+                    for load in room_loads
+                )
                 
-                # Wire info
-                wire_awg = str(w.get('wire_size', '14'))
-                wire_mm = self.AWG_TO_MM2.get(wire_awg, wire_awg)
-                ground_awg = str(w.get('ground_size', '14'))
-                ground_mm = self.AWG_TO_MM2.get(ground_awg, ground_awg)
-                vd = w.get('voltage_drop_percent', 0)
-                
-                # Breaker info
-                breaker = b.get('breaker_rating', 15)
-                poles = b.get('poles', 1)
-                breaker_type = b.get('breaker_type', 'MCB')
-                
-                # Conduit info
-                conduit_size = c.get('conduit_size', '20mm')
-                fill_pct = c.get('fill_percentage', 0)
-                fill_ok = fill_pct <= 40
-                
-                # Distance info
-                distance_m = w.get('distance_m', 15)
-                is_default = w.get('used_default_distance', True)
-                distance_marker = '*' if is_default else ''
-                if is_default:
-                    has_default_distance = True
-                
-                # Status indicators
-                poles_str = str(poles).replace('P', '')
-                vd_status = "✅" if vd <= 3 else "⚠️"
-                fill_status = "✅" if fill_ok else "⚠️"
-                
-                # Check if critical
-                is_critical = any(kw in name.lower() for kw in self.CRITICAL_KEYWORDS)
-                critical_marker = "🔴 " if is_critical else ""
-                
-                # Check wet area
-                is_wet_area = any(kw in room.lower() for kw in self.WET_AREA_KEYWORDS)
-                if is_wet_area and breaker_type == 'MCB':
-                    breaker_type = 'RCBO'  # Force RCBO for wet areas
-                
-                # Card-style output
-                lines.append(f"#### {critical_marker}🔌 {name} ({power:,.0f}W)")
+                lines.append(f"### {icon} {room} ({room_watts:,}W)")
                 lines.append("")
-                lines.append("| หมวด | รายละเอียด |")
-                lines.append("|:----:|------------|")
-                lines.append(f"| 🔗 **สาย** | THW {wire_mm}mm² × {distance_m:.0f}m{distance_marker} → VD {vd:.1f}% {vd_status} |")
-                lines.append(f"| 🌍 **กราวด์** | THW {ground_mm}mm² (สีเขียว/เหลือง) |")
-                lines.append(f"| 🔘 **ท่อ** | PVC {conduit_size} (Fill {fill_pct:.0f}%) {fill_status} |")
-                lines.append(f"| ⚡ **เบรกเกอร์** | {breaker_type} {breaker}A/{poles_str}P |")
                 
-                # Add warning rows
-                if is_critical:
-                    lines.append("| 🔴 **คำเตือน** | **ต้องใช้ RCBO 30mA + แยกวงจรเฉพาะ** |")
-                elif is_wet_area:
-                    lines.append("| ⚠️ **หมายเหตุ** | พื้นที่เปียก - แนะนำ RCBO 30mA |")
+                has_default_distance = False
                 
-                lines.append("")
-            
-            # Room footer
-            if has_default_distance:
-                lines.append("> 📏 `*` = ระยะโดยประมาณ **ควรวัดจริงหน้างาน**")
-                lines.append("")
+                for load in room_loads:
+                    lid = load.get('id', '')
+                    name = load.get('name', NOT_SPECIFIED)
+                    power = load.get('power_watts', 0) * load.get('quantity', 1)
+                    
+                    # Get sizing info
+                    w = wire_sizing.get(lid, {})
+                    b = breaker_selections.get(lid, {})
+                    c = conduit_sizing.get(lid, {})
+                    
+                    # Wire info
+                    wire_awg = str(w.get('wire_size', '14'))
+                    wire_mm = self.AWG_TO_MM2.get(wire_awg, wire_awg)
+                    ground_awg = str(w.get('ground_size', '14'))
+                    ground_mm = self.AWG_TO_MM2.get(ground_awg, ground_awg)
+                    vd = w.get('voltage_drop_percent', 0)
+                    
+                    # Breaker info
+                    breaker = b.get('breaker_rating', 15)
+                    poles = b.get('poles', 1)
+                    breaker_type = b.get('breaker_type', 'MCB')
+                    
+                    # Conduit info
+                    conduit_size = c.get('conduit_size', '20mm')
+                    fill_pct = c.get('fill_percentage', 0)
+                    fill_ok = fill_pct <= 40
+                    
+                    # Distance info
+                    distance_m = w.get('distance_m', 15)
+                    is_default = w.get('used_default_distance', True)
+                    distance_marker = '*' if is_default else ''
+                    if is_default:
+                        has_default_distance = True
+                    
+                    # Status indicators
+                    poles_str = str(poles).replace('P', '')
+                    vd_status = "✅" if vd <= 3 else "⚠️"
+                    fill_status = "✅" if fill_ok else "⚠️"
+                    
+                    # Check if critical
+                    is_critical = any(kw in name.lower() for kw in self.CRITICAL_KEYWORDS)
+                    critical_marker = "🔴 " if is_critical else ""
+                    
+                    # Check wet area
+                    is_wet_area = any(kw in room.lower() for kw in self.WET_AREA_KEYWORDS)
+                    if is_wet_area and breaker_type == 'MCB':
+                        breaker_type = 'RCBO'  # Force RCBO for wet areas
+                    
+                    # Card-style output
+                    lines.append(f"#### {critical_marker}🔌 {name} ({power:,.0f}W)")
+                    lines.append("")
+                    lines.append("| หมวด | รายละเอียด |")
+                    lines.append("|:----:|------------|")
+                    lines.append(f"| 🔗 **สาย** | THW {wire_mm}mm² × {distance_m:.0f}m{distance_marker} → VD {vd:.1f}% {vd_status} |")
+                    lines.append(f"| 🌍 **กราวด์** | THW {ground_mm}mm² (สีเขียว/เหลือง) |")
+                    lines.append(f"| 🔘 **ท่อ** | PVC {conduit_size} (Fill {fill_pct:.0f}%) {fill_status} |")
+                    lines.append(f"| ⚡ **เบรกเกอร์** | {breaker_type} {breaker}A/{poles_str}P |")
+                    
+                    # Add warning rows
+                    if is_critical:
+                        lines.append("| 🔴 **คำเตือน** | **ต้องใช้ RCBO 30mA + แยกวงจรเฉพาะ** |")
+                    elif is_wet_area:
+                        lines.append("| ⚠️ **หมายเหตุ** | พื้นที่เปียก - แนะนำ RCBO 30mA |")
+                    
+                    lines.append("")
+                
+                # Room footer
+                if has_default_distance:
+                    lines.append("> 📏 `*` = ระยะโดยประมาณ **ควรวัดจริงหน้างาน**")
+                    lines.append("")
         
         return lines
     
