@@ -88,6 +88,11 @@ class QueryRequest(BaseModel):
         description="Response language (Thai or English)"
     )
     filters: Optional[Dict[str, str]] = Field(None, description="Optional advanced filters for retrieval")
+    # 🆕 FIX: Accept site_context from JSON request (not just text extraction)
+    site_context: Optional[Dict[str, str]] = Field(
+        None,
+        description="Site context for design calculations: {distance_to_transformer, installation_area, panel_type}"
+    )
 
 
 class AnswerMetadata(BaseModel):
