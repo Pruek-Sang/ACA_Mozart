@@ -76,6 +76,8 @@ class DesignRequestInput(BaseModel):
 class DesignResultOutput(BaseModel):
     """Output to RAG"""
     session_id: str
+    project_name: Optional[str] = None  # 🆕 FIX: Include for formatter
+    project_number: Optional[str] = None  # 🆕 FIX: Include for formatter
     calculations: Dict[str, Any] = Field(default_factory=dict)
     wire_sizing: Dict[str, Any] = Field(default_factory=dict)
     breaker_selections: Dict[str, Any] = Field(default_factory=dict)
@@ -86,6 +88,9 @@ class DesignResultOutput(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     standards_markdown: Optional[str] = None
     readable_report: Optional[str] = None  # Human-readable report
+    # 🆕 FIX: Include request and summary for RAG formatter
+    request: Optional[Dict[str, Any]] = None  # Original request with loads
+    summary: Optional[Dict[str, Any]] = None  # Load summary
 
 # =============================================================================
 # FastAPI Application
@@ -341,8 +346,18 @@ def _convert_to_output(result) -> DesignResultOutput:
     standards_md = builder.create_standards_markdown(result)
     readable = builder.create_readable_report(result)
     
+    # 🆕 FIX: Create summary for RAG formatter
+    summary = builder.create_summary(result)
+    
+    # 🆕 FIX: Convert request to dict for JSON serialization
+    request_dict = None
+    if result.request:
+        request_dict = result.request.model_dump() if hasattr(result.request, 'model_dump') else vars(result.request)
+    
     return DesignResultOutput(
         session_id=result.session_id,
+        project_name=result.request.project_name if result.request else None,  # 🆕
+        project_number=result.request.project_number if result.request else None,  # 🆕
         calculations=result.calculations,
         wire_sizing=result.wire_sizing,
         breaker_selections=result.breaker_selections,
@@ -352,7 +367,9 @@ def _convert_to_output(result) -> DesignResultOutput:
         errors=result.errors,
         warnings=result.warnings,
         standards_markdown=standards_md,
-        readable_report=readable
+        readable_report=readable,
+        request=request_dict,  # 🆕 FIX: Include for formatter
+        summary=summary  # 🆕 FIX: Include for formatter
     )
 
 # =============================================================================
