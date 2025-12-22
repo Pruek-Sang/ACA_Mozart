@@ -162,6 +162,7 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     
     # Kitchen Appliances (Appliance, non-continuous)
     "INDUCTION-3000W": (3000, LoadType.APPLIANCE, False),
+    "IND-3000W": (3000, LoadType.APPLIANCE, False),  # 🆕 Alias for INDUCTION
     "MICROWAVE-1500W": (1500, LoadType.APPLIANCE, False),
     "RICECOOK-800W": (800, LoadType.APPLIANCE, False),
     "REFRIG-300W": (300, LoadType.APPLIANCE, True),  # Refrigerator runs continuously
