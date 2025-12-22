@@ -906,3 +906,202 @@ site_context: Optional[Dict[str, Any]] = Field(
 *เพิ่มเติมเมื่อ: 2025-12-23 00:45*
 *สรุป: เพิ่ม field ใน Models โดยไม่ตรวจสอบ type ที่ Gateway ส่งมา = 422 Error ทั้ง Production!*
 *แก้ภายใน 2 นาที - แค่เปลี่ยน `Dict[str, str]` เป็น `Dict[str, Any]`*
+
+---
+
+## 🔴🔴 ความผิดพลาดที่ 22: API Contract Drift - แก้ Backend แต่ลืมแจ้ง Frontend! (สำคัญมาก!)
+
+> **วันที่:** 2025-12-23 02:00
+> **ความรุนแรง:** 💀💀 CRITICAL - Silent Failure (เงียบๆ แต่ผิดหมด)
+> **Root Cause ของวัน:** Bug "0 Watts in Summary" มาจากปัญหานี้!
+
+### อาการ:
+
+```
+รายงานการออกแบบแสดง:
+┌─────────────────────────────────────┐
+│ 📊 สรุปโหลดไฟฟ้า                     │
+│ ⚡ กำลังไฟฟ้ารวม | 0 W              │  ← ❌ ควรเป็น 22,000W!
+│ 🔌 กระแสโหลดรวม | 0.0 A            │
+│ 📦 จำนวนวงจร   | 0 วงจร            │
+└─────────────────────────────────────┘
+
+แต่ข้างล่าง:
+• ชั้น 1 → รวม 15,850W               │  ← ✅ มีค่าถูก!
+• ชั้น 2 → รวม 6,150W                │
+```
+
+**Summary เป็น 0 แต่ Detail ถูกต้อง!** = Data มี แต่อ่านผิดที่!
+
+### สาเหตุ (API Contract Drift):
+
+**MCP Core (`result_builder.py`) ส่ง:**
+```json
+{
+  "summary": {
+    "total_load_va": 22000,         // ← ชื่อนี้!
+    "component_count": {
+      "loads": 35                    // ← ซ้อนอยู่ใน dict!
+    }
+  }
+}
+```
+
+**RAG (`markdown_formatter.py`) คาดหวัง:**
+```python
+total_watts = summary.get('total_watts')    # ❌ หาไม่เจอ! (ชื่อผิด)
+demand_current = summary.get('demand_current')  # ❌ ไม่มี field นี้!
+num_loads = summary.get('num_loads')        # ❌ หาไม่เจอ! (path ผิด)
+```
+
+**ผลลัพธ์:** ทุก field ได้ default = `0`!
+
+### ทำไมถึงเกิด:
+
+```
+Timeline:
+1. MCP Core refactor ภายใน → เปลี่ยนชื่อ total_watts → total_load_va
+2. เปลี่ยน num_loads → component_count.loads
+3. ไม่ได้แจ้ง RAG team / ไม่ได้ update interface doc
+4. RAG ยังใช้ชื่อเก่า → .get() return None → default 0
+5. ไม่มี Error เพราะ .get() ไม่ crash → Silent Failure!
+```
+
+### วิธีแก้ (Commit: 6b4c05d):
+
+```python
+# ✅ ที่ถูก - ทำให้ RAG "ปรับตัว" ได้
+def _create_load_summary(self, summary: Dict) -> List[str]:
+    # Try both old and new field names
+    total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
+    
+    # Calculate if not provided
+    demand_current = summary.get('demand_current')
+    if demand_current is None:
+        demand_current = total_watts / 230 if total_watts else 0
+    
+    # Handle nested dict
+    component_count = summary.get('component_count') or {}
+    num_loads = summary.get('num_loads') or component_count.get('loads', 0)
+```
+
+### ⚠️ ทำไม Fix นี้คือ "Sticking Plaster" (ยาปิดแผล):
+
+**ข้อดี:**
+- แก้ปัญหาได้เร็ว ไม่ต้องแก้ MCP Core
+- RAG ทนทานขึ้น (resilient) ต่อการเปลี่ยนแปลง
+
+**ข้อเสีย (Tech Debt):**
+- MCP Core ยัง output schema "ไม่สะอาด"
+- ถ้ามี Client ตัวที่ 3 (เช่น Mobile App) → ต้องเขียน adapter อีก!
+- ไม่ได้แก้ที่ต้นเหตุ (Source) แก้ที่ปลายทาง (Consumer)
+
+### 💀 บทเรียน (กฎเหล็กใหม่):
+
+28. **ห้าม Refactor Backend โดยไม่ตรวจสอบ Consumer!**
+    - Before changing API response field names → GREP all consumers!
+    - ```bash
+      grep -r "total_watts" ../Copilot-Mozart/  # หาว่าใครใช้อยู่
+      ```
+
+29. **ใช้ Shared Model Library (Long-term Fix):**
+    ```
+    /mozart-common/
+      contracts/
+        design_result.py  ← Class เดียวกัน ทั้ง MCP และ RAG import มาใช้
+    ```
+    - ถ้า MCP เปลี่ยนชื่อ field → RAG จะ **Build Error** ทันที (ก่อน deploy)
+
+30. **`.get()` คืออันตรายเงียบ:**
+    ```python
+    # ❌ Silent failure:
+    value = data.get('wrong_key')  # → None, no error!
+    
+    # ✅ Fail loud:
+    value = data['required_key']   # → KeyError if missing
+    
+    # ✅ หรือ Explicit check:
+    if 'required_key' not in data:
+        raise ValueError("Missing required_key!")
+    ```
+
+31. **Contract Testing (Future):**
+    - ใช้ Pact หรือ OpenAPI schema validation
+    - ทุกครั้งที่ MCP จะ deploy → ต้อง pass contract test กับ RAG ก่อน
+
+### Flow ที่ถูกต้อง (Ideal):
+
+```
+┌──────────────────┐     Contract Doc     ┌──────────────────┐
+│    MCP Core      │◄───────────────────►│      RAG         │
+│ (Producer)       │   (Shared Schema)   │  (Consumer)      │
+└────────┬─────────┘                     └────────┬─────────┘
+         │                                        │
+         ▼                                        ▼
+    result_builder.py                    markdown_formatter.py
+    - Uses DesignSummary class           - Imports same class!
+    - If change → tests fail →           - If mismatch → tests fail →
+      CANNOT deploy until fix!             CANNOT deploy until fix!
+```
+
+### สิ่งที่ต้องทำ (Next Refactoring):
+
+- [ ] สร้าง `mozart-common` package  
+- [ ] ย้าย Models ไปไว้ใน shared package
+- [ ] ให้ทั้ง MCP และ RAG import จาก package เดียวกัน
+- [ ] Add Contract Test ใน CI/CD
+
+---
+
+*เพิ่มเติมเมื่อ: 2025-12-23 02:00*
+*สรุป: แก้ Backend แต่ลืมแจ้ง Frontend = Silent Failure ทั้ง Production!*
+*Root Cause: API Contract Drift - 2 services คุยกันคนละภาษา แต่ไม่มี error!*
+*Fix: ทำให้ Consumer ฉลาดขึ้น (adapter pattern) แต่แผลเป็นยังอยู่ (Tech Debt)*
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 23 ธ.ค. 2024 02:00)
+
+28. **ห้าม Refactor API response โดยไม่ grep consumers!**
+29. **Long-term: ใช้ Shared Model Library**
+30. **`.get()` = อันตรายเงียบ** - ใช้ explicit checks สำหรับ required fields
+31. **ต้องมี Contract Testing** ในอนาคต
+
+---
+
+## 🔮 ถ้าพังอีก ควรเช็คตรงไหนก่อน? (Quick Debugging Guide)
+
+เมื่อเจอปัญหาแปลกๆ ให้เรียงลำดับเช็คดังนี้:
+
+| ลำดับ | ปัญหา | สิ่งที่ต้องเช็ค |
+|:-----:|-------|----------------|
+| 1️⃣ | **Deployment Failure** | Cloud Run Revision ตรงกับ Commit ไหม? |
+| 2️⃣ | **API Contract Drift** | Field names ตรงกันระหว่าง Producer/Consumer ไหม? |
+| 3️⃣ | **LLM Extraction Failure** | Logs [CP3] บอกว่า extract ได้กี่ rooms/loads? |
+| 4️⃣ | **Type Mismatch (422)** | Pydantic model รับ type ถูกไหม? |
+| 5️⃣ | **Missing Files in Docker** | Dockerfile มี COPY folder ใหม่ไหม? |
+| 6️⃣ | **F-String Escape** | มี `{` ใน f-string ที่ไม่ได้ escape ไหม? |
+
+```bash
+# Quick Debug Commands:
+# 1. Check Cloud Run
+gcloud run revisions list --service=mozart-rag --region=asia-southeast1
+
+# 2. Check if field exists
+grep -r "total_watts" app/formatters/
+
+# 3. Check LLM logs
+# ดู Cloud Run logs หา [CP3]
+
+# 4. Check Pydantic model
+grep -r "site_context" app/models.py
+
+# 5. Check Dockerfile
+grep "COPY" ../mcp_core_v2/Docker/Dockerfile
+```
+
+---
+
+*อัพเดทล่าสุด: 2025-12-23 02:00*
+*กู จะ ไม่ ทำ ผิด แบบ เดิม อีก! (รอบที่ 22 แล้ว...)*
+
