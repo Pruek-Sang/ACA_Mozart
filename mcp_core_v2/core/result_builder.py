@@ -7,6 +7,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Constants to avoid duplication (SonarQube S1192)
+METER_30_100A = "30(100)A"
+
 
 class ResultBuilder:
     """Builds comprehensive design result from individual calculation results."""
@@ -244,19 +247,16 @@ class ResultBuilder:
         # === USE demand_current FROM CALCULATIONS (sent by RAG) ===
         # RAG already calculated demand_current with proper power factor
         # Use that value instead of simple total_watts/230
-        total_amps = 0.0
         demand_current = 0.0
         if result.calculations:
             for panel_id, panel_calc in result.calculations.items():
                 if isinstance(panel_calc, dict):
                     # Use demand_current if available, else total_current
                     demand_current += panel_calc.get('demand_current', panel_calc.get('total_current', 0))
-                    total_amps += panel_calc.get('total_current', 0)
         
         # Fallback to simple calculation if no calculations available
         if demand_current == 0:
             demand_current = total_watts / 230
-            total_amps = demand_current
         
         # === USE main_breaker_rating FROM PANEL (sent by RAG) ===
         # RAG already calculated main_breaker_rating with ×1.25 factor
@@ -278,15 +278,15 @@ class ResultBuilder:
             main_wire = "THW 6 mm²"
             main_breaker = f"{panel_main_breaker}A 2P"
         elif panel_main_breaker <= 50:
-            meter = "30(100)A"
+            meter = METER_30_100A
             main_wire = "THW 10 mm²"
             main_breaker = f"{panel_main_breaker}A 2P"
         elif panel_main_breaker <= 63:
-            meter = "30(100)A"
+            meter = METER_30_100A
             main_wire = "THW 16 mm²"
             main_breaker = f"{panel_main_breaker}A 2P"
         elif panel_main_breaker <= 100:
-            meter = "30(100)A"
+            meter = METER_30_100A
             main_wire = "THW 25 mm²"
             main_breaker = f"{panel_main_breaker}A 2P"
         elif panel_main_breaker <= 125:
@@ -381,8 +381,10 @@ class ResultBuilder:
             
             lines.append(f"### {icon} {room}")
             lines.append("")
-            lines.append("| 🔌 อุปกรณ์ | ⚡ กำลัง | 🔗 สาย | ⚡ เบรกเกอร์ | 📉 VD% |")
-            lines.append("|------------|---------|--------|--------------|--------|")
+            lines.append("| 🔌 อุปกรณ์ | ⚡ กำลัง | � ระยะ | 🔗 สาย | ⚡ เบรกเกอร์ | 📉 VD% |")
+            lines.append("|------------|---------|--------|--------|--------------|--------|")
+            
+            has_default_distance = False  # Track if any load uses default distance
             
             for load in loads:
                 lid = load.id
@@ -399,16 +401,25 @@ class ResultBuilder:
                 breaker = b.get('breaker_rating', 15)
                 poles = b.get('poles', 1)
                 
+                # Distance with * if default
+                distance_m = w.get('distance_m', 15)
+                is_default = w.get('used_default_distance', True)
+                distance_str = f"{distance_m:.0f}m{'*' if is_default else ''}"
+                if is_default:
+                    has_default_distance = True
+                
                 # Clean up poles (remove extra P if present)
                 poles_str = str(poles).replace('P', '')
                 vd_emoji = "✅" if vd <= 3 else "⚠️"
                 
-                lines.append(f"| {name} | {power:,.0f}W | THW {wire_mm}mm² | {breaker}A/{poles_str}P | {vd:.1f}% {vd_emoji} |")
+                lines.append(f"| {name} | {power:,.0f}W | {distance_str} | THW {wire_mm}mm² | {breaker}A/{poles_str}P | {vd:.1f}% {vd_emoji} |")
             
             lines.append("")
             lines.append(f"> 💡 **โหลดรวมในห้อง:** {room_watts:,} W")
+            if has_default_distance:
+                lines.append("> 📏 *`*` = ระยะโดยประมาณ (ค่า default ตามประเภทอาคาร)*")
             lines.append("")
-        
+
         # Breaker summary
         lines.append("---")
         lines.append("")
@@ -484,6 +495,27 @@ class ResultBuilder:
             lines.append("")
             for w in result.warnings[:5]:
                 lines.append(f"- {w}")
+            lines.append("")
+        
+        # ============================================================
+        # Default Distance Warning (วสท. 2564)
+        # ============================================================
+        # Check if any wire sizing used default distance
+        used_default = False
+        default_warning_msg = None
+        for lid, w in result.wire_sizing.items():
+            # Merged if: check dict type AND used_default_distance flag together (SonarQube S1066)
+            if isinstance(w, dict) and w.get('used_default_distance', False):
+                used_default = True
+                distance_m = w.get('distance_m', 15)
+                default_warning_msg = f"⚠️ ค่า Voltage Drop คำนวณจากระยะ Default ({distance_m:.0f} เมตร) ตามประเภทอาคาร หากระยะจริงมากกว่านี้ ควรระบุในคำขอ"
+                break
+        
+        if used_default and default_warning_msg:
+            if not result.warnings:
+                lines.append("### ⚠️ ข้อควรระวัง")
+                lines.append("")
+            lines.append(f"- {default_warning_msg}")
             lines.append("")
         
         # Summary

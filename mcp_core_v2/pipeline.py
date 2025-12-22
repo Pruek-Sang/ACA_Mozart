@@ -14,7 +14,7 @@ from core.circuit_grouper import get_circuit_grouper, GroupedCircuit
 from core.lighting_calculator import get_lighting_calculator
 from core.room_defaults import get_room_defaults_manager
 from models.catalog_models import BreakerPoles, ConductorMaterial, BreakerType
-from config import get_settings
+from config import get_settings, get_branch_distance_feet, METERS_TO_FEET
 from exceptions import InvalidSpecError, UnsupportedProjectError
 # [NEXIA EXTENSION] Import Context Injectors
 from context import DeratingInjector, KaRatingInjector, NgLinkInjector
@@ -126,9 +126,9 @@ class DesignPipeline:
             logger.info("Step 5: Sizing conduits")
             conduit_sizing = self._size_conduits(request, wire_sizing, breaker_selections)
             
-            # Step 6: Check compliance
-            logger.info("Step 6: Checking NEC/EIT compliance")
-            compliance_report = self._check_compliance(request)
+            # Step 6: Check compliance (including VD limits per วสท. 2564)
+            logger.info("Step 6: Checking NEC/EIT/วสท. compliance")
+            compliance_report = self._check_compliance(request, wire_sizing)
             
             # Step 7: Generate AutoLISP
             logger.info("Step 7: Generating AutoLISP code")
@@ -235,15 +235,38 @@ class DesignPipeline:
         request: DesignRequest,
         _calculations: Dict[str, Any]  # Prefix with _ to mark as intentionally unused
     ) -> Dict[str, Any]:
-        """Size wires for all circuits."""
+        """Size wires for all circuits with voltage drop calculation.
+        
+        Distance priority:
+        1. load.branch_distance_m (user specified per load)
+        2. Default table based on building_type + floor_level
+        3. Fallback: 15m (conservative default)
+        """
         wire_sizing = {}
+        
+        # Track if we used default distance (for warning)
+        used_default_distance = False
         
         for load in request.loads:
             # Calculate load current
             current = self.load_calculator.calculate_load_current(load)
             
-            # Size wire with voltage drop consideration
-            # Assuming 100 feet distance for now
+            # ============================================================
+            # Distance Calculation (วสท. 2564 Compliant)
+            # ============================================================
+            # Priority: load.branch_distance_m > default table > fallback
+            if hasattr(load, 'branch_distance_m') and load.branch_distance_m is not None:
+                # User specified distance
+                distance_feet = load.branch_distance_m * METERS_TO_FEET
+                distance_source = "user_specified"
+            else:
+                # Use default table based on building type and floor
+                building_type = getattr(request, 'building_type', None)
+                floor_level = getattr(load.location, 'floor', None)
+                distance_feet = get_branch_distance_feet(building_type, floor_level)
+                distance_source = "default_table"
+                used_default_distance = True
+            
             # Import VoltageType enum
             from models.contracts import VoltageType
             
@@ -270,17 +293,15 @@ class DesignPipeline:
             # Get ambient temperature from settings (default 30°C if not configured)
             ambient_temp = getattr(self.settings, 'ambient_temperature_c', 30.0)
             
-            # Determine distance (in future, could come from load.distance_m)
-            # For now, use conservative default based on location/floor
-            distance_feet = 100  # Conservative default
-            # TODO: Future enhancement - get from load.location or load.distance_m
-            
             # Call wire sizer with full derating support
+            # Use VD limit from settings (วสท. 2564: Branch ≤ 3%)
+            max_vd_percent = getattr(self.settings, 'vd_limit_branch_percent', 3.0)
+            
             wire_result = self.wire_sizer.size_wire_with_voltage_drop(
                 current=current,
                 distance_feet=distance_feet,
                 voltage=voltage,
-                max_voltage_drop_percent=3.0,
+                max_voltage_drop_percent=max_vd_percent,
                 material=ConductorMaterial.COPPER,
                 temperature_rating=75,  # NEC standard for THHN/THWN
                 ambient_temp_c=ambient_temp,
@@ -297,7 +318,22 @@ class DesignPipeline:
                     circuit_breaker_rating=20  # Default, will be refined with breaker selection
                 )
             
+            # ============================================================
+            # Add distance metadata for output display and warnings
+            # ============================================================
+            wire_result['distance_m'] = distance_feet / METERS_TO_FEET
+            wire_result['distance_feet'] = distance_feet
+            wire_result['distance_source'] = distance_source
+            wire_result['used_default_distance'] = (distance_source == "default_table")
+            
             wire_sizing[load.id] = wire_result
+        
+        # Add global flag for default distance usage
+        if used_default_distance:
+            wire_sizing['_metadata'] = {
+                'used_default_distance': True,
+                'warning': '⚠️ ค่า Voltage Drop คำนวณจากระยะ Default ตามประเภทอาคาร หากระยะจริงมากกว่านี้ ควรระบุในคำขอ'
+            }
         
         return wire_sizing
     
@@ -518,9 +554,13 @@ class DesignPipeline:
         
         return conduit_sizing
     
-    def _check_compliance(self, request: DesignRequest) -> Dict[str, Any]:
-        """Check design for NEC compliance."""
-        return self.compliance_checker.check_design(request)
+    def _check_compliance(
+        self,
+        request: DesignRequest,
+        wire_sizing: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
+        """Check design for NEC/EIT/วสท. compliance including VD limits."""
+        return self.compliance_checker.check_design(request, wire_sizing)
     
     def _generate_autolisp(
         self,

@@ -58,6 +58,13 @@ class ElectricalLoad(BaseModel):
     location: Location
     is_continuous: bool = False
     notes: Optional[str] = None
+    # ============================================================
+    # Voltage Drop Distance Fields (วสท. 2564 Compliant)
+    # ============================================================
+    branch_distance_m: Optional[float] = Field(
+        None,
+        description="Distance from distribution board to load in meters. If None, uses default based on building type and floor."
+    )
 
 
 class PanelSpecification(BaseModel):
@@ -86,6 +93,17 @@ class DesignRequest(BaseModel):
     site_context: Optional[Dict[str, Any]] = Field(
         None,
         description="Site & installation context: distance_to_transformer, installation_area, panel_type, conduit_grouping"
+    )
+    # ============================================================
+    # Voltage Drop Distance Fields (วสท. 2564 Compliant)
+    # ============================================================
+    building_type: Optional[str] = Field(
+        None,
+        description="Building type for default distance lookup: บ้านเดี่ยว_1ชั้น, บ้านเดี่ยว_2ชั้น, ทาวน์เฮ้าส์, คอนโด, etc."
+    )
+    service_distance_m: Optional[float] = Field(
+        None,
+        description="Distance from transformer to MDB in meters. If None, uses default (30m) with warning."
     )
 
 
