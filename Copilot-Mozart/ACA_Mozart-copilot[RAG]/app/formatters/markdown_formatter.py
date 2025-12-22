@@ -46,16 +46,21 @@ class MarkdownFormatter(BaseFormatter):
     
     def format(self, mcp_result: Dict[str, Any]) -> str:
         """Transform MCP result into Card-style Markdown report."""
+        # 🆕 FIX: Defensive null check to prevent 'NoneType' has no attribute 'get'
+        if mcp_result is None:
+            return "❌ ไม่สามารถคำนวณได้: ไม่ได้รับข้อมูลจาก MCP Core"
+        
         lines = []
         
-        # Extract data
+        # Extract data with defensive defaults
         project_name = mcp_result.get('project_name', NOT_SPECIFIED)
-        summary = mcp_result.get('summary', {})
-        wire_sizing = mcp_result.get('wire_sizing', {})
-        breaker_selections = mcp_result.get('breaker_selections', {})
-        conduit_sizing = mcp_result.get('conduit_sizing', {})
-        request = mcp_result.get('request', {})
-        loads = request.get('loads', [])
+        summary = mcp_result.get('summary') or {}  # Handle None explicitly
+        wire_sizing = mcp_result.get('wire_sizing') or {}
+        breaker_selections = mcp_result.get('breaker_selections') or {}
+        conduit_sizing = mcp_result.get('conduit_sizing') or {}
+        request = mcp_result.get('request') or {}  # 🆕 FIX: Handle None request
+        loads = request.get('loads') or [] if isinstance(request, dict) else []
+
         
         # Header
         lines.extend(self._create_header(project_name, mcp_result))
@@ -105,9 +110,9 @@ class MarkdownFormatter(BaseFormatter):
         """Create project information section."""
         project_name = mcp_result.get('project_name', 'N/A')
         project_number = mcp_result.get('project_number', 'N/A')
-        request = mcp_result.get('request', {})
-        service_voltage = request.get('service_voltage', 'N/A')
-        loads = request.get('loads', [])
+        request = mcp_result.get('request') or {}  # 🆕 FIX: Handle None
+        service_voltage = request.get('service_voltage', 'N/A') if isinstance(request, dict) else 'N/A'
+        loads = request.get('loads', []) if isinstance(request, dict) else []
         
         return [
             "## 🏡 ข้อมูลโครงการ",
