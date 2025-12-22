@@ -272,7 +272,7 @@ class MarkdownFormatter(BaseFormatter):
                 for room_loads in rooms.values()
                 for load in room_loads
             )
-            lines.append(f"## 🏢 {floor_display} (รวม {floor_watts:,}W)")
+            lines.append(f"## 🏢 {floor_display} (รวม {round_up(floor_watts):,.0f}W)")
             lines.append("")
             
             for room, room_loads in rooms.items():
@@ -289,7 +289,7 @@ class MarkdownFormatter(BaseFormatter):
                     for load in room_loads
                 )
                 
-                lines.append(f"### {icon} {room} ({room_watts:,}W)")
+                lines.append(f"### {icon} {room} ({round_up(room_watts):,.0f}W)")
                 lines.append("")
                 
                 has_default_distance = False
