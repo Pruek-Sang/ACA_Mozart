@@ -54,6 +54,39 @@ class GroupedCircuit:
     requires_gfci: bool = False
     notes: List[str] = field(default_factory=list)
     
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization.
+        
+        This is CRITICAL for API response - without this, 
+        Pydantic cannot serialize GroupedCircuit objects to JSON!
+        """
+        return {
+            'circuit_id': self.circuit_id,
+            'circuit_name': self.circuit_name,
+            'name': self.circuit_name,  # Alias for formatter compatibility
+            'circuit_type': self.circuit_type.value if hasattr(self.circuit_type, 'value') else str(self.circuit_type),
+            'floor': self.floor,
+            'loads': [self._load_to_dict(load) for load in self.loads],
+            'total_watts': self.total_watts,
+            'total_current': round(self.total_current, 2),
+            'breaker_rating': self.breaker_rating,
+            'breaker_poles': self.breaker_poles,
+            'wire_size': self.wire_size,
+            'requires_rcbo': self.requires_rcbo,
+            'requires_gfci': self.requires_gfci,
+            'notes': self.notes,
+        }
+    
+    def _load_to_dict(self, load: ElectricalLoad) -> Dict[str, Any]:
+        """Convert ElectricalLoad to dict."""
+        return {
+            'id': load.id,
+            'name': load.name,
+            'power_watts': load.power_watts,
+            'quantity': load.quantity,
+            'location': load.location.room if hasattr(load.location, 'room') else str(load.location),
+        }
+    
     def add_load(self, load: ElectricalLoad):
         """Add a load to this circuit."""
         self.loads.append(load)
@@ -176,7 +209,7 @@ class CircuitGrouper:
         self,
         loads: List[ElectricalLoad],
         project_floors: List[str] = None
-    ) -> Dict[str, GroupedCircuit]:
+    ) -> List[Dict[str, Any]]:
         """Group loads into circuits following Thai residential standards.
         
         หลักการออกแบบที่ถูกต้อง (วสท.):
@@ -239,7 +272,10 @@ class CircuitGrouper:
         self._finalize_circuits()
         
         logger.info(f"Grouped {len(loads)} loads into {len(self.circuits)} circuits")
-        return self.circuits
+        
+        # 🆕 FIX: Convert GroupedCircuit objects to List[Dict] for JSON serialization
+        # Without this, Pydantic cannot serialize and grouped_circuits becomes empty!
+        return [circuit.to_dict() for circuit in self.circuits.values()]
     
     def _needs_dedicated_breaker(self, load: ElectricalLoad) -> bool:
         """Check if load needs dedicated breaker.
