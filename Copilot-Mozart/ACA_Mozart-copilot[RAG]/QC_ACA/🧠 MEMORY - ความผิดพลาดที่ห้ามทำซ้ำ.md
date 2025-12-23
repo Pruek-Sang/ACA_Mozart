@@ -1105,3 +1105,170 @@ grep "COPY" ../mcp_core_v2/Docker/Dockerfile
 *อัพเดทล่าสุด: 2025-12-23 02:00*
 *กู จะ ไม่ ทำ ผิด แบบ เดิม อีก! (รอบที่ 22 แล้ว...)*
 
+---
+
+## 🔴 ความผิดพลาดที่ 22: HTTP Transport Layer ไม่ส่ง Field ต่อ (24 ธ.ค. 2024)
+
+> **วันที่เกิด:** 2025-12-24 02:00
+> **ผู้ทำผิด:** AI (ทุกคนที่แก้ circuit_grouper แต่ไม่ได้แก้ api.py + mcp_client.py)
+> **Commits แก้ไข:** 8ceb888, 0c87d09
+
+### อาการ:
+
+```
+MCP Core คำนวณ grouped_circuits ถูกต้อง ✅
+แต่ Formatter แสดงโหลดแยกรายการ 35 ตัว แทนที่จะเป็นวงจร 12-15 วงจร! ❌
+```
+
+### สาเหตุ (Integration Gap):
+
+**เพิ่ม feature ในแต่ละ layer แต่ลืม HTTP transport layer!**
+
+```
+✅ circuit_grouper.py  → สร้าง grouped_circuits
+✅ pipeline.py         → ส่งไป result_builder
+✅ result_builder.py   → ใส่ใน DesignResult
+❌ api.py              → ไม่ได้ใส่ใน HTTP response   ← ลืม!
+❌ mcp_client.py       → ไม่ได้อ่านจาก response     ← ลืม!
+✅ markdown_formatter.py → พร้อมใช้ (แต่ไม่เคยได้รับ)
+```
+
+### ทำไมไม่เจอ:
+
+| เหตุการณ์ | สิ่งที่เกิด |
+|---------|-----------|
+| Unit Test | ผ่าน! เพราะทดสอบ `circuit_grouper` โดยตรง |
+| Local Test | ผ่าน! เพราะไม่ได้ผ่าน HTTP |
+| Cloud Run | ล้มเหลว! เพราะ data ต้องผ่าน HTTP API |
+
+### วิธีแก้:
+
+```python
+# api.py - เพิ่ม field ใน DesignResultOutput
+grouped_circuits: Optional[List[Dict[str, Any]]] = None
+
+# api.py - เพิ่มใน _convert_to_output()
+grouped_circuits=result.grouped_circuits if hasattr(result, 'grouped_circuits') else []
+
+# mcp_client.py - เพิ่ม field ใน McpDesignResponse
+grouped_circuits: Optional[list] = None
+
+# mcp_client.py - เพิ่มใน design()
+grouped_circuits=data.get("grouped_circuits")
+```
+
+### บทเรียน:
+
+1. **เพิ่ม feature ต้องตามสายข้อมูลทุก layer!**
+2. **HTTP API layer มักถูกลืม** เพราะ unit test ไม่ผ่าน
+3. **ต้องมี E2E Test** ที่ทดสอบ flow ทั้งหมด
+
+---
+
+## 🔴 ความผิดพลาดที่ 23: Hardcode ค่าใน Business Logic (24 ธ.ค. 2024)
+
+> **วันที่เกิด:** 2025-12-24 02:15
+> **ผู้ทำผิด:** AI (ใครก็ตามที่ hardcode power_factor=0.85 ใน api.py)
+> **Commit แก้ไข:** 6af5036
+
+### อาการ:
+
+```
+Water Heater 4500W ได้เบรกเกอร์ 30A (ผิด)
+ควรได้ 25A (ถูก)
+```
+
+### สาเหตุ:
+
+**api.py บรรทัด 312 hardcode power_factor=0.85 สำหรับทุกโหลด!**
+
+```python
+# ❌ ผิด - Hardcode ค่า
+power_factor=0.85  # Default power factor
+
+# ✅ ถูก - ใช้ค่าที่ส่งมาจาก RAG
+power_factor=load.power_factor if load.power_factor else 0.85
+```
+
+### ผลกระทบ:
+
+| โหลด | PF ถูก | PF ผิด | ผลลัพธ์ |
+|------|--------|--------|---------|
+| Water Heater 4500W | 1.0 (resistive) | 0.85 | Current 23A → 30A breaker ❌ |
+| Water Heater 4500W | 1.0 (resistive) | 1.0 | Current 19.57A → 25A breaker ✅ |
+
+### บทเรียน:
+
+1. **ห้าม hardcode ค่าที่ขึ้นกับประเภทโหลด!**
+2. **ค่าที่ควรเป็น parameter:**
+   - Power Factor
+   - Continuous Load Factor
+   - Voltage
+3. **Grep หา pattern นี้เพื่อเช็ค:**
+   ```bash
+   grep -r "= 0.85\|= 230\|= 1.25" --include="*.py"
+   ```
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 24 ธ.ค. 2024)
+
+32. **เพิ่ม field ใน Core ต้องตามสายข้อมูล:**
+    - [ ] Core model (DesignResult)
+    - [ ] API output (DesignResultOutput)  ← มักลืม!
+    - [ ] HTTP client (McpDesignResponse) ← มักลืม!
+    - [ ] Formatter/Display
+
+33. **ห้าม hardcode ค่าที่ขึ้นกับประเภทโหลด!**
+    - Power Factor → ใช้ dict lookup by load_type
+    - Voltage → รับจาก request
+    - Continuous Factor → กำหนดตาม circuit_type
+
+34. **ต้องมี E2E Test ที่ทดสอบ HTTP layer:**
+    ```python
+    # tests/test_e2e_data_flow.py
+    def test_grouped_circuits_in_response():
+        # ส่ง request ผ่าน HTTP
+        # ตรวจว่า response มี grouped_circuits
+    ```
+
+---
+
+## 🔮 ถ้าพังอีก ควรเช็คตรงไหนก่อน? (Quick Debugging Guide - อัพเดท)
+
+เมื่อเจอปัญหาแปลกๆ ให้เรียงลำดับเช็คดังนี้:
+
+| ลำดับ | ปัญหา | สิ่งที่ต้องเช็ค |
+|:-----:|-------|----------------|
+| 1️⃣ | **Deployment Failure** | Cloud Run Revision ตรงกับ Commit ไหม? |
+| 2️⃣ | **API Contract Drift** | Field names ตรงกันระหว่าง Producer/Consumer ไหม? |
+| 3️⃣ | **HTTP Field Missing** | api.py + mcp_client.py มี field ครบไหม? ← ใหม่! |
+| 4️⃣ | **Hardcoded Values** | มี hardcode ค่าที่ควรเป็น parameter ไหม? ← ใหม่! |
+| 5️⃣ | **LLM Extraction Failure** | Logs [CP3] บอกว่า extract ได้กี่ rooms/loads? |
+| 6️⃣ | **Type Mismatch (422)** | Pydantic model รับ type ถูกไหม? |
+| 7️⃣ | **Missing Files in Docker** | Dockerfile มี COPY folder ใหม่ไหม? |
+| 8️⃣ | **F-String Escape** | มี `{` ใน f-string ที่ไม่ได้ escape ไหม? |
+
+```bash
+# Quick Debug Commands:
+# 1. Check Cloud Run
+gcloud run revisions list --service=mozart-rag --region=asia-southeast1
+
+# 2. Check HTTP field transfer (NEW!)
+grep "grouped_circuits" mcp_core_v2/api.py Copilot-Mozart/ACA_Mozart-copilot\[RAG\]/app/mcp_client.py
+
+# 3. Check hardcoded values (NEW!)
+grep -r "= 0.85\|= 230\|= 1.25" --include="*.py" | grep -v venv | grep -v test
+
+# 4. Check Pydantic model
+grep -r "site_context" app/models.py
+
+# 5. Check Dockerfile
+grep "COPY" ../mcp_core_v2/Docker/Dockerfile
+```
+
+---
+
+*อัพเดทล่าสุด: 2025-12-24 02:48*
+*กู จะ ไม่ ทำ ผิด แบบ เดิม อีก! (รอบที่ 24 แล้ว...)*
+
