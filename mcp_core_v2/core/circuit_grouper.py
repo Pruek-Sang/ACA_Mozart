@@ -631,8 +631,16 @@ class CircuitGrouper:
                     return rating
             return 20  # Max for receptacle
         
-        # Apply continuous load factor (125%) if applicable
-        if circuit_type in [CircuitType.LIGHTING, CircuitType.HVAC]:
+        # Apply continuous load factor (125%) for all continuous loads
+        # วสท./NEC: น้ำอุ่น, แอร์, แสงสว่าง, ปั๊มน้ำ ต้องใช้ 1.25x
+        continuous_types = [
+            CircuitType.LIGHTING,
+            CircuitType.HVAC,
+            CircuitType.WATER_HEATER,  # ← ADDED: น้ำอุ่น
+            CircuitType.DEDICATED,      # ← ADDED: เตา Induction, etc.
+            CircuitType.MOTOR,          # ← ADDED: ปั๊มน้ำ
+        ]
+        if circuit_type in continuous_types:
             required = current * 1.25
         else:
             required = current
