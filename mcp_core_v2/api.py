@@ -91,6 +91,7 @@ class DesignResultOutput(BaseModel):
     # 🆕 FIX: Include request and summary for RAG formatter
     request: Optional[Dict[str, Any]] = None  # Original request with loads
     summary: Optional[Dict[str, Any]] = None  # Load summary
+    grouped_circuits: Optional[List[Dict[str, Any]]] = None  # 🆕 FIX: Circuit grouping from pipeline
 
 # =============================================================================
 # FastAPI Application
@@ -369,7 +370,8 @@ def _convert_to_output(result) -> DesignResultOutput:
         standards_markdown=standards_md,
         readable_report=readable,
         request=request_dict,  # 🆕 FIX: Include for formatter
-        summary=summary  # 🆕 FIX: Include for formatter
+        summary=summary,  # 🆕 FIX: Include for formatter
+        grouped_circuits=result.grouped_circuits if hasattr(result, 'grouped_circuits') else []  # 🆕 FIX: Circuit groups
     )
 
 # =============================================================================
