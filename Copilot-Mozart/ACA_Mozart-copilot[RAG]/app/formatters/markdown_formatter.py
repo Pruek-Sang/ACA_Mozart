@@ -39,8 +39,9 @@ class MarkdownFormatter(BaseFormatter):
     # Critical keywords (require RCBO)
     CRITICAL_KEYWORDS = ['น้ำอุ่น', 'ปั๊ม', 'water', 'pump', 'heater']
     
-    # Wet area keywords
-    WET_AREA_KEYWORDS = ['ห้องน้ำ', 'ครัว', 'ซักล้าง', 'bathroom', 'kitchen', 'laundry']
+    # Wet area keywords (require RCBO for safety)
+    # Note: Kitchen removed - not all kitchen items need RCBO, only those near water
+    WET_AREA_KEYWORDS = ['ห้องน้ำ', 'ซักล้าง', 'bathroom', 'laundry', 'outdoor', 'ภายนอก', 'ระเบียง']
     
     def get_format_type(self) -> str:
         return "markdown"
