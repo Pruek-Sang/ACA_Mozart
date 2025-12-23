@@ -62,7 +62,6 @@ class GroupedCircuit:
     def calculate_current(
         self, 
         voltage: float = 230.0, 
-        pf: float = 0.85,
         is_high_rise: bool = False
     ) -> float:
         """Calculate total current for this circuit.
@@ -70,17 +69,27 @@ class GroupedCircuit:
         Formula: I = P / (V × PF)  [Single phase]
         Thai Standard: 230V nominal
         
+        Power Factor (IEC 60364 / วสท. 2564):
+        - Resistive (heaters): PF = 1.0
+        - Inductive (motors): PF = 0.80
+        - Mixed/Default: PF = 0.85
+        
         Diversity Factor (วสท.):
         - อาคารสูง (≥10 ชั้น): 0.4 สำหรับ RECEPTACLE
         - บ้านพักอาศัย (<10 ชั้น): 1.0 (ไม่ใช้ diversity)
         
         Args:
             voltage: Voltage (default 230V)
-            pf: Power factor (default 0.85)
             is_high_rise: True if building ≥ 10 floors (enables diversity)
         """
         if voltage <= 0:
             voltage = 230.0  # Default Thai residential
+        
+        # Get Power Factor based on circuit type (IEC 60364 / วสท. 2564)
+        # Import here to avoid circular dependency
+        from core.circuit_grouper import CircuitGrouper
+        circuit_type_str = self.circuit_type.value if hasattr(self.circuit_type, 'value') else str(self.circuit_type)
+        pf = CircuitGrouper.PF_BY_CIRCUIT_TYPE.get(circuit_type_str, 0.85)
         
         # Apply diversity factor for receptacles ONLY in high-rise buildings
         # วสท.: บ้านพักอาศัยไม่ใช้ diversity factor
@@ -135,6 +144,20 @@ class CircuitGrouper:
     # อาคารสูง (≥10 ชั้น): ใช้ diversity factor 0.4 สำหรับเต้ารับ
     # บ้านพักอาศัย (<10 ชั้น): ไม่ใช้ diversity (1.0)
     HIGH_RISE_FLOOR_THRESHOLD = 10
+    
+    # === Power Factor by Circuit Type (IEC 60364 / วสท. 2564) ===
+    # Resistive loads: PF = 1.0 (pure resistance, no reactive power)
+    # Inductive loads: PF = 0.80-0.85 (motors, compressors)
+    # Mixed/Default: PF = 0.85 (conservative for unknown loads)
+    PF_BY_CIRCUIT_TYPE = {
+        'water_heater': 1.0,   # Resistive - pure heating element
+        'dedicated': 1.0,      # Kitchen appliances (induction, kettle) - resistive
+        'lighting': 0.90,      # LED drivers - near unity
+        'hvac': 0.85,          # Compressor motor - inductive
+        'motor': 0.80,         # Pure motor loads - highly inductive
+        'receptacle': 0.85,    # Mixed loads - conservative default
+        'other': 0.85,         # Unknown - conservative default
+    }
     
     def __init__(self, default_voltage: float = 230.0, num_floors: int = 2):
         """Initialize circuit grouper.
