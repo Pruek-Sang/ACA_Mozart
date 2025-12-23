@@ -116,6 +116,7 @@ class DesignResult(BaseModel):
     breaker_selections: Dict[str, Any]
     conduit_sizing: Dict[str, Any]
     compliance_report: Dict[str, Any]
+    grouped_circuits: List[Dict[str, Any]] = Field(default_factory=list)  # Circuit grouping data
     autolisp_code: Optional[str] = None
     completed_at: datetime = Field(default_factory=_utc_now)
     errors: List[str] = Field(default_factory=list)
