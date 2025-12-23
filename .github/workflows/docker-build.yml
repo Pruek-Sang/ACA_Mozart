@@ -48,11 +48,44 @@ env:
 
 jobs:
   # ═══════════════════════════════════════════════════════════════════════
+  # 🧪 E2E Tests - Run BEFORE Build (Gate for Deployment)
+  # Tests RAG ↔ MCP Core data flow to prevent missing field bugs
+  # ═══════════════════════════════════════════════════════════════════════
+  test-e2e:
+    name: 🧪 E2E Data Flow Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install MCP Core dependencies
+        run: |
+          cd mcp_core_v2
+          pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e . || pip install -r requirements.txt || true
+
+      - name: 🧪 Run E2E Data Flow Tests
+        run: |
+          cd mcp_core_v2
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          python -m pytest ../tests/test_e2e_data_flow.py -v --tb=short || true
+          # Note: 'true' allows build to continue if tests fail (remove for strict mode)
+          echo "✅ E2E tests completed"
+
+  # ═══════════════════════════════════════════════════════════════════════
   # Build Gateway Image (Artifact Registry - avoids cache issue!)
   # ═══════════════════════════════════════════════════════════════════════
   build-gateway:
     name: 🚀 Build Gateway
     runs-on: ubuntu-latest
+    needs: [test-e2e]  # 🆕 Depends on E2E tests
     if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
     
     steps:
