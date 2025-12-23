@@ -62,6 +62,7 @@ class McpElectricalLoad:
     is_continuous: bool = False
     notes: Optional[str] = None
     branch_distance_m: Optional[float] = None  # 🆕 VD Calculation
+    power_factor: Optional[float] = None  # 🆕 PF by load type (1.0=resistive, 0.85=motor)
     
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization"""
@@ -78,7 +79,8 @@ class McpElectricalLoad:
             },
             "is_continuous": self.is_continuous,
             "notes": self.notes,
-            "branch_distance_m": self.branch_distance_m
+            "branch_distance_m": self.branch_distance_m,
+            "power_factor": self.power_factor  # 🆕 Include PF in API request
         }
 
 
@@ -327,6 +329,16 @@ class McpAdapter:
         """Convert RAG LoadSpecs to MCP ElectricalLoads"""
         mcp_loads = []
         
+        # Power Factor by load type (IEC 60364 / วสท. 2564)
+        PF_BY_LOAD_TYPE = {
+            LoadType.APPLIANCE: 1.0,   # Resistive (heaters, kettles, induction)
+            LoadType.LIGHTING: 0.90,   # LED drivers
+            LoadType.HVAC: 0.85,       # Compressor motors
+            LoadType.MOTOR: 0.80,      # Motor loads
+            LoadType.RECEPTACLE: 0.85, # Mixed loads
+            LoadType.OTHER: 0.85,      # Default
+        }
+        
         for load in loads:
             # Look up device
             device_info = DEVICE_MAPPING.get(load.device_code)
@@ -335,6 +347,9 @@ class McpAdapter:
                 device_info = DEFAULT_DEVICE
             
             power_watts, load_type, is_continuous = device_info
+            
+            # Get power factor by load type
+            power_factor = PF_BY_LOAD_TYPE.get(load_type, 0.85)
             
             # Get room info
             room = room_lookup.get(load.room_id)
@@ -354,7 +369,8 @@ class McpAdapter:
                 location=McpLocation(room=room_name, floor=floor),
                 is_continuous=is_continuous,
                 notes=load.notes,
-                branch_distance_m=getattr(load, 'branch_distance_m', None)
+                branch_distance_m=getattr(load, 'branch_distance_m', None),
+                power_factor=power_factor  # 🆕 Correct PF by load type
             )
             mcp_loads.append(mcp_load)
         
