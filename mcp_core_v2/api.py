@@ -48,6 +48,7 @@ class LoadInput(BaseModel):
     location: LocationInput
     is_continuous: bool = False
     notes: Optional[str] = None
+    power_factor: Optional[float] = None  # 🆕 PF from RAG adapter (None = use default)
 
 class PanelInput(BaseModel):
     id: str
@@ -309,7 +310,7 @@ def _convert_to_internal(request: DesignRequestInput):
             quantity=load.quantity,
             location=Location(room=load.location.room, floor=load.location.floor or "1"),
             is_continuous=load.is_continuous,
-            power_factor=0.85  # Default power factor
+            power_factor=load.power_factor if load.power_factor else 0.85  # 🆕 Use provided PF or default
         ))
     
     # Convert panels  
