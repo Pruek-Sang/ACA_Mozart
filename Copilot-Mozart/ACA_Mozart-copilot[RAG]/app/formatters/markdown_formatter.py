@@ -208,8 +208,8 @@ class MarkdownFormatter(BaseFormatter):
                 poles = str(b.get('poles', 1)).replace('P', '')
                 breaker_type = b.get('breaker_type', 'MCB')
                 
-                # Current
-                current = power / 230 if power > 0 else 0
+                # Current - use provided value if available
+                current = b.get('total_current', power / 230 if power > 0 else 0)
                 current = round_up(current, 1)
                 
                 # Check if wet area or critical
@@ -263,10 +263,14 @@ class MarkdownFormatter(BaseFormatter):
         
         usage_desc = {
             '15A/1P': 'ไฟ, เต้ารับทั่วไป',
+            '16A/1P': 'เต้ารับ',
             '20A/1P': 'เครื่องใช้ไฟฟ้าสูง',
-            '20A/2P': 'น้ำอุ่น 3.5kW, เตา',
+            '20A/2P': 'น้ำอุ่น 3.5kW, เตา, ปั๊มน้ำ',
             '25A/2P': 'น้ำอุ่น 4.5kW',
-            '30A/2P': 'แอร์ ≥24000BTU',
+            '30A/2P': 'แอร์ ≥24000BTU, น้ำอุ่น 5-6kW',
+            '32A/2P': 'แอร์ขนาดใหญ่, น้ำอุ่น ≥6kW',
+            '40A/2P': 'แอร์ขนาดใหญ่มาก',
+            '50A/2P': 'วงจรหลัก',
         }
         
         breaker_count: Dict[str, int] = {}
@@ -354,7 +358,6 @@ class MarkdownFormatter(BaseFormatter):
             
             for circuit in floor_circuits:
                 ckt_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
-                ckt_type = circuit.get('circuit_type', 'general')
                 total_watts = round_up(circuit.get('total_watts', 0))
                 total_current = round_up(circuit.get('total_current', 0), 1)
                 breaker_rating = circuit.get('breaker_rating', 15)
@@ -366,8 +369,8 @@ class MarkdownFormatter(BaseFormatter):
                     num_loads = len(num_loads)
                 notes = circuit.get('notes', [])
                 
-                # VD% - estimate from wire size and typical distance
-                vd = 0.5 if total_current < 5 else 1.0 if total_current < 10 else 2.0
+                # VD% - use actual calculated value from wire_sizing
+                vd = circuit.get('voltage_drop_percent', circuit.get('vd', 2.0))
                 
                 # Breaker type
                 breaker_type = "RCBO" if requires_rcbo else "MCB"
