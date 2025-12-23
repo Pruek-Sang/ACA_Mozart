@@ -1272,3 +1272,61 @@ grep "COPY" ../mcp_core_v2/Docker/Dockerfile
 *อัพเดทล่าสุด: 2025-12-24 02:48*
 *กู จะ ไม่ ทำ ผิด แบบ เดิม อีก! (รอบที่ 24 แล้ว...)*
 
+---
+
+## 🔴 ความผิดพลาดที่ 24: Dataclass ไม่ Serialize เป็น JSON (24 ธ.ค. 2024 03:30)
+
+> **วันที่เกิด:** 2025-12-24 03:30
+> **ผู้ทำผิด:** AI (ใครก็ตามที่สร้าง GroupedCircuit dataclass โดยไม่มี to_dict)
+> **Commit แก้ไข:** ac6c950
+
+### อาการ:
+
+```
+grouped_circuits ใน API output = [] หรือ None
+ทั้งที่ MCP Core คำนวณถูกต้อง!
+Formatter เห็น empty → Fallback ไปแสดง 35 loads แทน
+```
+
+### สาเหตุ:
+
+**`group_loads()` return `Dict[str, GroupedCircuit]` แต่ API คาดหวัง `List[Dict]`!**
+
+```python
+# ❌ ก่อน (พัง)
+def group_loads(...) -> Dict[str, GroupedCircuit]:
+    return self.circuits  # Python objects!
+
+# ✅ หลัง (ใช้งานได้)
+def group_loads(...) -> List[Dict[str, Any]]:
+    return [circuit.to_dict() for circuit in self.circuits.values()]
+```
+
+**Pydantic Behavior:**
+- เจอ type mismatch (Object ≠ Dict)
+- **Silent fail** → return `None` หรือ `[]`
+- ไม่มี Error message!
+
+### บทเรียน:
+
+1. **Dataclass ต้องมี `to_dict()` method** ถ้าจะส่งผ่าน API
+2. **ตรวจสอบ Return Type** ให้ตรงกับ API contract
+3. **Pydantic ไม่ serialize Python objects อัตโนมัติ** (ต้องเป็น dict)
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 24 ธ.ค. 2024 03:30)
+
+35. **Class ที่จะส่งผ่าน API ต้องมี:**
+    - `to_dict()` method
+    - หรือใช้ Pydantic BaseModel (ไม่ใช่ dataclass)
+
+36. **ตรวจสอบ Return Type ก่อน Deploy:**
+    ```bash
+    grep -n "def.*->" file.py | grep -v "Dict\|List\|str\|int"
+    ```
+
+---
+
+*อัพเดทล่าสุด: 2025-12-24 03:30*
+*กู จะ ไม่ ทำ ผิด แบบ เดิม อีก! (รอบที่ 25 แล้ว...)*
