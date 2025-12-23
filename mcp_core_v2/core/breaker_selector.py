@@ -59,7 +59,8 @@ class BreakerSelector:
             'breaker_type': breaker_type.value,
             'load_current': load_current,
             'continuous_load': continuous_load,
-            'margin': selected_rating - load_current
+            'margin': selected_rating - load_current,
+            'ka_rating': 6  # Default 6kA, will be overwritten by catalog or injector
         }
         
         if catalog_breaker:
@@ -69,6 +70,10 @@ class BreakerSelector:
                 'price': catalog_breaker.price,
                 'interrupt_rating': catalog_breaker.interrupt_rating
             }
+            # Use catalog's interrupt_rating as ka_rating if available
+            # Note: catalog stores in Amperes (e.g., 10000A = 10kA), convert to kA
+            if catalog_breaker.interrupt_rating:
+                result['ka_rating'] = catalog_breaker.interrupt_rating // 1000
         else:
             logger.warning(f"No catalog item found for {selected_rating}A {poles.value} {breaker_type.value} breaker")
         
