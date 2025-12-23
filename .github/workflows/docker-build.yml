@@ -287,6 +287,9 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 80
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic frontend --region ${{ env.GCP_REGION }} --to-latest
       
       - name: ⏭️ Skip Frontend (build failed)
         if: needs.build-frontend.result != 'success'
@@ -307,6 +310,9 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8000
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic gateway --region ${{ env.GCP_REGION }} --to-latest
       
       - name: ⏭️ Skip Gateway (build failed)
         if: needs.build-gateway.result != 'success'
@@ -327,6 +333,9 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 5001
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic mcp-core --region ${{ env.GCP_REGION }} --to-latest
       
       - name: ⏭️ Skip MCP Core (build failed)
         if: needs.build-mcp-core.result != 'success'
@@ -347,6 +356,9 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 8080
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic mozart-rag --region ${{ env.GCP_REGION }} --to-latest
       
       - name: ⏭️ Skip Mozart RAG (build failed)
         if: needs.build-rag.result != 'success'
