@@ -58,6 +58,7 @@ class McpDesignResponse:
     # 🆕 FIX: Include request and summary for formatter
     request: Optional[Dict[str, Any]] = None  # Original request with loads
     summary: Optional[Dict[str, Any]] = None  # Load summary
+    grouped_circuits: Optional[list] = None    # 🆕 FIX: Circuit grouping from MCP Core
     
     # Errors/warnings from MCP
     errors: Optional[list] = None
@@ -90,6 +91,7 @@ class McpDesignResponse:
             "standards_markdown": self.standards_markdown,
             "request": self.request,  # 🆕 FIX: Include for formatter
             "summary": self.summary,  # 🆕 FIX: Include for formatter
+            "grouped_circuits": self.grouped_circuits,  # 🆕 FIX: Circuit groups for formatter
             "errors": self.errors,
             "warnings": self.warnings,
             "error_message": self.error_message
@@ -174,6 +176,7 @@ class McpClient:
                         standards_markdown=data.get("standards_markdown"),
                         request=data.get("request"),  # 🆕 FIX: Include for formatter
                         summary=data.get("summary"),  # 🆕 FIX: Include for formatter
+                        grouped_circuits=data.get("grouped_circuits"),  # 🆕 FIX: Circuit groups
                         errors=data.get("errors", []),
                         warnings=data.get("warnings", [])
                     )
