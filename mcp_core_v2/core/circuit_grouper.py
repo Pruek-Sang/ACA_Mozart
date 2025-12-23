@@ -105,7 +105,8 @@ class CircuitGrouper:
     # Maximum loads per circuit
     MAX_LIGHTING_WATTS = 1500       # ~6.5A @ 230V
     MAX_RECEPTACLE_WATTS = 3000     # ~13A @ 230V
-    MAX_OUTLETS_PER_CIRCUIT = 10    # NEC guideline
+    MAX_OUTLETS_PER_CIRCUIT = 10    # NEC/วสท. guideline for receptacles
+    MAX_LIGHTS_PER_CIRCUIT = 10     # วสท. 2564: max 10 light fixtures per circuit
     
     # Dedicated circuit thresholds (watts)
     DEDICATED_THRESHOLD = 1500      # >1500W gets dedicated circuit
@@ -326,30 +327,111 @@ class CircuitGrouper:
         self.circuits[circuit_id] = circuit
     
     def _create_lighting_circuit(self, loads: List[ElectricalLoad], floor: str):
-        """Create grouped lighting circuit for a floor."""
+        """Create grouped lighting circuit(s) for a floor.
+        
+        Uses BALANCED LOAD DISTRIBUTION (Best-Fit Decreasing) like receptacles.
+        Thai standard (วสท. 2564): max 10 light fixtures OR 1500W per circuit.
+        
+        Algorithm:
+        1. Count total light fixtures
+        2. Calculate minimum circuits needed based on count AND watts
+        3. Distribute loads evenly using best-fit decreasing
+        """
         if not loads:
             return
         
-        circuit_id = self._next_circuit_id("LT")
-        circuit = GroupedCircuit(
-            circuit_id=circuit_id,
-            circuit_name=f"ไฟแสงสว่าง ชั้น {floor}",
-            circuit_type=CircuitType.LIGHTING,
-            floor=floor,
-            breaker_poles=1
+        MAX_LIGHTS = self.MAX_LIGHTS_PER_CIRCUIT  # 10
+        MAX_WATTS = self.MAX_LIGHTING_WATTS       # 1500W
+        
+        # Step 1: Count total fixtures and watts
+        total_fixtures = sum(
+            load.quantity if hasattr(load, 'quantity') else 1 
+            for load in loads
+        )
+        total_watts = sum(
+            load.power_watts * (load.quantity if hasattr(load, 'quantity') else 1)
+            for load in loads
         )
         
-        for load in loads:
-            circuit.add_load(load)
+        # Step 2: Calculate minimum circuits needed (take max of both limits)
+        circuits_by_count = math.ceil(total_fixtures / MAX_LIGHTS)
+        circuits_by_watts = math.ceil(total_watts / MAX_WATTS)
+        num_circuits = max(circuits_by_count, circuits_by_watts, 1)
         
-        # Check if need to split
-        if circuit.total_watts > self.MAX_LIGHTING_WATTS:
-            circuit.notes.append(
-                f"⚠️ โหลดสูง ({circuit.total_watts}W) พิจารณาแยกวงจร"
+        # If only 1 circuit needed, use simple grouping (original behavior)
+        if num_circuits == 1:
+            circuit_id = self._next_circuit_id("LT")
+            circuit = GroupedCircuit(
+                circuit_id=circuit_id,
+                circuit_name=f"ไฟแสงสว่าง ชั้น {floor}",
+                circuit_type=CircuitType.LIGHTING,
+                floor=floor,
+                breaker_poles=1
             )
+            for load in loads:
+                circuit.add_load(load)
+            circuit.notes.append(f"รวม {total_fixtures} จุดไฟ")
+            self.circuits[circuit_id] = circuit
+            return
         
-        circuit.notes.append(f"รวม {len(loads)} จุดไฟ")
-        self.circuits[circuit_id] = circuit
+        # Step 3: Multi-circuit - use Best-Fit Decreasing
+        circuits_data = [{'loads': [], 'count': 0, 'watts': 0} for _ in range(num_circuits)]
+        
+        # Sort loads by watts (largest first) for better packing
+        sorted_loads = sorted(
+            loads,
+            key=lambda l: l.power_watts * (l.quantity if hasattr(l, 'quantity') else 1),
+            reverse=True
+        )
+        
+        for load in sorted_loads:
+            qty = load.quantity if hasattr(load, 'quantity') else 1
+            watts = load.power_watts * qty
+            
+            # Find best circuit: most space, respecting both limits
+            best_idx = None
+            best_score = -1
+            
+            for i in range(num_circuits):
+                count_space = MAX_LIGHTS - circuits_data[i]['count']
+                watts_space = MAX_WATTS - circuits_data[i]['watts']
+                
+                # Can fit?
+                if count_space >= qty and watts_space >= watts:
+                    score = count_space + (watts_space / MAX_WATTS * 10)
+                    if score > best_score:
+                        best_idx = i
+                        best_score = score
+            
+            # If no perfect fit, find circuit with most space
+            if best_idx is None:
+                best_idx = min(range(num_circuits), 
+                              key=lambda i: circuits_data[i]['count'])
+            
+            circuits_data[best_idx]['loads'].append(load)
+            circuits_data[best_idx]['count'] += qty
+            circuits_data[best_idx]['watts'] += watts
+        
+        # Step 4: Create actual GroupedCircuit objects
+        for i, ckt_data in enumerate(circuits_data):
+            if not ckt_data['loads']:
+                continue
+            
+            circuit_id = self._next_circuit_id("LT")
+            suffix = f"-{i+1}" if num_circuits > 1 else ""
+            circuit = GroupedCircuit(
+                circuit_id=circuit_id,
+                circuit_name=f"ไฟแสงสว่าง ชั้น {floor}{suffix}",
+                circuit_type=CircuitType.LIGHTING,
+                floor=floor,
+                breaker_poles=1
+            )
+            
+            for load in ckt_data['loads']:
+                circuit.add_load(load)
+            
+            circuit.notes.append(f"รวม {ckt_data['count']} จุดไฟ ({ckt_data['watts']:.0f}W)")
+            self.circuits[circuit_id] = circuit
     
     def _create_receptacle_circuit(self, loads: List[ElectricalLoad], floor: str):
         """Create grouped receptacle circuit for a floor.
