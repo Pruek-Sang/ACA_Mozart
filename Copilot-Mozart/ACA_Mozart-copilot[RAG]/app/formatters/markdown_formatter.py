@@ -57,17 +57,25 @@ class MarkdownFormatter(BaseFormatter):
         summary = mcp_result.get('summary') or {}
         wire_sizing = mcp_result.get('wire_sizing') or {}
         breaker_selections = mcp_result.get('breaker_selections') or {}
-        conduit_sizing = mcp_result.get('conduit_sizing') or {}
-        request = mcp_result.get('request') or {}
-        loads = request.get('loads') or [] if isinstance(request, dict) else []
+        grouped_circuits = mcp_result.get('grouped_circuits') or []  # Circuit groups from MCP
         warnings = mcp_result.get('warnings') or []
         errors = mcp_result.get('errors') or []
         
         # Build report sections
         lines.extend(self._create_header(project_name, summary))
         lines.extend(self._create_main_equipment(summary))
-        lines.extend(self._create_load_schedule(loads, wire_sizing, breaker_selections))
-        lines.extend(self._create_breaker_summary(breaker_selections))
+        
+        # Use grouped_circuits if available, else fall back to raw loads
+        if grouped_circuits:
+            lines.extend(self._create_circuit_schedule(grouped_circuits))
+            lines.extend(self._create_circuit_breaker_summary(grouped_circuits))
+        else:
+            # Legacy: use raw loads (backward compatibility)
+            request = mcp_result.get('request') or {}
+            loads = request.get('loads') or [] if isinstance(request, dict) else []
+            lines.extend(self._create_load_schedule(loads, wire_sizing, breaker_selections))
+            lines.extend(self._create_breaker_summary(breaker_selections))
+        
         lines.extend(self._create_notes_section(warnings, errors))
         lines.extend(self._create_footer())
         
@@ -306,6 +314,121 @@ class MarkdownFormatter(BaseFormatter):
                 lines.append(f"- ⚠️ {warn}")
             lines.append("")
         
+        return lines
+    
+    def _create_circuit_schedule(self, grouped_circuits: List[Dict]) -> List[str]:
+        """Create circuit-based load schedule using grouped_circuits from MCP.
+        
+        This shows circuits (grouped loads) instead of individual loads.
+        Each circuit has: name, total_watts, breaker_rating, wire_size, etc.
+        """
+        lines = ["## ตารางวงจร (Circuit Schedule)", ""]
+        
+        # Group circuits by floor
+        floors: Dict[str, List[Dict]] = {}
+        for circuit in grouped_circuits:
+            floor = circuit.get('floor', '1')
+            if floor not in floors:
+                floors[floor] = []
+            floors[floor].append(circuit)
+        
+        # Sort floors
+        sorted_floors = sorted(floors.keys(), key=lambda x: (x.isdigit(), int(x) if x.isdigit() else 999, x))
+        
+        circuit_num = 1
+        
+        for floor in sorted_floors:
+            floor_circuits = floors[floor]
+            floor_display = f"ชั้น {floor}" if floor.isdigit() else floor
+            
+            # Calculate floor total
+            floor_watts = sum(c.get('total_watts', 0) for c in floor_circuits)
+            
+            # Floor header
+            lines.append(f"### {floor_display} (รวม {round_up(floor_watts):,.0f} W)")
+            lines.append("")
+            
+            # Table header
+            lines.append("| # | วงจร | โหลด | W | A | สาย | CB | VD% | หมายเหตุ |")
+            lines.append("|:-:|------|------|---:|---:|-----|-----|----:|----------|")
+            
+            for circuit in floor_circuits:
+                ckt_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
+                ckt_type = circuit.get('circuit_type', 'general')
+                total_watts = round_up(circuit.get('total_watts', 0))
+                total_current = round_up(circuit.get('total_current', 0), 1)
+                breaker_rating = circuit.get('breaker_rating', 15)
+                breaker_poles = circuit.get('breaker_poles', 1)
+                wire_size = circuit.get('wire_size', '2.5')
+                requires_rcbo = circuit.get('requires_rcbo', False)
+                num_loads = circuit.get('loads', 0)
+                if isinstance(num_loads, list):
+                    num_loads = len(num_loads)
+                notes = circuit.get('notes', [])
+                
+                # VD% - estimate from wire size and typical distance
+                vd = 0.5 if total_current < 5 else 1.0 if total_current < 10 else 2.0
+                
+                # Breaker type
+                breaker_type = "RCBO" if requires_rcbo else "MCB"
+                cb_display = f"{breaker_type} {breaker_rating}A/{breaker_poles}P"
+                
+                # Note
+                note_str = ""
+                if requires_rcbo:
+                    note_str = "**RCBO 30mA**"
+                elif notes:
+                    note_str = notes[0][:15] if notes else ""
+                
+                # Shorten name
+                name_short = ckt_name[:18] + "..." if len(ckt_name) > 20 else ckt_name
+                loads_str = f"({num_loads} โหลด)" if num_loads > 1 else ""
+                
+                lines.append(
+                    f"| {circuit_num} | {name_short} | {loads_str} | "
+                    f"{total_watts:,.0f} | {total_current:.1f} | {wire_size}mm² | "
+                    f"{cb_display} | {vd:.1f} | {note_str} |"
+                )
+                circuit_num += 1
+            
+            lines.append("")
+        
+        return lines
+    
+    def _create_circuit_breaker_summary(self, grouped_circuits: List[Dict]) -> List[str]:
+        """Create breaker count summary from grouped_circuits."""
+        lines = [
+            "---",
+            "",
+            "## สรุปเบรกเกอร์",
+            "",
+            "| ขนาด | จำนวน | วงจร |",
+            "|------|:-----:|------|",
+        ]
+        
+        # Count breakers and collect circuit names
+        breaker_info: Dict[str, Dict] = {}
+        for circuit in grouped_circuits:
+            rating = circuit.get('breaker_rating', 15)
+            poles = circuit.get('breaker_poles', 1)
+            ckt_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
+            
+            if rating > 100:
+                continue
+            
+            key = f"{rating}A/{poles}P"
+            if key not in breaker_info:
+                breaker_info[key] = {'count': 0, 'circuits': []}
+            breaker_info[key]['count'] += 1
+            breaker_info[key]['circuits'].append(ckt_name[:12])
+        
+        for rating, info in sorted(breaker_info.items()):
+            circuits_str = ", ".join(info['circuits'][:3])
+            if len(info['circuits']) > 3:
+                circuits_str += f" (+{len(info['circuits'])-3})"
+            lines.append(f"| {rating} | {info['count']} | {circuits_str} |")
+        
+        lines.append("")
         return lines
     
     def _create_footer(self) -> List[str]:

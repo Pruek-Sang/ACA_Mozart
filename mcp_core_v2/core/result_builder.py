@@ -60,6 +60,7 @@ class ResultBuilder:
             breaker_selections=breaker_selections,
             conduit_sizing=conduit_sizing,
             compliance_report=compliance_report,
+            grouped_circuits=grouped_circuits or [],  # Include circuit grouping data
             autolisp_code=autolisp_code,
             completed_at=datetime.now(timezone.utc),
             errors=errors,
@@ -169,6 +170,7 @@ class ResultBuilder:
             'breaker_selections': result.breaker_selections,
             'conduit_sizing': result.conduit_sizing,
             'compliance_report': result.compliance_report,
+            'grouped_circuits': result.grouped_circuits,  # Circuit grouping data for formatter
             'autolisp_code_length': len(result.autolisp_code) if result.autolisp_code else 0,
             'errors': result.errors,
             'warnings': result.warnings,
