@@ -255,20 +255,6 @@ class CircuitGrouper:
                 return True
         
         return False
-        if load.power_watts * load.quantity >= self.DEDICATED_THRESHOLD:
-            return True
-        
-        # Check by type keywords
-        load_name_upper = load.name.upper()
-        for keyword in self.DEDICATED_LOAD_TYPES:
-            if keyword in load_name_upper:
-                return True
-        
-        # HVAC and Motor types always dedicated
-        if load.load_type in [LoadType.HVAC, LoadType.MOTOR]:
-            return True
-        
-        return False
     
     def _needs_rcbo(self, load: ElectricalLoad) -> bool:
         """Check if load needs RCBO (wet location)."""
