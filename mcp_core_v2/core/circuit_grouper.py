@@ -670,14 +670,29 @@ class CircuitGrouper:
             
             # 🆕 Calculate Voltage Drop %
             # VD% = (2 × L × I × R) / V × 100
-            # Using default distance 15m for floor 1, 25m for floor 2
-            default_distance = 25.0 if circuit.floor != "1" else 15.0
+            # Priority: user-specified distance > floor-based default
+            distance = self._get_circuit_distance(circuit)
             circuit.voltage_drop_percent = self._calculate_vd_percent(
                 current=circuit.total_current,
                 wire_size_mm2=circuit.wire_size,
-                distance_m=default_distance,
+                distance_m=distance,
                 voltage=self.VOLTAGE_1PH
             )
+    
+    def _get_circuit_distance(self, circuit) -> float:
+        """Get distance for VD calculation.
+        
+        Priority:
+        1. User-specified branch_distance_m in any load
+        2. Floor-based default (15m floor 1, 25m floor 2)
+        """
+        # Check if any load has user-specified distance
+        for load in circuit.loads:
+            if hasattr(load, 'branch_distance_m') and load.branch_distance_m is not None:
+                return float(load.branch_distance_m)
+        
+        # Default based on floor
+        return 25.0 if circuit.floor != "1" else 15.0
     
     def _calculate_vd_percent(
         self,
