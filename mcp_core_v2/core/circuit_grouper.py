@@ -50,7 +50,6 @@ class GroupedCircuit:
     breaker_rating: int = 0
     breaker_poles: int = 1
     wire_size: str = "2.5"
-    voltage_drop_percent: float = 0.0  # 🆕 VD% calculated by wire_sizer
     requires_rcbo: bool = False
     requires_gfci: bool = False
     notes: List[str] = field(default_factory=list)
@@ -73,7 +72,6 @@ class GroupedCircuit:
             'breaker_rating': self.breaker_rating,
             'breaker_poles': self.breaker_poles,
             'wire_size': self.wire_size,
-            'voltage_drop_percent': round(self.voltage_drop_percent, 2),  # 🆕 VD%
             'requires_rcbo': self.requires_rcbo,
             'requires_gfci': self.requires_gfci,
             'notes': self.notes,
@@ -667,67 +665,6 @@ class CircuitGrouper:
                 circuit.breaker_rating,
                 circuit.circuit_type
             )
-            
-            # 🆕 Calculate Voltage Drop %
-            # VD% = (2 × L × I × R) / V × 100
-            # Priority: user-specified distance > floor-based default
-            distance = self._get_circuit_distance(circuit)
-            circuit.voltage_drop_percent = self._calculate_vd_percent(
-                current=circuit.total_current,
-                wire_size_mm2=circuit.wire_size,
-                distance_m=distance,
-                voltage=self.VOLTAGE_1PH
-            )
-    
-    def _get_circuit_distance(self, circuit) -> float:
-        """Get distance for VD calculation.
-        
-        Priority:
-        1. User-specified branch_distance_m in any load
-        2. Floor-based default (15m floor 1, 25m floor 2)
-        """
-        # Check if any load has user-specified distance
-        for load in circuit.loads:
-            if hasattr(load, 'branch_distance_m') and load.branch_distance_m is not None:
-                return float(load.branch_distance_m)
-        
-        # Default based on floor
-        return 25.0 if circuit.floor != "1" else 15.0
-    
-    def _calculate_vd_percent(
-        self,
-        current: float,
-        wire_size_mm2: str,
-        distance_m: float,
-        voltage: float = 230.0
-    ) -> float:
-        """Calculate voltage drop percentage.
-        
-        Formula: VD% = (2 × L × I × ρ) / (A × V) × 100
-        
-        Where:
-        - L = cable length (m)
-        - I = current (A)
-        - ρ = resistivity of copper = 0.0175 Ω·mm²/m
-        - A = cross-sectional area (mm²)
-        - V = voltage (V)
-        """
-        # Resistivity of copper at 75°C (IEC 60228)
-        RHO_COPPER = 0.0175  # Ω·mm²/m
-        
-        try:
-            area = float(wire_size_mm2.replace('mm²', '').replace('mm', '').strip())
-        except ValueError:
-            area = 2.5  # Default
-        
-        if area <= 0 or voltage <= 0:
-            return 0.0
-        
-        # VD = 2 × L × I × ρ / A (for single phase, 2× for round trip)
-        vd_volts = (2 * distance_m * current * RHO_COPPER) / area
-        vd_percent = (vd_volts / voltage) * 100
-        
-        return round(vd_percent, 2)
     
     def _select_breaker_rating(
         self,
