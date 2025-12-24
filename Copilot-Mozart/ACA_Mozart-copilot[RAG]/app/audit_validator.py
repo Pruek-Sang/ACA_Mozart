@@ -60,6 +60,11 @@ def validate_user_specs(
         
         # Find matching user specs (by device type in circuit loads)
         circuit_loads = circuit.get('loads', [])
+        # 🆕 FIX: Handle case where 'loads' is an integer (count) instead of a list
+        if not isinstance(circuit_loads, list):
+            logger.warning(f"[CP-AUDIT] Skipping circuit {circuit_name} - loads is {type(circuit_loads).__name__}, not list")
+            continue
+        
         for load in circuit_loads:
             device = load.get('device', load.get('name', ''))
             room = load.get('room', load.get('room_name', ''))
