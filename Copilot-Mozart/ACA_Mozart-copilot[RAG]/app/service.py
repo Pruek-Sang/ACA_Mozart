@@ -1846,8 +1846,47 @@ class RagService:
                 # Use new formatter (Card-style, Legend at top, critical warnings)
                 formatted_text = format_design_report(result)
                 
+                # [CP-AUDIT-FLOW] Audit Mode Integration
+                # 1. Get grouped_circuits from MCP result
+                # 2. Validate user-specified values against auto values
+                # 3. Format audit report and append to response
+                audit_report_text = ""
+                try:
+                    from app.audit_validator import validate_user_specs
+                    from app.formatters.audit_formatter import format_audit_report as format_audit
+                    
+                    grouped_circuits = result.get('grouped_circuits', [])
+                    extracted_loads = getattr(req, '_extracted_loads', [])  # Will be set if user specified breaker/wire
+                    
+                    logger.info(f"[CP-AUDIT-FLOW] Checking audit: {len(grouped_circuits)} circuits, {len(extracted_loads)} extracted loads")
+                    
+                    # Check if any loads have user-specified values
+                    has_user_specs = any(
+                        load.get('user_breaker') or load.get('user_wire_size')
+                        for load in extracted_loads
+                    ) if extracted_loads else False
+                    
+                    if has_user_specs:
+                        logger.info("[CP-AUDIT-FLOW] User specs found, running audit validation")
+                        audit_results = validate_user_specs(grouped_circuits, extracted_loads)
+                        if audit_results:
+                            audit_report_text = format_audit(audit_results)
+                            logger.info(f"[CP-AUDIT-FLOW] Audit report generated: {len(audit_results)} items")
+                        else:
+                            logger.info("[CP-AUDIT-FLOW] No audit results to display")
+                    else:
+                        logger.info("[CP-AUDIT-FLOW] No user specs, skipping audit")
+                except Exception as e:
+                    logger.error(f"[CP-AUDIT-FLOW] Audit failed: {e}")
+                    # Don't fail the whole response, just skip audit
+                
+                # Combine main report with audit report
+                final_text = formatted_text
+                if audit_report_text:
+                    final_text = formatted_text + audit_report_text
+                
                 return StandardResponse(
-                    answer=formatted_text,
+                    answer=final_text,
                     sources=[SourceRef(
                         file="MCP Core Calculation",
                         section="design_result",
@@ -1861,7 +1900,7 @@ class RagService:
                         retrieved_docs=["mcp_calculation"],
                         retrieval_group="mcp",
                         autolisp_code=mcp_response.autolisp_code,
-                        readable_report=formatted_text,  # Use new formatter output
+                        readable_report=final_text,  # Use combined output
                         standards_markdown=mcp_response.standards_markdown
                     )
                 )
@@ -1986,6 +2025,12 @@ class RagService:
                     
                     # Convert to structured ProjectRequirements
                     project_req = self._convert_to_project_requirements(loads)
+                    
+                    # [CP-AUDIT-FLOW] Attach extracted loads for Audit Mode
+                    # These may contain user_breaker / user_wire_size from LLM extraction
+                    project_req._extracted_loads = loads.get('loads', [])
+                    user_specs_count = sum(1 for l in project_req._extracted_loads if l.get('user_breaker') or l.get('user_wire_size'))
+                    logger.info(f"[CP-AUDIT-FLOW] Attached {len(project_req._extracted_loads)} loads, {user_specs_count} with user specs")
                     
                     # Debug: log floors
                     floor_info = {r.name: r.floor for r in project_req.rooms}
