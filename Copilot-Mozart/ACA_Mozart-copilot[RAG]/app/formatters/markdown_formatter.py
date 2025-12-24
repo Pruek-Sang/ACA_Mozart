@@ -84,7 +84,9 @@ class MarkdownFormatter(BaseFormatter):
     
     def _create_header(self, project_name: str, summary: Dict) -> List[str]:
         """Create professional header with project info."""
-        today = datetime.now().strftime("%d/%m/%Y")
+        # 🆕 FIX: Use Thailand timezone instead of UTC
+        from zoneinfo import ZoneInfo
+        today = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%d/%m/%Y")
         
         # Calculate totals
         total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
@@ -437,7 +439,9 @@ class MarkdownFormatter(BaseFormatter):
     
     def _create_footer(self) -> List[str]:
         """Create professional footer."""
-        today = datetime.now().strftime("%d/%m/%Y %H:%M")
+        # 🆕 FIX: Use Thailand timezone instead of UTC
+        from zoneinfo import ZoneInfo
+        today = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%d/%m/%Y %H:%M")
         return [
             "---",
             "",

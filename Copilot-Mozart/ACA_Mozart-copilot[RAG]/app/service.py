@@ -159,7 +159,7 @@ def extract_site_context_from_text(text: str) -> Dict[str, str]:
         context['installation_area'] = 'indoor'
     elif re.search(r'(?:ใต้หลังคา|หลังคา|ร้อน|อุณหภูมิสูง|high.?temp)', text_lower):
         context['installation_area'] = 'high_temp'
-    elif re.search(r'(?:กลางแจ้ง|outdoor|นอกบ้าน|นอกอาคาร)', text_lower):
+    elif re.search(r'(?:กลางแจ้ง|กลางแดด|outdoor|นอกบ้าน|นอกอาคาร)', text_lower):
         context['installation_area'] = 'outdoor'
     elif re.search(r'(?:ฝังดิน|underground|ใต้ดิน)', text_lower):
         context['installation_area'] = 'underground'
