@@ -324,41 +324,114 @@ class RagService:
     
     def _detect_design_intent(self, query: str) -> bool:
         """
-        Detect if query is asking for electrical design.
+        Hybrid Intent Detection (v3) - Regex + LLM Fallback
         
-        Design keywords: ออกแบบ, คำนวณระบบ, วางแผนไฟฟ้า, design, calculate
-        Returns True if query is a design request.
+        Flow:
+        Query → [Regex: Clear Question?] → YES → Return False (Q&A)
+              → [Regex: Clear Design?] → YES → Return True (Design)
+              → [Ambiguous?] → LLM Few-shot → DESIGN/QA
+        
+        Examples:
+        "มาตรฐาน วสท คืออะไร" → Q&A (Regex clear)
+        "ห้องครัว มีเตาไฟฟ้า" → Design (Regex clear)
+        "ช่วยดูเรื่องไฟหน่อย" → Ambiguous → LLM decides
         """
-        design_keywords_th = [
-            "ออกแบบ", "ออกแบบระบบ", "ออกแบบไฟฟ้า",
-            "คำนวณระบบ", "คำนวณไฟฟ้า", "วางแผนไฟฟ้า",
-            "วางระบบ", "ติดตั้งระบบ", "ต้องใช้สายขนาด",
-            "บ้าน.*ชั้น.*แอร์", "มีแอร์.*ตัว.*น้ำอุ่น",
-        ]
-        design_keywords_en = [
-            "design electrical", "design system", "calculate electrical",
-            "plan electrical", "wire sizing for", "breaker sizing for"
-        ]
+        import re
         
         query_lower = query.lower()
         
-        # Check Thai keywords
-        for kw in design_keywords_th:
-            if kw in query_lower:
-                return True
+        # =====================================================================
+        # STEP 1: REGEX - CLEAR QUESTION? (100% Q&A)
+        # =====================================================================
+        question_patterns = [
+            r".*คืออะไร",            # คืออะไร?
+            r".*หมายความว่า",         # หมายความว่าอะไร
+            r".*ต่างกันยังไง",        # ต่างกันยังไง
+            r"^มาตรฐาน[^ก-๙]*$",     # มาตรฐาน... (no room info)
+            r"^วสท.*กำหนด",          # วสท กำหนด...
+            r"^nec\s",              # NEC...
+            r".*อธิบาย.*หน่อย",      # อธิบาย...หน่อย
+            r".*ทำไม.*ถึง",          # ทำไมถึง...
+            r".*ใช้กับอะไร",          # ใช้กับอะไรได้
+        ]
         
-        # Check English keywords
-        for kw in design_keywords_en:
-            if kw in query_lower:
-                return True
+        for pattern in question_patterns:
+            if re.search(pattern, query_lower):
+                logger.info(f"[INTENT] Regex: Clear Q&A - '{pattern}'")
+                return False
         
-        # Pattern: mentions multiple appliances (likely design request)
-        import re
-        appliance_pattern = r"(แอร์|น้ำอุ่น|ปั๊มน้ำ|เตา|ไฟ).*\d+.*(ตัว|เครื่อง|จุด)"
-        if re.search(appliance_pattern, query):
+        # =====================================================================
+        # STEP 2: REGEX - CLEAR DESIGN? (100% Design)
+        # =====================================================================
+        room_patterns = [
+            r"ห้อง(นอน|น้ำ|ครัว|นั่งเล่น|ทานข้าว)",
+            r"\d+\s*ห้อง",
+            r"bedroom|bathroom|kitchen|living",
+        ]
+        
+        building_patterns = [
+            r"บ้าน.*\d*\s*ชั้น",
+            r"\d+\s*ชั้น",
+            r"คอนโด|ทาวน์เฮ้าส์|อาคาร",
+        ]
+        
+        has_room = any(re.search(p, query_lower) for p in room_patterns)
+        has_building = any(re.search(p, query_lower) for p in building_patterns)
+        
+        if has_room or has_building:
+            logger.info(f"[INTENT] Regex: Clear Design (room={has_room}, building={has_building})")
             return True
         
-        return False
+        # =====================================================================
+        # STEP 3: AMBIGUOUS → LLM FEW-SHOT FALLBACK
+        # =====================================================================
+        # If regex can't decide clearly, ask LLM
+        logger.info(f"[INTENT] Regex: Ambiguous → calling LLM fallback")
+        return self._llm_classify_intent(query)
+    
+    def _llm_classify_intent(self, query: str) -> bool:
+        """
+        LLM Few-shot Intent Classification (fallback for ambiguous queries)
+        
+        Returns True = Design mode, False = Q&A mode
+        """
+        try:
+            prompt = """คุณเป็น Intent Classifier สำหรับระบบออกแบบไฟฟ้า
+
+ตัดสินว่า query นี้ต้องการ:
+- DESIGN = ต้องการออกแบบ/คำนวณระบบไฟฟ้า (มีข้อมูลห้อง/อุปกรณ์)
+- QA = ถามคำถาม/ขอข้อมูล/อธิบาย (ไม่มีข้อมูลห้อง)
+
+Examples:
+"ออกแบบบ้าน 2 ชั้น มีแอร์" → DESIGN
+"บ้าน 3 ห้องนอน มีน้ำอุ่น" → DESIGN
+"ห้องครัว 1 ห้อง มีเตาไฟฟ้า" → DESIGN
+"มาตรฐาน วสท คืออะไร" → QA
+"เบรกเกอร์ 20A ใช้กับอะไรได้บ้าง" → QA
+"ทำไมต้องใช้ RCBO" → QA
+"ช่วยดูเรื่องไฟหน่อย" → QA
+"คำนวณโหลดให้หน่อย" → QA (ไม่มีข้อมูลห้อง)
+
+Query: "{query}"
+
+ตอบแค่คำเดียว: DESIGN หรือ QA"""
+
+            # Use existing LLM generation method
+            response = self._generate_with_llm(
+                prompt.format(query=query),
+                temperature=0.0,
+                max_tokens=10
+            )
+            
+            result = response.strip().upper()
+            is_design = "DESIGN" in result
+            
+            logger.info(f"[INTENT] LLM: '{result}' → Design={is_design}")
+            return is_design
+            
+        except Exception as e:
+            logger.warning(f"[INTENT] LLM fallback failed: {e}, defaulting to Q&A")
+            return False  # Safe default: Q&A mode
     
     def _auto_fill_lighting(
         self, 
