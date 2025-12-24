@@ -10,7 +10,8 @@ import { ApiKeyModal } from './components/ApiKeyModal';
 import { LoginForm } from './components/LoginForm';
 import { useChat } from './hooks/useChat';
 import { useAuthContext } from './contexts/AuthContext';
-import FloorPlanVisualizer from './features/floorplan/FloorPlanVisualizer';
+// OLD: import FloorPlanVisualizer from './features/floorplan/FloorPlanVisualizer';
+import { AuditPane } from './components/AuditPane'; // 🆕 Audit Mode
 
 
 function App() {
@@ -31,8 +32,8 @@ function App() {
     // API Key for Gateway (still needed for RAG)
     apiKey,
     setApiKey,
-    // Floor plan data
-    rooms,
+    // Floor plan data - commented out after replacing FloorPlanVisualizer with AuditPane
+    // rooms,
   } = useChat();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -131,10 +132,9 @@ function App() {
           <InputBar onSend={send} disabled={isTyping} />
         </div>
 
-        {/* ===== RIGHT PANE: Floor Plan Visualizer 🆕 ===== */}
+        {/* ===== RIGHT PANE: Audit Report 🆕 ===== */}
         <div className="phone-frame flex-1 flex flex-col overflow-hidden">
-          <FloorPlanVisualizer
-            rooms={rooms}
+          <AuditPane
             chatText={messages.filter(m => m.role === 'bot').slice(-1)[0]?.content || ''}
           />
         </div>
