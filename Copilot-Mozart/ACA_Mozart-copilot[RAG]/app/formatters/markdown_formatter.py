@@ -115,23 +115,33 @@ class MarkdownFormatter(BaseFormatter):
         ]
     
     def _create_main_equipment(self, summary: Dict) -> List[str]:
-        """Create main equipment sizing section."""
+        """Create main equipment sizing section.
+        
+        Thai MEA Meter Sizing (มาตรฐาน กฟน./กฟภ.):
+        - 5(15)A   : โหลด ≤3.5 kW (≤15A)
+        - 15(45)A  : โหลด ≤10 kW (≤45A)  
+        - 30(100)A : โหลด ≤23 kW (≤100A) - สูงสุดสำหรับมิเตอร์ธรรมดา
+        - CT Meter : โหลด >23 kW (>100A) - ต้องใช้หม้อแปลงกระแส
+        
+        Note: demand_current คือกระแสรวม (ไม่ใช่ design current ×1.25)
+        """
         demand_current = summary.get('demand_current')
         if demand_current is None:
             total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
             demand_current = total_watts / 230 if total_watts else 0
         
-        # Determine sizes
+        # Determine sizes based on Thai MEA standards
+        # 🆕 FIX: Corrected meter sizing thresholds
         if demand_current <= 15:
             meter, main_wire, main_cb = "5(15)A", "4 mm²", "16A/1P"
-        elif demand_current <= 30:
-            meter, main_wire, main_cb = "15(45)A", "10 mm²", "32A/2P"
-        elif demand_current <= 50:
-            meter, main_wire, main_cb = "30(100)A", "16 mm²", "50A/2P"
+        elif demand_current <= 45:
+            meter, main_wire, main_cb = "15(45)A", "10 mm²", "50A/2P"
         elif demand_current <= 100:
-            meter, main_wire, main_cb = "50(150)A", "35 mm²", "100A/2P"
+            # 30(100)A meter for demand up to 100A
+            meter, main_wire, main_cb = "30(100)A", "25 mm²", "100A/2P"
         else:
-            meter, main_wire, main_cb = "CT", "50 mm²", "125A/2P"
+            # >100A requires CT meter
+            meter, main_wire, main_cb = "CT Meter", "50 mm²", "125A/2P"
         
         return [
             "## อุปกรณ์หลัก",
@@ -386,8 +396,8 @@ class MarkdownFormatter(BaseFormatter):
                 elif notes:
                     note_str = notes[0][:15] if notes else ""
                 
-                # Shorten name
-                name_short = ckt_name[:18] + "..." if len(ckt_name) > 20 else ckt_name
+                # Shorten name (increased limit for readability)
+                name_short = ckt_name[:25] + "..." if len(ckt_name) > 28 else ckt_name
                 loads_str = f"({num_loads} โหลด)" if num_loads > 1 else ""
                 
                 lines.append(
@@ -426,7 +436,7 @@ class MarkdownFormatter(BaseFormatter):
             if key not in breaker_info:
                 breaker_info[key] = {'count': 0, 'circuits': []}
             breaker_info[key]['count'] += 1
-            breaker_info[key]['circuits'].append(ckt_name[:12])
+            breaker_info[key]['circuits'].append(ckt_name[:20])  # Increased from 12 to 20
         
         for rating, info in sorted(breaker_info.items()):
             circuits_str = ", ".join(info['circuits'][:3])
