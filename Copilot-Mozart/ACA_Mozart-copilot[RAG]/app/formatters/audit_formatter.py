@@ -76,7 +76,8 @@ def format_audit_report(audit_results: List[Dict[str, Any]]) -> str:
             # Translate item names
             item_display = {
                 'breaker': 'Breaker',
-                'wire_size': 'สายไฟ'
+                'wire_size': 'สายไฟ',
+                'VD%': 'VD%'  # 🆕 Added VD% display
             }.get(item, item)
             
             lines.append(f"| {circuit} | {item_display} | {user_styled} | {auto_val} | {status_icon} |")
