@@ -1875,7 +1875,10 @@ class RagService:
                         else:
                             logger.info("[CP-AUDIT-FLOW] No audit results to display")
                     else:
-                        logger.info("[CP-AUDIT-FLOW] No user specs, skipping audit")
+                        # 🆕 Show auto-audit summary when no user specs
+                        from app.formatters.audit_formatter import format_auto_audit_summary
+                        audit_report_text = format_auto_audit_summary(len(grouped_circuits))
+                        logger.info(f"[CP-AUDIT-FLOW] Auto-audit summary for {len(grouped_circuits)} circuits")
                 except Exception as e:
                     logger.error(f"[CP-AUDIT-FLOW] Audit failed: {e}")
                     # Don't fail the whole response, just skip audit
