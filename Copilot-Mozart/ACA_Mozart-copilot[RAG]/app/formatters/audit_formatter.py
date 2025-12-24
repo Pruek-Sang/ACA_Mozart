@@ -47,7 +47,7 @@ def format_audit_report(audit_results: List[Dict[str, Any]]) -> str:
     
     for result in audit_results:
         circuit = result.get('circuit_name', 'Unknown')[:15]
-        device = result.get('device', '')
+        # device = result.get('device', '')  # Not used in table, kept for future
         
         for check in result.get('checks', []):
             item = check.get('item', '')
@@ -55,14 +55,22 @@ def format_audit_report(audit_results: List[Dict[str, Any]]) -> str:
             auto_val = check.get('auto_value', '-')
             status = check.get('status', 'PASS')
             
+            # Color styling for readability
+            # Using HTML with background colors: light red for FAIL, light green for PASS
             if status == 'FAIL':
                 status_icon = "❌"
+                # Light red background with dark red text
+                user_styled = f"<span style='background:#ffcccc;color:#cc0000;padding:2px 4px;border-radius:3px'><b>{user_val}</b></span>"
                 fail_count += 1
             elif status == 'WARN':
                 status_icon = "⚠️"
+                # Light yellow background with dark orange text
+                user_styled = f"<span style='background:#fff3cd;color:#856404;padding:2px 4px;border-radius:3px'><b>{user_val}</b></span>"
                 warn_count += 1
             else:
                 status_icon = "✅"
+                # Light green background with dark green text
+                user_styled = f"<span style='background:#d4edda;color:#155724;padding:2px 4px;border-radius:3px'><b>{user_val}</b></span>"
                 pass_count += 1
             
             # Translate item names
@@ -71,12 +79,12 @@ def format_audit_report(audit_results: List[Dict[str, Any]]) -> str:
                 'wire_size': 'สายไฟ'
             }.get(item, item)
             
-            lines.append(f"| {circuit} | {item_display} | {user_val} | {auto_val} | {status_icon} |")
+            lines.append(f"| {circuit} | {item_display} | {user_styled} | {auto_val} | {status_icon} |")
     
     lines.append("")
     
     # Add summary
-    total = fail_count + warn_count + pass_count
+    # total = fail_count + warn_count + pass_count  # Not used, for reference
     lines.append(f"**สรุป:** ✅ {pass_count} รายการผ่าน")
     if warn_count > 0:
         lines.append(f", ⚠️ {warn_count} รายการเตือน")
