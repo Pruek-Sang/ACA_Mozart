@@ -140,6 +140,32 @@ def validate_user_specs(
                     except ValueError:
                         logger.error(f"[CP-AUDIT] Cannot parse wire sizes: user={user_wire}, auto={auto_wire}")
                 
+                # 🆕 Check VD% if user specified distance
+                if user_spec.get('user_vd_percent'):
+                    try:
+                        user_vd = float(user_spec['user_vd_percent'])
+                        # VD should not exceed 3% for branch circuits (วสท. 2564)
+                        if user_vd > 3.0:
+                            checks.append({
+                                'item': 'VD%',
+                                'user_value': f"{user_vd:.1f}%",
+                                'auto_value': '≤3.0%',
+                                'status': 'FAIL',
+                                'reason': f"VD {user_vd:.1f}% เกินมาตรฐาน 3%"
+                            })
+                            logger.warning(f"[CP-AUDIT] FAIL: {circuit_name} VD {user_vd}% > 3%")
+                        else:
+                            checks.append({
+                                'item': 'VD%',
+                                'user_value': f"{user_vd:.1f}%",
+                                'auto_value': '≤3.0%',
+                                'status': 'PASS',
+                                'reason': 'OK'
+                            })
+                            logger.info(f"[CP-AUDIT] PASS: {circuit_name} VD {user_vd}% <= 3%")
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"[CP-AUDIT] Cannot parse VD%: {e}")
+                
                 if checks:
                     overall_status = 'FAIL' if any(c['status'] == 'FAIL' for c in checks) else \
                                     ('WARN' if any(c['status'] == 'WARN' for c in checks) else 'PASS')
