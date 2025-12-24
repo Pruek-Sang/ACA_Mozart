@@ -86,15 +86,39 @@ class GatewayResponse(BaseModel):
 # =============================================================================
 
 # Technical keywords for MOZART routing (regex fallback)
+# 🆕 EXPANDED: More design-related terms for better detection
 MOZART_KEYWORDS = [
-    # Thai
-    r"ออกแบบ.*ไฟ", r"คำนวณ", r"voltage", r"แรงดัน", r"กระแส", r"โหลด",
-    r"วงจร", r"circuit", r"สาย", r"cable", r"เบรกเกอร์", r"breaker",
-    r"ขนาด", r"sizing", r"มาตรฐาน", r"standard", r"วสท", r"ห้อง.*ไฟ",
-    r"autocad", r"autolisp", r"dxf", r"mcp", r"spec",
-    # English
+    # === Thai Design Keywords ===
+    r"ออกแบบ.*ไฟ", r"ออกแบบ.*บ้าน", r"ออกแบบ.*อาคาร", r"ออกแบบ.*ระบบ",
+    r"คำนวณ", r"ช่วย.*ไฟ", r"ทำ.*ไฟ", r"ติดตั้ง.*ไฟ",
+    
+    # === Thai Electrical Terms ===
+    r"voltage", r"แรงดัน", r"กระแส", r"โหลด", r"วงจร", r"circuit",
+    r"สาย", r"cable", r"เบรกเกอร์", r"breaker", r"ขนาด", r"sizing",
+    r"มาตรฐาน", r"standard", r"วสท", r"ห้อง.*ไฟ", r"ตู้เมน", r"ตู้ไฟ",
+    r"เมน", r"main", r"สวิตช์", r"switch", r"ปลั๊ก", r"outlet", r"เต้ารับ",
+    
+    # === Room Types (triggers design) ===
+    r"ห้องนอน", r"ห้องน้ำ", r"ห้องครัว", r"ห้องนั่งเล่น", r"ห้องทานข้าว",
+    r"bedroom", r"bathroom", r"kitchen", r"living", r"dining",
+    
+    # === Building Types ===
+    r"บ้าน.*ชั้น", r"\d+\s*ชั้น", r"คอนโด", r"ทาวน์เฮ้าส์", r"townhouse",
+    r"อาคาร", r"โรงงาน", r"factory", r"warehouse", r"โกดัง",
+    
+    # === Devices (triggers load calculation) ===
+    r"แอร์", r"เครื่องปรับอากาศ", r"air.?con", r"a/?c",
+    r"น้ำอุ่น", r"water.?heater", r"เครื่องทำน้ำอุ่น",
+    r"ปั๊ม", r"pump", r"เครื่องซักผ้า", r"washing",
+    r"ตู้เย็น", r"refrigerator", r"fridge", r"เตาไฟฟ้า", r"induction",
+    
+    # === English Design ===
     r"electrical", r"design", r"wire", r"panel", r"load", r"power",
-    r"watt", r"amp", r"volt", r"ground", r"earthing"
+    r"watt", r"amp", r"volt", r"ground", r"earthing",
+    r"autocad", r"autolisp", r"dxf", r"mcp", r"spec",
+    
+    # === Load Schedule / Calculation ===
+    r"load.?schedule", r"ตาราง.*โหลด", r"คำนวณ.*ไฟ", r"sizing.*wire"
 ]
 
 # Compiled regex patterns
@@ -119,13 +143,19 @@ class LLMRouter:
     ROUTER_PROMPT = """You are an intent classifier for an engineering AI system.
 
 The system has TWO modes:
-1. MOZART (RAG/Engineering): Technical questions about electrical design, calculations, standards, AutoCAD, specifications
+1. MOZART (RAG/Engineering): Technical questions about electrical design, calculations, standards, AutoCAD, specifications, house/building design, load calculations, wire sizing
 2. AMADEUS (AGI/Chat): General conversation, philosophy, ethics, jokes, non-technical questions
+
+IMPORTANT: Any mention of rooms, buildings, electrical devices, or sizing = MOZART
 
 Examples:
 User: "ออกแบบไฟห้องครัวให้หน่อย" → MOZART
 User: "คำนวณ voltage drop ให้ที" → MOZART
 User: "สร้าง spec บ้านให้หน่อย" → MOZART
+User: "บ้าน 2 ชั้น มีห้องนอน 3 ห้อง" → MOZART
+User: "ติดแอร์กี่ BTU" → MOZART
+User: "น้ำอุ่นใช้เบรกเกอร์ขนาดเท่าไหร่" → MOZART
+User: "ขนาดสายไฟสำหรับปั๊มน้ำ" → MOZART
 User: "คุณคิดยังไงกับความหมายของชีวิต" → AMADEUS
 User: "เล่าเรื่องตลกหน่อย" → AMADEUS
 User: "สวัสดี เป็นอย่างไรบ้าง" → AMADEUS
@@ -389,9 +419,19 @@ class ServiceProxy:
             user_input_lower = request.input.lower()
             
             # Check if this is a design request (wants full calculation)
+            # 🆕 EXPANDED: More keywords that trigger design mode
             is_design_request = any(kw in user_input_lower for kw in [
+                # Design verbs
                 "ออกแบบ", "design", "คำนวณ", "sizing", "calculate",
-                "breaker", "wire", "สาย", "เบรกเกอร์"
+                "ช่วย", "ทำ", "ติดตั้ง",
+                # Equipment
+                "breaker", "wire", "สาย", "เบรกเกอร์", "เมน", "ตู้ไฟ",
+                # Room types (implies design)
+                "ห้องนอน", "ห้องน้ำ", "ห้องครัว", "bedroom", "bathroom", "kitchen",
+                # Building types
+                "บ้าน", "อาคาร", "คอนโด", "ทาวน์เฮ้าส์", "ชั้น",
+                # Devices (implies load calculation)
+                "แอร์", "น้ำอุ่น", "ปั๊ม", "ac", "heater", "pump"
             ])
             
             # Check if this is a spec request (wants spec only)
