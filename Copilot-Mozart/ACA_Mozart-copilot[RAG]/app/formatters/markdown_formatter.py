@@ -68,7 +68,7 @@ class MarkdownFormatter(BaseFormatter):
         
         # Use grouped_circuits if available, else fall back to raw loads
         if grouped_circuits:
-            lines.extend(self._create_circuit_schedule(grouped_circuits))
+            lines.extend(self._create_circuit_schedule(grouped_circuits, wire_sizing))
             lines.extend(self._create_circuit_breaker_summary(grouped_circuits))
         else:
             # Legacy: use raw loads (backward compatibility)
@@ -333,12 +333,17 @@ class MarkdownFormatter(BaseFormatter):
         
         return lines
     
-    def _create_circuit_schedule(self, grouped_circuits: List[Dict]) -> List[str]:
+    def _create_circuit_schedule(self, grouped_circuits: List[Dict], wire_sizing: Dict[str, Any] = None) -> List[str]:
         """Create circuit-based load schedule using grouped_circuits from MCP.
         
         This shows circuits (grouped loads) instead of individual loads.
         Each circuit has: name, total_watts, breaker_rating, wire_size, etc.
+        VD% is read from wire_sizing dict, NOT from grouped_circuits.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        wire_sizing = wire_sizing or {}
         lines = ["## ตารางวงจร (Circuit Schedule)", ""]
         
         # Group circuits by floor
@@ -365,9 +370,9 @@ class MarkdownFormatter(BaseFormatter):
             lines.append(f"### {floor_display} (รวม {round_up(floor_watts):,.0f} W)")
             lines.append("")
             
-            # Table header
-            lines.append("| # | วงจร | โหลด | W | A | สาย | CB | VD% | หมายเหตุ |")
-            lines.append("|:-:|------|------|---:|---:|-----|-----|----:|----------|")
+            # Table header (kW instead of W for professional format)
+            lines.append("| # | วงจร | โหลด | kW | A | สาย | CB | VD% | หมายเหตุ |")
+            lines.append("|:-:|------|------|----:|---:|-----|-----|----:|----------|")
             
             for circuit in floor_circuits:
                 ckt_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
@@ -382,8 +387,17 @@ class MarkdownFormatter(BaseFormatter):
                     num_loads = len(num_loads)
                 notes = circuit.get('notes', [])
                 
-                # VD% - use actual calculated value from wire_sizing
-                vd = circuit.get('voltage_drop_percent', circuit.get('vd', 2.0))
+                # VD% - lookup from wire_sizing by circuit_id/load_id
+                circuit_id = circuit.get('circuit_id') or circuit.get('id') or ckt_name
+                vd_data = wire_sizing.get(circuit_id, {})
+                vd = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
+                
+                # 🆕 Debug logging for VD source tracking
+                is_default_vd = abs(vd - 2.0) < 0.001  # Compare with epsilon
+                if is_default_vd:
+                    logger.debug(f"[VD-DEBUG] Circuit '{ckt_name}' using default VD 2.0 (not found in wire_sizing)")
+                else:
+                    logger.debug(f"[VD-DEBUG] Circuit '{ckt_name}' VD={vd:.2f}% from wire_sizing")
                 
                 # Breaker type
                 breaker_type = "RCBO" if requires_rcbo else "MCB"
@@ -400,9 +414,12 @@ class MarkdownFormatter(BaseFormatter):
                 name_short = ckt_name[:25] + "..." if len(ckt_name) > 28 else ckt_name
                 loads_str = f"({num_loads} โหลด)" if num_loads > 1 else ""
                 
+                # Convert W to kW for display
+                kw_display = total_watts / 1000
+                
                 lines.append(
                     f"| {circuit_num} | {name_short} | {loads_str} | "
-                    f"{total_watts:,.0f} | {total_current:.1f} | {wire_size}mm² | "
+                    f"{kw_display:.2f} | {total_current:.1f} | {wire_size}mm² | "
                     f"{cb_display} | {vd:.1f} | {note_str} |"
                 )
                 circuit_num += 1
