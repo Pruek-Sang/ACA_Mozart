@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import warnings
-from typing import List, Dict, Any, Optional, Union, TYPE_CHECKING
+from typing import List, Dict, Any, Optional, Union, Tuple, TYPE_CHECKING
 
 # =============================================================================
 # LLM Provider Abstraction
@@ -538,6 +538,49 @@ class RagService:
         
         return result
 
+    def _should_ask_back(self, extracted_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        [CP-ASK] Check if we need to ask user for clarification.
+        
+        Only ask back when confidence is REALLY low (< 0.7).
+        This prevents annoying the user with unnecessary questions.
+        
+        Returns:
+            Tuple[bool, str]: (should_ask, message)
+        """
+        CONFIDENCE_THRESHOLD = 0.7
+        low_confidence_items = []
+        
+        # Check overall extraction confidence
+        overall_conf = extracted_data.get('extraction_confidence', 1.0)
+        if overall_conf < CONFIDENCE_THRESHOLD:
+            logger.info(f"[CP-ASK] Overall confidence LOW: {overall_conf}")
+            low_confidence_items.append(f"ภาพรวม (confidence: {overall_conf:.1f})")
+        
+        # Check each room's confidence
+        for room in extracted_data.get('rooms', []):
+            room_conf = room.get('confidence', 1.0)
+            if room_conf < CONFIDENCE_THRESHOLD:
+                room_name = room.get('name', 'Unknown')
+                logger.info(f"[CP-ASK] Room '{room_name}' confidence LOW: {room_conf}")
+                low_confidence_items.append(f"ห้อง '{room_name}' (confidence: {room_conf:.1f})")
+        
+        # Check each load's confidence
+        for load in extracted_data.get('loads', []):
+            load_conf = load.get('confidence', 1.0)
+            if load_conf < CONFIDENCE_THRESHOLD:
+                device = load.get('device', 'Unknown')
+                logger.info(f"[CP-ASK] Load '{device}' confidence LOW: {load_conf}")
+                low_confidence_items.append(f"อุปกรณ์ '{device}' (confidence: {load_conf:.1f})")
+        
+        if low_confidence_items:
+            message = f"⚠️ ข้อมูลไม่ชัดเจน กรุณายืนยัน:\n" + "\n".join(f"- {item}" for item in low_confidence_items)
+            logger.warning(f"[CP-ASK] Will ask back: {len(low_confidence_items)} items")
+            return True, message
+        
+        logger.info(f"[CP-ASK] All confidence OK, proceeding without asking")
+        return False, ""
+
     def _extract_loads_from_text(self, query: str) -> Dict[str, Any]:
         """
         Use LLM to extract structured loads from natural language query.
@@ -560,6 +603,19 @@ class RagService:
 - "heater 4500w" = น้ำอุ่น 4500W
 - "kitchen induction" = ห้องครัวมีเตาแม่เหล็กไฟฟ้า
 
+📝 ตัวอย่าง Messy Input (ต้องเข้าใจและให้ confidence ต่ำถ้าไม่แน่ใจ):
+- "เต้ารับ ไฟ 6 4" = เต้ารับ 6 จุด + ไฟ 4 ดวง (confidence: 0.5-0.7 เพราะไม่ชัดเจน)
+- "เต้ารับชั้น 1 6" = ชั้น 1 เต้ารับ 6 จุด (confidence: 0.8)
+- "ไฟ5" = ไฟ 5 ดวง (confidence: 0.9)
+- "บ้าน2ชึ้น ห้องนอน2 ห้องน้ำ2" = 2 ชั้น 2 ห้องนอน 2 ห้องน้ำ (confidence: 0.9)
+
+📝 ตัวอย่าง User-specified Breaker (สำหรับ Audit Mode):
+- "น้ำอุ่น 3500w 16a" = HEATER-3500W, user_breaker: 16
+- "เครื่องทำน้ำอุ่นชั้น 2 breaker 16a" = ชั้น 2 HEATER, user_breaker: 16
+- "heater breaker 20A" = HEATER, user_breaker: 20
+- "แอร์ห้องนอน สาย 2.5" = AC, user_wire_size: "2.5"
+- ⚠️ ถ้าผู้ใช้ระบุค่าเบรกเกอร์/สาย ต้องใส่ใน user_breaker/user_wire_size เสมอ!
+
 จากข้อความ: "{normalized_query}"
 
 ⚠️ คำที่ต้องระวัง (Fuzzy Matching หลายภาษา):
@@ -579,11 +635,20 @@ class RagService:
   "voltage_system": "TH_1PH_230V",
   "num_floors": จำนวนชั้น (ถ้าไม่ระบุให้ใส่ 1),
   "service_distance_m": ระยะสายเมนเป็นเมตร (ถ้ามี เช่น "หม้อแปลง 50 เมตร" -> 50, ถ้าไม่มีให้ใส่ null),
+  "extraction_confidence": 0.0-1.0 (ความมั่นใจในการสกัดข้อมูลโดยรวม),
   "rooms": [
-    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่, "area_sqm": พื้นที่ตร.ม. (ถ้าไม่ระบุใส่ null)}}
+    {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่, "area_sqm": พื้นที่ตร.ม. (ถ้าไม่ระบุใส่ null), "confidence": 0.0-1.0}}
   ],
   "loads": [
-    {{"room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)", "device": "รหัสอุปกรณ์", "quantity": จำนวน, "branch_distance_m": ระยะสายย่อยเป็นเมตร (ถ้าไม่มีใส่ null)}}
+    {{
+      "room_name": "ชื่อห้อง (ต้องตรงกับ name ใน rooms)",
+      "device": "รหัสอุปกรณ์",
+      "quantity": จำนวน,
+      "branch_distance_m": ระยะสายย่อยเป็นเมตร (ถ้าไม่มีใส่ null),
+      "confidence": 0.0-1.0,
+      "user_breaker": ถ้าผู้ใช้ระบุขนาดเบรกเกอร์เอง เช่น "16a" "breaker 20A" ให้ใส่เลข (16, 20) ถ้าไม่ระบุใส่ null,
+      "user_wire_size": ถ้าผู้ใช้ระบุขนาดสายเอง เช่น "สาย 2.5" "wire 4mm" ให้ใส่เลข ("2.5", "4") ถ้าไม่ระบุใส่ null
+    }}
   ],
   "missing_info": ["รายการข้อมูลที่ยังขาด"]
 }}
