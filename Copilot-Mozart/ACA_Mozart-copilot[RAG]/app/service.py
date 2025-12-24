@@ -416,11 +416,11 @@ Query: "{query}"
 
 ตอบแค่คำเดียว: DESIGN หรือ QA"""
 
-            # Use existing LLM generation method
-            response = self._generate_with_llm(
+            # Use _generate_content with config dict
+            config = {"temperature": 0.0, "max_output_tokens": 10}
+            response = self._generate_content(
                 prompt.format(query=query),
-                temperature=0.0,
-                max_tokens=10
+                config
             )
             
             result = response.strip().upper()
