@@ -1,6 +1,189 @@
 // src/features/loadschedule/tableParser.ts
-// Parse chat text response into structured table data
+// Parse NEW Markdown table format from Mozart RAG response
 
+export interface CircuitRow {
+    id: string;
+    circuitNum: number;
+    circuitName: string;
+    loads: string;
+    kW: number;
+    current: number;
+    wireSize: string;
+    breaker: string;
+    vdPercent: number;
+    notes: string;
+    floor: string;
+}
+
+export interface LoadScheduleData {
+    projectName: string;
+    totalLoad: number;           // W
+    totalCurrent: number;        // A
+    designCurrent: number;       // A (×1.25)
+    meterSize: string;
+    mainWire: string;
+    mainBreaker: string;
+    floors: FloorData[];
+    breakerSummary: BreakerSummaryRow[];
+    warnings: string[];
+}
+
+export interface FloorData {
+    name: string;
+    totalWatts: number;
+    circuits: CircuitRow[];
+}
+
+export interface BreakerSummaryRow {
+    size: string;
+    count: number;
+    circuits: string;
+}
+
+/**
+ * Parse NEW Markdown format from Mozart RAG response
+ * 
+ * Expected format:
+ * | # | วงจร | โหลด | kW | A | สาย | CB | VD% | หมายเหตุ |
+ * |:-:|------|------|----:|---:|-----|-----|----:|----------|
+ * | 1 | HEATER-4500W in ห้องน้ำ | | 4.50 | 19.6 | 2.5mm² | MCB 25A/2P | 2.0 | ต้องใช้ RCBO |
+ */
+export function parseLoadScheduleText(text: string): LoadScheduleData {
+    const data: LoadScheduleData = {
+        projectName: 'โครงการออกแบบไฟฟ้า',
+        totalLoad: 0,
+        totalCurrent: 0,
+        designCurrent: 0,
+        meterSize: '',
+        mainWire: '',
+        mainBreaker: '',
+        floors: [],
+        breakerSummary: [],
+        warnings: []
+    };
+
+    const lines = text.split('\n');
+    let currentFloor: FloorData | null = null;
+    let circuitId = 0;
+
+    for (const line of lines) {
+        // Parse summary info
+        const loadMatch = line.match(/โหลดรวม[^|]*?[\|\：\:]?\s*([\d,\.]+)\s*(?:W|kW)/i);
+        if (loadMatch) {
+            let val = parseFloat(loadMatch[1].replace(/,/g, ''));
+            if (line.toLowerCase().includes('kw')) val *= 1000;
+            data.totalLoad = val;
+        }
+
+        const currentMatch = line.match(/กระแส(?:รวม)?[^|]*?[\|\：\:]?\s*([\d\.]+)\s*A/i);
+        if (currentMatch) {
+            data.totalCurrent = parseFloat(currentMatch[1]);
+        }
+
+        const designMatch = line.match(/Design Current[^|]*?[\|\：\:]?\s*([\d\.]+)\s*A/i);
+        if (designMatch) {
+            data.designCurrent = parseFloat(designMatch[1]);
+        }
+
+        const meterMatch = line.match(/มิเตอร์[^|]*?[\|\：\:]?\s*\*?\*?([^\*\|]+)\*?\*?/i);
+        if (meterMatch) {
+            data.meterSize = meterMatch[1].trim();
+        }
+
+        const wireMatch = line.match(/สายเมน[^|]*?[\|\：\:]?\s*\*?\*?([^\*\|]+)\*?\*?/i);
+        if (wireMatch) {
+            data.mainWire = wireMatch[1].trim();
+        }
+
+        const breakerMatch = line.match(/Main Breaker[^|]*?[\|\：\:]?\s*\*?\*?([^\*\|]+)\*?\*?/i);
+        if (breakerMatch) {
+            data.mainBreaker = breakerMatch[1].trim();
+        }
+
+        // Detect floor header: ### ชั้น 1 (รวม X W) or ### ชั้น 2
+        const floorMatch = line.match(/^###\s*(ชั้น\s*\d+)[^\(]*(?:\(รวม\s*([\d,\.]+)\s*W\))?/i);
+        if (floorMatch) {
+            if (currentFloor && currentFloor.circuits.length > 0) {
+                data.floors.push(currentFloor);
+            }
+            currentFloor = {
+                name: floorMatch[1].trim(),
+                totalWatts: floorMatch[2] ? parseFloat(floorMatch[2].replace(/,/g, '')) : 0,
+                circuits: []
+            };
+            continue;
+        }
+
+        // Parse circuit table row: | 1 | HEATER-4500W in ห้องน้ำ | | 3.00 | 13.1 | 2.5mm² | MCB 20A/2P | 2.0 | notes |
+        const circuitMatch = line.match(/^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\d\.]+)\s*\|\s*([\d\.]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*([\d\.]+)\s*\|\s*(.*?)\s*\|$/);
+        if (circuitMatch && currentFloor) {
+            currentFloor.circuits.push({
+                id: `circuit-${circuitId++}`,
+                circuitNum: parseInt(circuitMatch[1]),
+                circuitName: circuitMatch[2].trim(),
+                loads: circuitMatch[3].trim(),
+                kW: parseFloat(circuitMatch[4]),
+                current: parseFloat(circuitMatch[5]),
+                wireSize: circuitMatch[6].trim(),
+                breaker: circuitMatch[7].trim(),
+                vdPercent: parseFloat(circuitMatch[8]),
+                notes: circuitMatch[9].trim(),
+                floor: currentFloor.name
+            });
+            continue;
+        }
+
+        // Parse breaker summary: | 15A/1P | 2 | ไฟแสงสว่าง ชั้น 1, ชั้น 2 |
+        const breakerSummaryMatch = line.match(/^\|\s*(\d+A\/\d+P)\s*\|\s*(\d+)\s*\|\s*(.+?)\s*\|$/);
+        if (breakerSummaryMatch) {
+            data.breakerSummary.push({
+                size: breakerSummaryMatch[1],
+                count: parseInt(breakerSummaryMatch[2]),
+                circuits: breakerSummaryMatch[3].trim()
+            });
+            continue;
+        }
+
+        // Parse warnings (⚠️ lines)
+        if (line.includes('⚠️') && !line.startsWith('|')) {
+            const warningText = line.replace(/^[-\*]\s*/, '').trim();
+            if (warningText) {
+                data.warnings.push(warningText);
+            }
+        }
+    }
+
+    // Push last floor
+    if (currentFloor && currentFloor.circuits.length > 0) {
+        data.floors.push(currentFloor);
+    }
+
+    // Calculate totals from circuits if not found in summary
+    if (data.totalLoad === 0 && data.floors.length > 0) {
+        data.totalLoad = data.floors.reduce((sum, f) =>
+            sum + f.circuits.reduce((s, c) => s + c.kW * 1000, 0), 0);
+    }
+    if (data.totalCurrent === 0 && data.totalLoad > 0) {
+        data.totalCurrent = data.totalLoad / 230;
+    }
+    if (data.designCurrent === 0 && data.totalCurrent > 0) {
+        data.designCurrent = data.totalCurrent * 1.25;
+    }
+
+    return data;
+}
+
+/**
+ * Calculate total load from floors
+ */
+export function calculateTotalLoad(floors: FloorData[]): number {
+    return floors.reduce((sum, floor) =>
+        sum + floor.circuits.reduce((s, c) => s + c.kW * 1000, 0), 0);
+}
+
+/**
+ * Legacy function for backwards compatibility
+ */
 export interface LoadRow {
     id: string;
     category: string;
@@ -11,92 +194,23 @@ export interface LoadRow {
     editable: boolean;
 }
 
-export interface LoadScheduleData {
-    projectName: string;
-    totalLoad: number;
-    totalCurrent: number;
-    designCurrent: number;
-    rows: LoadRow[];
-}
+export function parseLoadScheduleLegacy(text: string): { rows: LoadRow[] } {
+    const data = parseLoadScheduleText(text);
+    const rows: LoadRow[] = [];
 
-/**
- * Parse load schedule text from chat response
- */
-export function parseLoadScheduleText(text: string): LoadScheduleData {
-    const data: LoadScheduleData = {
-        projectName: 'โครงการออกแบบไฟฟ้า',
-        totalLoad: 0,
-        totalCurrent: 0,
-        designCurrent: 0,
-        rows: []
-    };
-
-    const lines = text.split('\n');
-    let currentCategory = '';
-    let rowId = 0;
-
-    for (const line of lines) {
-        // Parse total load
-        const loadMatch = line.match(/โหลดรวม.*?:\s*([\d,]+)\s*W/);
-        if (loadMatch) {
-            data.totalLoad = Number.parseInt(loadMatch[1].replace(/,/g, ''), 10);
-        }
-
-        // Parse current
-        const currentMatch = line.match(/กระแส.*?:\s*([\d.]+)\s*A/);
-        if (currentMatch) {
-            data.totalCurrent = Number.parseFloat(currentMatch[1]);
-        }
-
-        // Parse design current
-        const designMatch = line.match(/Design Current.*?:\s*([\d.]+)\s*A/);
-        if (designMatch) {
-            data.designCurrent = Number.parseFloat(designMatch[1]);
-        }
-
-        // Detect category (💡 ไฟแสงสว่าง, 🔌 เต้ารับ, ❄️ แอร์, etc.)
-        const categoryMatch = line.match(/│\s*\d+\s*│\s*(💡|🔌|❄️|🚿|🔥)\s*(.+?)(?:\s*│|$)/);
-        if (categoryMatch) {
-            currentCategory = categoryMatch[2].trim();
-        }
-
-        // Detect room with quantity (└─ ห้องนั่งเล่น: 5ดวง)
-        const roomMatch = line.match(/└─\s*(.+?):\s*(?:คู่×)?(\d+)/);
-        if (roomMatch && currentCategory) {
-            const roomName = roomMatch[1].trim();
-            const quantity = Number.parseInt(roomMatch[2], 10);
-
-            // Determine if editable based on category
-            const isEditable = currentCategory.includes('ไฟ') ||
-                currentCategory.includes('เต้ารับ') ||
-                currentCategory.includes('แอร์');
-
-            // Estimate load per item
-            let loadPerItem = 100; // default
-            if (currentCategory.includes('ไฟ')) loadPerItem = 100;
-            if (currentCategory.includes('เต้ารับ')) loadPerItem = 180;
-            if (currentCategory.includes('แอร์')) loadPerItem = 1200;
-
-            data.rows.push({
-                id: `row-${rowId++}`,
-                category: currentCategory,
-                room: roomName,
-                quantity,
-                unit: currentCategory.includes('ไฟ') ? 'ดวง' :
-                    currentCategory.includes('เต้ารับ') ? 'คู่' :
-                        currentCategory.includes('แอร์') ? 'BTU' : 'ชุด',
-                load: quantity * loadPerItem,
-                editable: isEditable
+    for (const floor of data.floors) {
+        for (const circuit of floor.circuits) {
+            rows.push({
+                id: circuit.id,
+                category: circuit.circuitName,
+                room: floor.name,
+                quantity: 1,
+                unit: 'วงจร',
+                load: circuit.kW * 1000,
+                editable: false
             });
         }
     }
 
-    return data;
-}
-
-/**
- * Calculate total load from rows
- */
-export function calculateTotalLoad(rows: LoadRow[]): number {
-    return rows.reduce((sum, row) => sum + row.load, 0);
+    return { rows };
 }
