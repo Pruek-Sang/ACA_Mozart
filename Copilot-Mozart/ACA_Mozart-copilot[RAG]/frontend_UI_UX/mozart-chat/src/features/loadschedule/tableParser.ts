@@ -9,7 +9,10 @@ export interface CircuitRow {
     kW: number;
     current: number;
     wireSize: string;
+    groundSize: string;   // 🆕 GRD
+    conduitSize: string;  // 🆕 ท่อ
     breaker: string;
+    icKa: number;         // 🆕 Ic (kA)
     vdPercent: number;
     notes: string;
     floor: string;
@@ -114,8 +117,9 @@ export function parseLoadScheduleText(text: string): LoadScheduleData {
             continue;
         }
 
-        // Parse circuit table row: | 1 | HEATER-4500W in ห้องน้ำ | | 3.00 | 13.1 | 2.5mm² | MCB 20A/2P | 2.0 | notes |
-        const circuitMatch = line.match(/^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\d\.]+)\s*\|\s*([\d\.]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*([\d\.]+)\s*\|\s*(.*?)\s*\|$/);
+        // Parse circuit table row (NEW FORMAT with 12 columns):
+        // | 1 | HEATER-4500W in ห้องน้ำ | | 3.00 | 13.1 | 2.5mm² | 2.5mm² | 1/2" | MCB 20A/2P | 6 | 2.0 | notes |
+        const circuitMatch = line.match(/^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\d\.]+)\s*\|\s*([\d\.]+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*([\d\.]+)\s*\|\s*(.*?)\s*\|$/);
         if (circuitMatch && currentFloor) {
             currentFloor.circuits.push({
                 id: `circuit-${circuitId++}`,
@@ -125,9 +129,12 @@ export function parseLoadScheduleText(text: string): LoadScheduleData {
                 kW: parseFloat(circuitMatch[4]),
                 current: parseFloat(circuitMatch[5]),
                 wireSize: circuitMatch[6].trim(),
-                breaker: circuitMatch[7].trim(),
-                vdPercent: parseFloat(circuitMatch[8]),
-                notes: circuitMatch[9].trim(),
+                groundSize: circuitMatch[7].trim(),   // 🆕 GRD
+                conduitSize: circuitMatch[8].trim(),  // 🆕 ท่อ
+                breaker: circuitMatch[9].trim(),
+                icKa: parseInt(circuitMatch[10]),     // 🆕 Ic
+                vdPercent: parseFloat(circuitMatch[11]),
+                notes: circuitMatch[12].trim(),
                 floor: currentFloor.name
             });
             continue;
