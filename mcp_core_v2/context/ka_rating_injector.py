@@ -44,8 +44,20 @@ class KaRatingInjector:
         if not distance:
             logger.debug("KaRatingInjector: No distance_to_transformer in context, skipping")
             return result
+        
+        # 🆕 FIX: Convert numeric distance to category string
+        if isinstance(distance, (int, float)):
+            if distance < 50:
+                distance_category = "less_than_50m"
+            elif distance <= 100:
+                distance_category = "50_100m"
+            else:
+                distance_category = "more_than_100m"
+            logger.info(f"KaRatingInjector: Distance {distance}m → category '{distance_category}'")
+        else:
+            distance_category = distance  # Already a string category
             
-        min_ka = self.KA_REQUIREMENTS.get(distance, 6)
+        min_ka = self.KA_REQUIREMENTS.get(distance_category, 6)
         
         # Access breaker_selections from result
         breaker_selections = getattr(result, 'breaker_selections', None)
