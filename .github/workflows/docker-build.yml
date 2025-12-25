@@ -190,8 +190,8 @@ jobs:
 
       - name: 🐳 Build Docker image
         run: |
-          echo "🏗️ Building MCP Core Docker image..."
-          docker build \
+          echo "🏗️ Building MCP Core Docker image (--no-cache)..."
+          docker build --no-cache \
             -f ./mcp_core_v2/Docker/Dockerfile \
             -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:latest \
             -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }} \
@@ -228,8 +228,8 @@ jobs:
 
       - name: 🐳 Build Docker image
         run: |
-          echo "🏗️ Building Mozart RAG Docker image..."
-          docker build \
+          echo "🏗️ Building Mozart RAG Docker image (--no-cache)..."
+          docker build --no-cache \
             -f ./Copilot-Mozart/ACA_Mozart-copilot\[RAG\]/Docker/Dockerfile_light \
             -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:latest \
             -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:${{ github.sha }} \
