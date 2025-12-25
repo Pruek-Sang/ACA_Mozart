@@ -84,8 +84,18 @@ class KaRatingInjector:
         # 🆕 ALWAYS add warning if distance < 100m (50_100m or less_than_50m category)
         if distance_category in ("less_than_50m", "50_100m"):
             if hasattr(result, 'warnings') and isinstance(result.warnings, list):
+                # 🆕 FIX: Convert category to human-readable description
+                if isinstance(distance, (int, float)):
+                    distance_desc = f"{distance}m"
+                elif distance_category == "less_than_50m":
+                    distance_desc = "< 50m"
+                elif distance_category == "50_100m":
+                    distance_desc = "50-100m"
+                else:
+                    distance_desc = "> 100m"
+                    
                 warning_msg = (
-                    f"⚠️ ระยะหม้อแปลง {distance}m: แนะนำใช้ Main Breaker ที่มีพิกัดตัด ≥{min_ka}kA "
+                    f"⚠️ ระยะหม้อแปลง {distance_desc}: แนะนำใช้ Main Breaker ที่มีพิกัดตัด ≥{min_ka}kA "
                     f"เพื่อความปลอดภัยจากกระแสลัดวงจรสูง"
                 )
                 # Avoid duplicate warnings
