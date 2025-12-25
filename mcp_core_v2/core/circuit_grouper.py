@@ -815,7 +815,8 @@ class CircuitGrouper:
                 "breaker": f"{circuit.breaker_rating}A/{circuit.breaker_poles}P",
                 "wire_size": circuit.wire_size,
                 "wire": f"THW {circuit.wire_size}mm²",
-                "loads": len(circuit.loads),
+                "loads": [circuit._load_to_dict(l) for l in circuit.loads],  # 🆕 FIX: List for audit_validator, not just count
+                "load_count": len(circuit.loads),  # 🆕 Keep count as separate field
                 "rcbo": circuit.requires_rcbo,
                 "notes": circuit.notes
             })
