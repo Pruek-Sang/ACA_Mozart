@@ -59,6 +59,7 @@ class MarkdownFormatter(BaseFormatter):
         wire_sizing = mcp_result.get('wire_sizing') or {}
         breaker_selections = mcp_result.get('breaker_selections') or {}
         grouped_circuits = mcp_result.get('grouped_circuits') or []  # Circuit groups from MCP
+        conduit_sizing = mcp_result.get('conduit_sizing') or {}  # 🆕 Conduit sizing from MCP
         warnings = mcp_result.get('warnings') or []
         errors = mcp_result.get('errors') or []
         
@@ -68,7 +69,7 @@ class MarkdownFormatter(BaseFormatter):
         
         # Use grouped_circuits if available, else fall back to raw loads
         if grouped_circuits:
-            lines.extend(self._create_circuit_schedule(grouped_circuits, wire_sizing))
+            lines.extend(self._create_circuit_schedule(grouped_circuits, wire_sizing, conduit_sizing))
             lines.extend(self._create_circuit_breaker_summary(grouped_circuits))
         else:
             # Legacy: use raw loads (backward compatibility)
@@ -333,17 +334,24 @@ class MarkdownFormatter(BaseFormatter):
         
         return lines
     
-    def _create_circuit_schedule(self, grouped_circuits: List[Dict], wire_sizing: Dict[str, Any] = None) -> List[str]:
+    def _create_circuit_schedule(
+        self, 
+        grouped_circuits: List[Dict], 
+        wire_sizing: Dict[str, Any] = None,
+        conduit_sizing: Dict[str, Any] = None  # 🆕 Added conduit sizing
+    ) -> List[str]:
         """Create circuit-based load schedule using grouped_circuits from MCP.
         
         This shows circuits (grouped loads) instead of individual loads.
         Each circuit has: name, total_watts, breaker_rating, wire_size, etc.
         VD% is read from wire_sizing dict, NOT from grouped_circuits.
+        GRD and conduit are read from wire_sizing and conduit_sizing.
         """
         import logging
         logger = logging.getLogger(__name__)
         
         wire_sizing = wire_sizing or {}
+        conduit_sizing = conduit_sizing or {}
         lines = ["## ตารางวงจร (Circuit Schedule)", ""]
         
         # Group circuits by floor
@@ -370,9 +378,9 @@ class MarkdownFormatter(BaseFormatter):
             lines.append(f"### {floor_display} (รวม {round_up(floor_watts):,.0f} W)")
             lines.append("")
             
-            # Table header (kW instead of W for professional format)
-            lines.append("| # | วงจร | โหลด | kW | A | สาย | CB | VD% | หมายเหตุ |")
-            lines.append("|:-:|------|------|----:|---:|-----|-----|----:|----------|")
+            # Table header with GRD, ท่อ, Ic columns
+            lines.append("| # | วงจร | โหลด | kW | A | สาย | GRD | ท่อ | CB | Ic | VD% | หมายเหตุ |")
+            lines.append("|:-:|------|------|----:|---:|-----|-----|-----|-----|:--:|----:|----------|")
             
             for circuit in floor_circuits:
                 ckt_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
@@ -403,6 +411,16 @@ class MarkdownFormatter(BaseFormatter):
                 breaker_type = "RCBO" if requires_rcbo else "MCB"
                 cb_display = f"{breaker_type} {breaker_rating}A/{breaker_poles}P"
                 
+                # 🆕 GRD (ground wire size) from wire_sizing
+                grd_size = vd_data.get('ground_size', '2.5') if isinstance(vd_data, dict) else '2.5'
+                
+                # 🆕 Conduit (ท่อ) from conduit_sizing
+                conduit_data = conduit_sizing.get(circuit_id, {})
+                conduit_size = conduit_data.get('trade_size', '1/2"') if isinstance(conduit_data, dict) else '1/2"'
+                
+                # 🆕 Ic (kA) - default 6kA, can be upgraded by ka_rating_injector
+                ic_ka = 6  # Default interrupting capacity
+                
                 # Note
                 note_str = ""
                 if requires_rcbo:
@@ -420,7 +438,7 @@ class MarkdownFormatter(BaseFormatter):
                 lines.append(
                     f"| {circuit_num} | {name_short} | {loads_str} | "
                     f"{kw_display:.2f} | {total_current:.1f} | {wire_size}mm² | "
-                    f"{cb_display} | {vd:.1f} | {note_str} |"
+                    f"{grd_size}mm² | {conduit_size} | {cb_display} | {ic_ka} | {vd:.1f} | {note_str} |"
                 )
                 circuit_num += 1
             
