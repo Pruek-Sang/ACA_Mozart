@@ -61,32 +61,36 @@ class KaRatingInjector:
         
         # Access breaker_selections from result
         breaker_selections = getattr(result, 'breaker_selections', None)
-        if not breaker_selections:
-            logger.debug("KaRatingInjector: No breaker_selections found in result")
-            return result
         
-        # Find main breakers (keys ending with '_main')
+        # 🆕 FALLBACK: Even if no breaker_selections, still add warning based on distance
         modified_count = 0
-        for key, breaker_info in breaker_selections.items():
-            if key.endswith('_main') and isinstance(breaker_info, dict):
-                current_ka = breaker_info.get('ka_rating', 0)
-                
-                if current_ka < min_ka:
-                    breaker_info['ka_rating'] = min_ka
-                    breaker_info['ka_adjusted'] = True
-                    breaker_info['ka_adjustment_reason'] = (
-                        f"Auto-adjusted from {current_ka}kA to {min_ka}kA "
-                        f"due to transformer distance ({distance})"
-                    )
-                    modified_count += 1
-                    logger.info(f"KaRatingInjector: Upgraded {key} from {current_ka}kA to {min_ka}kA")
         
-        if modified_count > 0:
-            # Add warning to result
+        if breaker_selections:
+            # Find main breakers (keys ending with '_main')
+            for key, breaker_info in breaker_selections.items():
+                if key.endswith('_main') and isinstance(breaker_info, dict):
+                    current_ka = breaker_info.get('ka_rating', 0)
+                    
+                    if current_ka < min_ka:
+                        breaker_info['ka_rating'] = min_ka
+                        breaker_info['ka_adjusted'] = True
+                        breaker_info['ka_adjustment_reason'] = (
+                            f"Auto-adjusted from {current_ka}kA to {min_ka}kA "
+                            f"due to transformer distance ({distance}m)"
+                        )
+                        modified_count += 1
+                        logger.info(f"KaRatingInjector: Upgraded {key} from {current_ka}kA to {min_ka}kA")
+        
+        # 🆕 ALWAYS add warning if distance < 100m (50_100m or less_than_50m category)
+        if distance_category in ("less_than_50m", "50_100m"):
             if hasattr(result, 'warnings') and isinstance(result.warnings, list):
-                result.warnings.append(
-                    f"[Safety] {modified_count} main breaker(s) upgraded to {min_ka}kA "
-                    f"due to proximity to transformer ({distance})"
+                warning_msg = (
+                    f"⚠️ ระยะหม้อแปลง {distance}m: แนะนำใช้ Main Breaker ที่มีพิกัดตัด ≥{min_ka}kA "
+                    f"เพื่อความปลอดภัยจากกระแสลัดวงจรสูง"
                 )
+                # Avoid duplicate warnings
+                if warning_msg not in result.warnings:
+                    result.warnings.append(warning_msg)
+                    logger.info(f"KaRatingInjector: Added kA warning for distance {distance}m")
                         
         return result
