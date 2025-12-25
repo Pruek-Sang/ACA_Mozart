@@ -1,10 +1,9 @@
 // src/features/loadschedule/LoadScheduleEditor.tsx
-// Editable load schedule table with PDF export
+// Professional Load Schedule Editor with PDF export (matches วิศวกรไฟฟ้า format)
 
-import React, { useState, useMemo, useRef } from 'react';
-import { Download, Edit3, Check, X } from 'lucide-react';
-import { parseLoadScheduleText, calculateTotalLoad } from './tableParser';
-import type { LoadRow } from './tableParser';
+import React, { useMemo, useRef } from 'react';
+import { Download, X } from 'lucide-react';
+import { parseLoadScheduleText, type LoadScheduleData } from './tableParser';
 import './loadschedule.css';
 
 interface LoadScheduleEditorProps {
@@ -14,53 +13,8 @@ interface LoadScheduleEditorProps {
 
 const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClose }) => {
     // Parse chat text into structured data
-    const initialData = useMemo(() => parseLoadScheduleText(chatText), [chatText]);
-
-    // State for editable rows
-    const [rows, setRows] = useState<LoadRow[]>(initialData.rows);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [editValue, setEditValue] = useState<string>('');
+    const data: LoadScheduleData = useMemo(() => parseLoadScheduleText(chatText), [chatText]);
     const tableRef = useRef<HTMLDivElement>(null);
-
-    // Calculate current totals
-    const totalLoad = useMemo(() => calculateTotalLoad(rows), [rows]);
-    const totalCurrent = totalLoad / 230;
-    const designCurrent = totalCurrent * 1.25;
-
-    // Start editing a cell
-    const startEdit = (row: LoadRow) => {
-        if (!row.editable) return;
-        setEditingId(row.id);
-        setEditValue(String(row.quantity));
-    };
-
-    // Save edit
-    const saveEdit = (rowId: string) => {
-        const newQuantity = Number.parseInt(editValue, 10);
-        if (Number.isNaN(newQuantity) || newQuantity < 0) {
-            setEditingId(null);
-            return;
-        }
-
-        setRows(prev => prev.map(row => {
-            if (row.id === rowId) {
-                const loadPerItem = row.load / row.quantity || 100;
-                return {
-                    ...row,
-                    quantity: newQuantity,
-                    load: newQuantity * loadPerItem
-                };
-            }
-            return row;
-        }));
-        setEditingId(null);
-    };
-
-    // Cancel edit
-    const cancelEdit = () => {
-        setEditingId(null);
-        setEditValue('');
-    };
 
     // Export to PDF
     const exportToPDF = async () => {
@@ -70,8 +24,8 @@ const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClo
         const html2pdf = (await import('html2pdf.js')).default;
 
         const opt = {
-            margin: [10, 10, 10, 10] as [number, number, number, number],
-            filename: `ตารางโหลดไฟฟ้า_${new Date().toLocaleDateString('th-TH')}.pdf`,
+            margin: [10, 5, 10, 5] as [number, number, number, number],
+            filename: `LoadSchedule_${new Date().toLocaleDateString('th-TH')}.pdf`,
             image: { type: 'jpeg' as const, quality: 0.98 },
             html2canvas: {
                 scale: 2,
@@ -81,7 +35,7 @@ const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClo
             jsPDF: {
                 unit: 'mm' as const,
                 format: 'a4' as const,
-                orientation: 'portrait' as const
+                orientation: 'landscape' as const  // Landscape for wide table
             }
         };
 
@@ -89,7 +43,7 @@ const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClo
     };
 
     // Empty state
-    if (rows.length === 0) {
+    if (data.floors.length === 0) {
         return (
             <div className="load-schedule-empty">
                 <p>ไม่พบข้อมูลตารางโหลด</p>
@@ -102,7 +56,7 @@ const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClo
         <div className="load-schedule-editor">
             {/* Header */}
             <div className="lse-header">
-                <h2>📋 ตารางโหลดไฟฟ้า</h2>
+                <h2>📋 ตารางโหลดไฟฟ้า (Load Schedule)</h2>
                 <div className="lse-actions">
                     <button onClick={exportToPDF} className="lse-export-btn">
                         <Download size={16} />
@@ -116,16 +70,11 @@ const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClo
                 </div>
             </div>
 
-            {/* Editable hint */}
-            <div className="lse-hint">
-                <Edit3 size={14} />
-                <span>คลิกที่ตัวเลขสีม่วงเพื่อแก้ไข</span>
-            </div>
-
-            {/* Table */}
-            <div ref={tableRef} className="lse-table-wrapper">
+            {/* PDF Content */}
+            <div ref={tableRef} className="lse-pdf-content">
+                {/* Print Header */}
                 <div className="lse-print-header">
-                    <h1>ตารางคำนวณโหลดไฟฟ้า</h1>
+                    <h1>ตารางโหลดไฟฟ้า (LOAD SCHEDULE)</h1>
                     <p>วันที่: {new Date().toLocaleDateString('th-TH', {
                         year: 'numeric',
                         month: 'long',
@@ -133,77 +82,151 @@ const LoadScheduleEditor: React.FC<LoadScheduleEditorProps> = ({ chatText, onClo
                     })}</p>
                 </div>
 
-                <table className="lse-table">
-                    <thead>
+                {/* Panel Info Header */}
+                <table className="lse-panel-info">
+                    <tbody>
                         <tr>
-                            <th>ประเภท</th>
-                            <th>ห้อง</th>
-                            <th>จำนวน</th>
-                            <th>หน่วย</th>
-                            <th>โหลด (W)</th>
+                            <td className="label">PANEL NAME</td>
+                            <td className="value">MDB-1</td>
+                            <td className="label">MAIN BUS CAPACITY</td>
+                            <td className="value">{data.mainBreaker || '100A'}</td>
+                            <td className="label">SYSTEM</td>
+                            <td className="value">1Φ 230V 50Hz</td>
+                        </tr>
+                        <tr>
+                            <td className="label">LOCATION</td>
+                            <td className="value">ตู้เมน</td>
+                            <td className="label">มิเตอร์</td>
+                            <td className="value">{data.meterSize || '30(100)A'}</td>
+                            <td className="label">สายเมน</td>
+                            <td className="value">{data.mainWire || 'THW 25mm²'}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* Main Circuit Table */}
+                <table className="lse-circuit-table">
+                    <thead>
+                        <tr className="header-main">
+                            <th rowSpan={2}>CCT.</th>
+                            <th rowSpan={2}>DESCRIPTION</th>
+                            <th colSpan={3} className="group-header">CONNECTION LOAD (VA)</th>
+                            <th colSpan={5} className="group-header">CIRCUIT BREAKER</th>
+                            <th colSpan={2} className="group-header">WIRE (mm²)</th>
+                            <th rowSpan={2}>VD%</th>
+                            <th rowSpan={2}>REMARK</th>
+                        </tr>
+                        <tr className="header-sub">
+                            <th>L1</th>
+                            <th>L2</th>
+                            <th>L3</th>
+                            <th>TYPE</th>
+                            <th>POLE</th>
+                            <th>Ic(kA)</th>
+                            <th>AF</th>
+                            <th>AT</th>
+                            <th>L/N</th>
+                            <th>GRD</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {rows.map(row => (
-                            <tr key={row.id} className={row.editable ? 'editable-row' : ''}>
-                                <td className="category-cell">{row.category}</td>
-                                <td>{row.room}</td>
-                                <td className="quantity-cell">
-                                    {editingId === row.id ? (
-                                        <div className="edit-input-wrapper">
-                                            <input
-                                                type="number"
-                                                value={editValue}
-                                                onChange={(e) => setEditValue(e.target.value)}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') saveEdit(row.id);
-                                                    if (e.key === 'Escape') cancelEdit();
-                                                }}
-                                                autoFocus
-                                                min={0}
-                                                className="edit-input"
-                                            />
-                                            <button onClick={() => saveEdit(row.id)} className="save-btn">
-                                                <Check size={14} />
-                                            </button>
-                                            <button onClick={cancelEdit} className="cancel-btn">
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <span
-                                            className={`quantity-value ${row.editable ? 'editable' : ''}`}
-                                            onClick={() => startEdit(row)}
-                                            onKeyDown={(e) => e.key === 'Enter' && startEdit(row)}
-                                            role={row.editable ? 'button' : undefined}
-                                            tabIndex={row.editable ? 0 : undefined}
-                                        >
-                                            {row.quantity}
-                                            {row.editable && <Edit3 size={12} className="edit-icon" />}
-                                        </span>
-                                    )}
-                                </td>
-                                <td>{row.unit}</td>
-                                <td className="load-cell">{row.load.toLocaleString()}</td>
-                            </tr>
+                        {data.floors.map((floor) => (
+                            <React.Fragment key={floor.name}>
+                                {/* Floor Header */}
+                                <tr className="floor-header">
+                                    <td colSpan={14}>{floor.name} (รวม {floor.totalWatts.toLocaleString()} W)</td>
+                                </tr>
+                                {/* Circuits */}
+                                {floor.circuits.map((circuit) => {
+                                    const watts = circuit.kW * 1000;
+                                    const breakerParts = circuit.breaker.match(/(\w+)\s*(\d+)A[\/]?(\d+)?P?/i);
+                                    const breakerType = breakerParts?.[1] || 'MCB';
+                                    const breakerAt = breakerParts?.[2] || '';
+                                    const breakerPoles = breakerParts?.[3] || '1';
+                                    const wireMatch = circuit.wireSize.match(/([\d\.]+)/);
+                                    const wireSize = wireMatch?.[1] || '2.5';
+
+                                    return (
+                                        <tr key={circuit.id} className={circuit.notes.includes('RCBO') ? 'highlight-row' : ''}>
+                                            <td className="center">{circuit.circuitNum}</td>
+                                            <td className="description">{circuit.circuitName}</td>
+                                            <td className="va-cell">{watts}</td>
+                                            <td className="va-cell">-</td>
+                                            <td className="va-cell">-</td>
+                                            <td className="center">{breakerType}</td>
+                                            <td className="center">{breakerPoles}P</td>
+                                            <td className="center">6</td>
+                                            <td className="center">{breakerAt}</td>
+                                            <td className="center">{breakerAt}</td>
+                                            <td className="center">{wireSize}</td>
+                                            <td className="center">{parseFloat(wireSize) >= 4 ? '4' : '2.5'}</td>
+                                            <td className="center vd-cell">{circuit.vdPercent.toFixed(1)}</td>
+                                            <td className="notes">{circuit.notes}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </React.Fragment>
                         ))}
                     </tbody>
                     <tfoot>
                         <tr className="total-row">
-                            <td colSpan={4}>โหลดรวม (Total Connected Load)</td>
-                            <td className="load-cell">{totalLoad.toLocaleString()} W</td>
+                            <td colSpan={2} className="total-label">TOTAL LOAD (VA)</td>
+                            <td className="va-cell total">{data.totalLoad.toLocaleString()}</td>
+                            <td className="va-cell">-</td>
+                            <td className="va-cell">-</td>
+                            <td colSpan={9}></td>
                         </tr>
                         <tr className="summary-row">
-                            <td colSpan={4}>กระแสโหลด (Demand Current)</td>
-                            <td className="load-cell">{totalCurrent.toFixed(1)} A</td>
+                            <td colSpan={2}>DEMAND CURRENT</td>
+                            <td colSpan={3}>{data.totalCurrent.toFixed(1)} A</td>
+                            <td colSpan={9}></td>
                         </tr>
                         <tr className="summary-row">
-                            <td colSpan={4}>Design Current (×1.25)</td>
-                            <td className="load-cell">{designCurrent.toFixed(1)} A</td>
+                            <td colSpan={2}>DESIGN CURRENT (×1.25)</td>
+                            <td colSpan={3}>{data.designCurrent.toFixed(1)} A</td>
+                            <td colSpan={9}></td>
                         </tr>
                     </tfoot>
                 </table>
 
+                {/* Breaker Summary */}
+                {data.breakerSummary.length > 0 && (
+                    <div className="lse-breaker-summary">
+                        <h3>สรุปเบรกเกอร์</h3>
+                        <table className="lse-summary-table">
+                            <thead>
+                                <tr>
+                                    <th>ขนาด</th>
+                                    <th>จำนวน</th>
+                                    <th>วงจร</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.breakerSummary.map((row, idx) => (
+                                    <tr key={idx}>
+                                        <td>{row.size}</td>
+                                        <td className="center">{row.count}</td>
+                                        <td>{row.circuits}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Warnings */}
+                {data.warnings.length > 0 && (
+                    <div className="lse-warnings">
+                        <h3>⚠️ คำเตือนจากระบบ</h3>
+                        <ul>
+                            {data.warnings.map((warning, idx) => (
+                                <li key={idx}>{warning}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {/* Footer */}
                 <div className="lse-print-footer">
                     <p>สร้างโดย Mozart AI • ตามมาตรฐาน วสท. 2001-56 และ NEC 2023</p>
                 </div>
