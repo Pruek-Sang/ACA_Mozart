@@ -1893,8 +1893,10 @@ Query: "{query}"
             adapter = McpAdapter()
             logger.info(f"[DEBUG-SC-4] _build_design_response - req.site_context: {req.site_context}")
             logger.info(f"[DEBUG-SC-4] req.site_context type: {type(req.site_context)}")
+            print(f"[DEBUG-SC-4] PRINT: _build_design_response site_context = {req.site_context}")  # Guaranteed
             mcp_request = adapter.convert(project_input, req.site_context)
             logger.info(f"[DEBUG-SC-5] mcp_request.site_context: {mcp_request.site_context}")
+            print(f"[DEBUG-SC-5] PRINT: mcp_request.site_context = {mcp_request.site_context}")  # Guaranteed
             
             # Call MCP Core
             mcp_client = McpClient()
@@ -2032,6 +2034,7 @@ Query: "{query}"
         # 🔍 DEBUG: Log incoming request site_context
         logger.info(f"[DEBUG-SC-1] Incoming req.site_context: {req.site_context}")
         logger.info(f"[DEBUG-SC-1] Query: {req.query[:100]}...")
+        print(f"[DEBUG-SC-1] PRINT: req.site_context = {req.site_context}")  # Guaranteed output
         
         # =====================================================================
         # PHASE 0: DESIGN INTENT DETECTION (NEW FEATURE!)
