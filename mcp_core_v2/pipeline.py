@@ -179,10 +179,13 @@ class DesignPipeline:
             # [NEXIA EXTENSION] Post-Process Injection (Safety & Compliance)
             # Get site_context directly from request
             site_context = request.site_context or {}
+            print(f"[MCP-DEBUG] site_context received: {site_context}")  # Guaranteed output
+            print(f"[MCP-DEBUG] distance_to_transformer: {site_context.get('distance_to_transformer', 'MISSING')}")
             
             # 1. Enforce kA Ratings
             result = self.ka_rating_injector.inject(result, site_context)
             logger.info(f"[INJECT] kA rating check: distance={site_context.get('distance_to_transformer', 'N/A')}")
+            print(f"[MCP-DEBUG] After kA inject - warnings: {getattr(result, 'warnings', [])}")
             
             # 2. Enforce N-G Link Rules
             result = self.ng_link_injector.inject(result, site_context)
