@@ -10,6 +10,7 @@ Port: MCP Core runs on 5001 (not 8080, that's RAG!)
 """
 
 import logging
+import asyncio
 import httpx
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
@@ -155,64 +156,71 @@ class McpClient:
         logger.info(f"Calling MCP Core: {url}")
         logger.debug(f"Payload: {payload}")
         
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(url, json=payload)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return McpDesignResponse(
-                        success=True,
-                        session_id=data.get("session_id"),
-                        project_name=data.get("project_name"),  # 🆕 FIX
-                        project_number=data.get("project_number"),  # 🆕 FIX
-                        calculations=data.get("calculations"),
-                        wire_sizing=data.get("wire_sizing"),
-                        breaker_selections=data.get("breaker_selections"),
-                        conduit_sizing=data.get("conduit_sizing"),
-                        compliance_report=data.get("compliance_report"),
-                        autolisp_code=data.get("autolisp_code"),
-                        readable_report=data.get("readable_report"),
-                        standards_markdown=data.get("standards_markdown"),
-                        request=data.get("request"),  # 🆕 FIX: Include for formatter
-                        summary=data.get("summary"),  # 🆕 FIX: Include for formatter
-                        grouped_circuits=data.get("grouped_circuits"),  # 🆕 FIX: Circuit groups
-                        errors=data.get("errors", []),
-                        warnings=data.get("warnings", [])
-                    )
+        # 🆕 Retry logic: 3 attempts with exponential backoff
+        max_retries = 3
+        retry_delays = [1, 2, 4]  # seconds
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(url, json=payload)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        return McpDesignResponse(
+                            success=True,
+                            session_id=data.get("session_id"),
+                            project_name=data.get("project_name"),  # 🆕 FIX
+                            project_number=data.get("project_number"),  # 🆕 FIX
+                            calculations=data.get("calculations"),
+                            wire_sizing=data.get("wire_sizing"),
+                            breaker_selections=data.get("breaker_selections"),
+                            conduit_sizing=data.get("conduit_sizing"),
+                            compliance_report=data.get("compliance_report"),
+                            autolisp_code=data.get("autolisp_code"),
+                            readable_report=data.get("readable_report"),
+                            standards_markdown=data.get("standards_markdown"),
+                            request=data.get("request"),  # 🆕 FIX: Include for formatter
+                            summary=data.get("summary"),  # 🆕 FIX: Include for formatter
+                            grouped_circuits=data.get("grouped_circuits"),  # 🆕 FIX: Circuit groups
+                            errors=data.get("errors", []),
+                            warnings=data.get("warnings", [])
+                        )
+                    else:
+                        # MCP returned an error - don't retry
+                        logger.error(f"MCP returned {response.status_code}: {response.text}")
+                        return McpDesignResponse(
+                            success=False,
+                            error_message=f"MCP returned HTTP {response.status_code}",
+                            http_status=response.status_code,
+                            errors=[response.text[:500]]  # Truncate long errors
+                        )
+            
+            except (httpx.TimeoutException, httpx.ConnectError) as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    delay = retry_delays[attempt]
+                    logger.warning(f"MCP call failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
                 else:
-                    # MCP returned an error
-                    logger.error(f"MCP returned {response.status_code}: {response.text}")
-                    return McpDesignResponse(
-                        success=False,
-                        error_message=f"MCP returned HTTP {response.status_code}",
-                        http_status=response.status_code,
-                        errors=[response.text[:500]]  # Truncate long errors
-                    )
+                    logger.error(f"MCP call failed after {max_retries} attempts: {e}")
+            
+            except Exception as e:
+                logger.error(f"MCP call failed: {e}", exc_info=True)
+                return McpDesignResponse(
+                    success=False,
+                    error_message=str(e),
+                    errors=[f"Unexpected error: {str(e)}"]
+                )
         
-        except httpx.TimeoutException:
-            logger.error(f"MCP timeout after {self.timeout}s")
-            return McpDesignResponse(
-                success=False,
-                error_message=f"MCP Core timeout after {self.timeout}s",
-                errors=["Timeout waiting for MCP Core response"]
-            )
-        
-        except httpx.ConnectError:
-            logger.error(f"Cannot connect to MCP Core at {self.base_url}")
-            return McpDesignResponse(
-                success=False,
-                error_message=f"Cannot connect to MCP Core at {self.base_url}",
-                errors=["MCP Core is not running or unreachable"]
-            )
-        
-        except Exception as e:
-            logger.error(f"MCP call failed: {e}", exc_info=True)
-            return McpDesignResponse(
-                success=False,
-                error_message=str(e),
-                errors=[f"Unexpected error: {str(e)}"]
-            )
+        # All retries exhausted
+        error_type = "Timeout" if isinstance(last_error, httpx.TimeoutException) else "Connection"
+        return McpDesignResponse(
+            success=False,
+            error_message=f"MCP Core {error_type} after {max_retries} retries",
+            errors=[f"{error_type} waiting for MCP Core response (tried {max_retries} times)"]
+        )
 
 
 # =============================================================================
