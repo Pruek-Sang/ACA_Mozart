@@ -328,7 +328,18 @@ class MarkdownFormatter(BaseFormatter):
             lines.append("")
             for err in errors[:3]:
                 lines.append(f"- ❌ {err}")
-            for warn in warnings[:5]:
+            
+            # 🆕 FIX: Prioritize critical warnings (kA, N-G Link, RCBO) first
+            critical_keywords = ["kA", "หม้อแปลง", "N-G", "Sub-panel", "RCBO", "≥10"]
+            critical_warns = [w for w in warnings if any(kw in w for kw in critical_keywords)]
+            other_warns = [w for w in warnings if w not in critical_warns]
+            
+            # Show critical warnings first (all of them)
+            for warn in critical_warns:
+                lines.append(f"- ⚠️ {warn}")
+            
+            # Then show up to 5 other warnings
+            for warn in other_warns[:5]:
                 lines.append(f"- ⚠️ {warn}")
             lines.append("")
         
