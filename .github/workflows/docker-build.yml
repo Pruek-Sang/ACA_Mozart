@@ -79,6 +79,14 @@ jobs:
           # Note: 'true' allows build to continue if tests fail (remove for strict mode)
           echo "✅ E2E tests completed"
 
+      - name: 🛡️ Run MCP Core Input Sanitizer Tests
+        run: |
+          cd mcp_core_v2
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          echo "🧪 Running Input Sanitizer validation tests..."
+          python -m pytest tests/test_input_sanitizer.py -v --tb=short
+          echo "✅ Input Sanitizer tests completed"
+
   # ═══════════════════════════════════════════════════════════════════════
   # Build Gateway Image (Artifact Registry - avoids cache issue!)
   # ═══════════════════════════════════════════════════════════════════════

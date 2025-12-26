@@ -18,6 +18,7 @@ from config import get_settings, get_branch_distance_feet, METERS_TO_FEET
 from exceptions import InvalidSpecError, UnsupportedProjectError
 # [NEXIA EXTENSION] Import Context Injectors
 from context import DeratingInjector, KaRatingInjector, NgLinkInjector
+from context.input_sanitizer_injector import InputSanitizerInjector
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class DesignPipeline:
         self.derating_injector = DeratingInjector()
         self.ka_rating_injector = KaRatingInjector()
         self.ng_link_injector = NgLinkInjector()
+        self.input_sanitizer = InputSanitizerInjector()  # 🆕 PRE-validation
     
     def _validate_request(self, request: DesignRequest):
         """Validate design request before processing.
@@ -84,6 +86,26 @@ class DesignPipeline:
         logger.info(f"[CP7-IN] Pipeline start: {rooms_count} rooms, {loads_count} loads, session={request.session_id}")
         
         try:
+            # 🆕 PRE-FLIGHT CHECK: Sanitize inputs before processing
+            sanitize_result = self.input_sanitizer.sanitize(request)
+            if not sanitize_result.is_valid:
+                logger.warning(f"[SANITIZE] Blocked: {len(sanitize_result.errors)} errors")
+                return self.result_builder.build_result(
+                    request=request,
+                    calculations={},
+                    wire_sizing={},
+                    breaker_selections={},
+                    conduit_sizing={},
+                    compliance_report={"status": "BLOCKED", "reason": "Input Validation Failed"},
+                    grouped_circuits=[],
+                    autolisp_code=None,
+                    errors=sanitize_result.errors,
+                    warnings=sanitize_result.warnings
+                )
+            
+            # Add sanitizer warnings to result (if any)
+            sanitize_warnings = sanitize_result.warnings
+            
             # Validate input
             self._validate_request(request)
             
