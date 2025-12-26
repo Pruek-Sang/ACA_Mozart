@@ -329,8 +329,8 @@ class MarkdownFormatter(BaseFormatter):
             for err in errors[:3]:
                 lines.append(f"- ❌ {err}")
             
-            # 🆕 FIX: Prioritize critical warnings (kA, N-G Link, RCBO) first
-            critical_keywords = ["kA", "หม้อแปลง", "N-G", "Sub-panel", "RCBO", "≥10"]
+            # 🆕 FIX: Consolidate duplicate warnings & prioritize critical ones
+            critical_keywords = ["kA", "หม้อแปลง", "N-G", "Sub-panel", "RCBO", "≥10", "SUB-PANEL"]
             critical_warns = [w for w in warnings if any(kw in w for kw in critical_keywords)]
             other_warns = [w for w in warnings if w not in critical_warns]
             
@@ -338,8 +338,21 @@ class MarkdownFormatter(BaseFormatter):
             for warn in critical_warns:
                 lines.append(f"- ⚠️ {warn}")
             
-            # Then show up to 5 other warnings
-            for warn in other_warns[:5]:
+            # 🆕 Consolidate VD warnings (count instead of showing each)
+            vd_warns = [w for w in other_warns if "VD" in w or "Voltage Drop" in w or "ระยะ Default" in w]
+            afci_warns = [w for w in other_warns if "AFCI" in w]
+            remaining_warns = [w for w in other_warns if w not in vd_warns and w not in afci_warns]
+            
+            # Show consolidated VD warning
+            if vd_warns:
+                lines.append(f"- ℹ️ Voltage Drop: มี {len(vd_warns)} วงจร ใช้ระยะ Default (ควรระบุระยะจริง)")
+            
+            # Show consolidated AFCI warning
+            if afci_warns:
+                lines.append(f"- ⚠️ AFCI Protection: มี {len(afci_warns)} วงจร ที่แนะนำติดตั้ง AFCI (ตาม NEC)")
+            
+            # Show remaining unique warnings (up to 5)
+            for warn in remaining_warns[:5]:
                 lines.append(f"- ⚠️ {warn}")
             lines.append("")
         
