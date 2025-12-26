@@ -1891,7 +1891,10 @@ Query: "{query}"
             
             # Convert to MCP format (🆕 now with site_context!)
             adapter = McpAdapter()
+            logger.info(f"[DEBUG-SC-4] _build_design_response - req.site_context: {req.site_context}")
+            logger.info(f"[DEBUG-SC-4] req.site_context type: {type(req.site_context)}")
             mcp_request = adapter.convert(project_input, req.site_context)
+            logger.info(f"[DEBUG-SC-5] mcp_request.site_context: {mcp_request.site_context}")
             
             # Call MCP Core
             mcp_client = McpClient()
@@ -2026,6 +2029,10 @@ Query: "{query}"
         """
         from fastapi import HTTPException
         
+        # 🔍 DEBUG: Log incoming request site_context
+        logger.info(f"[DEBUG-SC-1] Incoming req.site_context: {req.site_context}")
+        logger.info(f"[DEBUG-SC-1] Query: {req.query[:100]}...")
+        
         # =====================================================================
         # PHASE 0: DESIGN INTENT DETECTION (NEW FEATURE!)
         # =====================================================================
@@ -2117,10 +2124,12 @@ Query: "{query}"
                         # Use site_context directly from request JSON
                         site_ctx = req.site_context
                         logger.info(f"✅ Using site_context from request JSON: {site_ctx}")
+                        logger.info(f"[DEBUG-SC-2] site_ctx type: {type(site_ctx)}, keys: {site_ctx.keys() if isinstance(site_ctx, dict) else 'N/A'}")
                     else:
                         # Fallback: Extract from query text
                         site_ctx = extract_site_context_from_text(req.query)
                         logger.info(f"🔍 Extracted site_context from text: {site_ctx}")
+                        logger.info(f"[DEBUG-SC-2] Extracted site_ctx type: {type(site_ctx)}")
                     
                     # 🆕 FIX: Check if site_context is complete
                     is_complete, missing_fields = is_site_context_complete(site_ctx)
@@ -2150,6 +2159,7 @@ Query: "{query}"
                         conduit_grouping=site_ctx.get("conduit_grouping", "1")
                     )
                     logger.info(f"✅ site_context set: {project_req.site_context}")
+                    logger.info(f"[DEBUG-SC-3] About to call _build_design_response with site_context: {project_req.site_context}")
                     
                     # Chain to MCP Core for calculations
                     result = await self._build_design_response(project_req, req.language)
