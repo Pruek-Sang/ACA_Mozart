@@ -340,7 +340,9 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --port 5001
+            --port 5001 \
+            --min-instances=1 \
+            --max-instances=10
           # 🔄 Force traffic to latest revision (prevent stuck on old revision)
           echo "🔄 Routing 100% traffic to latest revision..."
           gcloud run services update-traffic mcp-core --region ${{ env.GCP_REGION }} --to-latest
@@ -363,7 +365,9 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --port 8080
+            --port 8080 \
+            --min-instances=1 \
+            --max-instances=10
           # 🔄 Force traffic to latest revision (prevent stuck on old revision)
           echo "🔄 Routing 100% traffic to latest revision..."
           gcloud run services update-traffic mozart-rag --region ${{ env.GCP_REGION }} --to-latest
