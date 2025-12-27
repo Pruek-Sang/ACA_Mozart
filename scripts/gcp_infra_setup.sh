@@ -40,8 +40,34 @@ else
     echo "⚠️  Please enter your Gemini API key when prompted:"
     # Create secret (will prompt for value)
     # Uncomment to run:
-    # echo -n "YOUR_API_KEY" | gcloud secrets create gemini-key --data-file=- --project=$PROJECT_ID
-    echo "⏸️  Skipped - uncomment the line above and add your key"
+# echo -n "YOUR_API_KEY" | gcloud secrets create gemini-key --data-file=- --project=$PROJECT_ID
+echo "⏸️  Skipped - uncomment the line above and add your key"
+fi
+
+# ─────────────────────────────────────────────────────────────────
+# Phase 4b: Supabase Secrets (for Stateful Intelligence)
+# ─────────────────────────────────────────────────────────────────
+echo ""
+echo "🔐 Phase 4b: Setting up Supabase Secrets..."
+
+# Supabase URL
+if gcloud secrets describe supabase-url --project=$PROJECT_ID 2>/dev/null; then
+    echo "✅ Secret 'supabase-url' already exists"
+else
+    echo "Creating secret 'supabase-url'..."
+    # Uncomment and replace YOUR_SUPABASE_URL:
+    # echo -n "https://xxx.supabase.co" | gcloud secrets create supabase-url --data-file=- --project=$PROJECT_ID
+    echo "⏸️  Skipped - uncomment and add your Supabase URL"
+fi
+
+# Supabase Service Role Key
+if gcloud secrets describe supabase-service-key --project=$PROJECT_ID 2>/dev/null; then
+    echo "✅ Secret 'supabase-service-key' already exists"
+else
+    echo "Creating secret 'supabase-service-key'..."
+    # Uncomment and replace YOUR_SERVICE_KEY:
+    # echo -n "eyJ..." | gcloud secrets create supabase-service-key --data-file=- --project=$PROJECT_ID
+    echo "⏸️  Skipped - uncomment and add your Supabase Service Role Key"
 fi
 
 # Grant Cloud Run access to secrets
@@ -53,6 +79,17 @@ SA_EMAIL="203658178245-compute@developer.gserviceaccount.com"
 #     --member="serviceAccount:$SA_EMAIL" \
 #     --role="roles/secretmanager.secretAccessor" \
 #     --project=$PROJECT_ID
+
+# Grant access to Supabase secrets:
+# gcloud secrets add-iam-policy-binding supabase-url \
+#     --member="serviceAccount:$SA_EMAIL" \
+#     --role="roles/secretmanager.secretAccessor" \
+#     --project=$PROJECT_ID
+# gcloud secrets add-iam-policy-binding supabase-service-key \
+#     --member="serviceAccount:$SA_EMAIL" \
+#     --role="roles/secretmanager.secretAccessor" \
+#     --project=$PROJECT_ID
+
 echo "⏸️  Skipped - uncomment when ready"
 
 # ─────────────────────────────────────────────────────────────────
