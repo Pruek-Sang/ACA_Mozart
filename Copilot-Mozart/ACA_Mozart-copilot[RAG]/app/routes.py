@@ -33,6 +33,24 @@ from app.session_store import session_store
 from core.ingest import IngestionEngine
 from core.vector_adapter import get_vector_db
 
+# 🆕 Stateful Intelligence imports
+try:
+    from app.context import session_injector
+    from app.context.supabase_client import get_supabase_client, SupabaseHealthCheck
+    SUPABASE_AVAILABLE = True
+except ImportError as e:
+    SUPABASE_AVAILABLE = False
+    session_injector = None
+    get_supabase_client = lambda: None
+
+try:
+    from app.middleware import rate_limiter, RateLimitExceeded
+    RATE_LIMITER_AVAILABLE = True
+except ImportError as e:
+    RATE_LIMITER_AVAILABLE = False
+    rate_limiter = None
+    RateLimitExceeded = Exception  # Fallback
+
 logger = logging.getLogger("Aura.Routes")
 
 # Initialize FastAPI app
@@ -85,53 +103,110 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+# 🆕 Rate Limit Exception Handler
+if RATE_LIMITER_AVAILABLE:
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+        """Handle rate limit exceeded - return 429 with retry-after"""
+        user_id = getattr(request.state, "user_id", request.client.host if request.client else "unknown")
+        logger.warning(f"🚫 Rate limit exceeded for {user_id}: {exc.message}")
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": exc.message,
+                "retry_after": exc.retry_after,
+                "request_id": getattr(request.state, "request_id", "unknown")
+            },
+            headers={"Retry-After": str(exc.retry_after)}
+        )
+
+
 # === API Routes ===
 
 @app.get("/")
 async def root():
-    """Health check"""
+    """
+    Health check + Supabase keepalive (prevents Free Tier pause!)
+    
+    Every call to this endpoint pings Supabase to keep the project active.
+    """
+    supabase_status = "not_configured"
+    
+    # 🔌 Keepalive ping - ทุก health check จะ ping Supabase
+    if SUPABASE_AVAILABLE:
+        client = get_supabase_client()
+        if client:
+            try:
+                # Simple query to keep project alive (SELECT on sessions table)
+                client.table("mozart.sessions").select("id").limit(1).execute()
+                supabase_status = "connected"
+                logger.debug("🔌 Supabase keepalive: ping success")
+            except Exception as e:
+                supabase_status = f"error: {str(e)[:50]}"
+                logger.warning(f"⚠️ Supabase keepalive failed: {e}")
+        else:
+            supabase_status = "client_not_initialized"
+    
     return {
         "service": "Mozart RAG Spec Engine",
         "version": settings.API_VERSION,
         "status": "alive",
+        "supabase": supabase_status,
+        "rate_limiter": "enabled" if RATE_LIMITER_AVAILABLE else "disabled",
         "goddess": "Aura"
     }
 
 
 @app.post("/api/v1/ask", response_model=StandardResponse)
-async def ask_standard(req: QueryRequest):
+async def ask_standard(req: QueryRequest, request: Request):
     """
     Ask a question about electrical standards
     
     This endpoint provides human-readable answers grounded in knowledge base.
+    Rate limited: 20 requests/minute per user.
     
     Errors:
+    - 429: Rate limit exceeded
     - 503: Vector database unavailable
     - 504: LLM timeout
     """
+    # ⏱️ Rate limit check (20/min for ask)
+    if RATE_LIMITER_AVAILABLE and rate_limiter:
+        user_id = getattr(request.state, "user_id", request.client.host if request.client else "anonymous")
+        rate_limiter.check(user_id, "ask")
+        logger.debug(f"⏱️ Rate check passed for {user_id} on /ask")
+    
     return await rag_service.process_ask(req)
 
 
 @app.post("/api/v1/mcp_spec", response_model=McpSpecResponse)
-async def mcp_spec(req: ProjectRequirements):
+async def mcp_spec(req: ProjectRequirements, request: Request):
     """
     Generate MCP ProjectInputSpec from human requirements
     
     This is the CORE transformation endpoint.
+    Rate limited: 10 requests/minute per user (expensive LLM call!).
     
     Errors:
     - 400: Incomplete/invalid requirements
     - 422: LLM output failed validation after retries
+    - 429: Rate limit exceeded
     - 503: Vector database unavailable
     - 504: LLM timeout
     
     All requests are logged to trust_log for audit.
     """
+    # ⏱️ Rate limit check (10/min for design-type endpoints)
+    if RATE_LIMITER_AVAILABLE and rate_limiter:
+        user_id = getattr(request.state, "user_id", request.client.host if request.client else "anonymous")
+        rate_limiter.check(user_id, "design")
+        logger.debug(f"⏱️ Rate check passed for {user_id} on /mcp_spec")
+    
     return await rag_service.generate_mcp_spec(req)
 
 
 @app.post("/api/v1/design")
-async def design_electrical_system(req: ProjectRequirements):
+async def design_electrical_system(req: ProjectRequirements, request: Request):
     """
     End-to-end electrical design: Requirements → RAG → MCP → Results
     
@@ -141,13 +216,20 @@ async def design_electrical_system(req: ProjectRequirements):
     3. MCP Core: Calculate wire sizing, breakers, etc.
     
     Returns combined result with both spec and calculations.
+    Rate limited: 10 requests/minute per user (most expensive endpoint!).
     
     Errors:
     - 400: Invalid/incomplete requirements (including missing site_context!)
     - 422: Spec generation failed
+    - 429: Rate limit exceeded
     - 503: MCP Core unavailable
     - 504: Timeout (RAG or MCP)
     """
+    # ⏱️ Rate limit check (10/min for design - expensive!)
+    if RATE_LIMITER_AVAILABLE and rate_limiter:
+        user_id = getattr(request.state, "user_id", request.client.host if request.client else "anonymous")
+        rate_limiter.check(user_id, "design")
+        logger.info(f"⏱️ Rate check passed for {user_id} on /design")
     # 🆕 Step 0: Validate site_context (REQUIRED for safety!)
     if not req.site_context:
         raise HTTPException(
