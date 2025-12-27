@@ -59,6 +59,11 @@ from app.trust_log import trust_logger
 from app.formatters import format_design_report  # Card-style Markdown formatter
 from core.privacy import PrivacyGuard
 
+# 🆕 Refactored Stateful Intelligence modules
+from app.intent.edit_detector import detect_edit_intent
+from app.context.audit_logger import log_conversation
+from app.context.merge_engine import merge_design_changes
+
 logger = logging.getLogger("Aura.Service")
 
 # =============================================================================
@@ -433,6 +438,16 @@ Query: "{query}"
             logger.warning(f"[INTENT] LLM fallback failed: {e}, defaulting to Q&A")
             return False  # Safe default: Q&A mode
     
+    # =========================================================================
+    # STATEFUL INTELLIGENCE METHODS - REFACTORED TO SEPARATE MODULES
+    # =========================================================================
+    # The following functions have been moved to dedicated modules:
+    # - detect_edit_intent() → app/intent/edit_detector.py
+    # - log_conversation() → app/context/audit_logger.py
+    # - merge_design_changes() → app/context/merge_engine.py
+    # =========================================================================
+
+
     def _auto_fill_lighting(
         self, 
         raw_rooms: List[Dict], 
@@ -2012,15 +2027,21 @@ Query: "{query}"
                 )
             )
 
-    async def process_ask(self, req: QueryRequest) -> StandardResponse:
+    async def process_ask(self, req: QueryRequest, session_id: Optional[str] = None) -> StandardResponse:
         """
         Process a general QA question - now with smart intent detection!
         
         If query looks like a design request (e.g., "ออกแบบบ้าน 2 ชั้น มีแอร์ 3 ตัว"),
         automatically extracts loads and chains to MCP Core for calculations.
         
+        🆕 Phase 1-4 Stateful Intelligence:
+        - Detects EDIT vs CREATE intent
+        - Logs conversation to Supabase (Audit Trail)
+        - Loads existing session for EDIT mode
+        
         Args:
             req: Query request with context_hint and language
+            session_id: Optional session ID for stateful editing
         
         Returns:
             Standard response with answer, sources, and metadata
@@ -2037,6 +2058,76 @@ Query: "{query}"
         print(f"[DEBUG-SC-1] PRINT: req.site_context = {req.site_context}")  # Guaranteed output
         
         # =====================================================================
+        # 🆕 PHASE 1: EDIT INTENT DETECTION (Stateful Intelligence)
+        # Uses refactored module: app/intent/edit_detector.py
+        # =====================================================================
+        is_edit_mode = detect_edit_intent(req.query)
+        
+        if is_edit_mode and session_id:
+            logger.info(f"🔧 EDIT mode detected for session {session_id[:8]}... query: '{req.query[:50]}...'")
+            
+            # [STATEFUL] 1. Merge changes into session
+            merge_result = await merge_design_changes(session_id, req.query)
+            
+            if merge_result:
+                logger.info(f"✅ Merge successful - Recalculating design for session {session_id}")
+                
+                # [STATEFUL] 2. Convert merged data to ProjectRequirements
+                # Note: merge_result contains raw dicts from DB/Session
+                rooms_data = merge_result.get("rooms", [])
+                loads_data = merge_result.get("loads", [])
+                site_ctx_data = merge_result.get("site_context", {})
+                
+                # Convert dicts to Pydantic models
+                current_rooms = [
+                    RoomInput(
+                        name=r.get("name"), 
+                        type=r.get("type", "bedroom"), 
+                        floor=r.get("floor", 1),
+                        area_sqm=r.get("area_sqm")
+                    ) 
+                    for r in rooms_data
+                ]
+                
+                current_loads = [
+                    LoadInput(
+                        room_name=l.get("room_name"),
+                        device=l.get("device"),
+                        quantity=l.get("quantity", 1),
+                        floor=l.get("floor", 1),
+                        branch_distance_m=l.get("branch_distance_m")
+                    )
+                    for l in loads_data
+                ]
+                
+                project_req = ProjectRequirements(
+                    project_name="Stateful Edit",
+                    rooms=current_rooms,
+                    loads=current_loads
+                )
+                
+                # Apply site_context if present
+                if site_ctx_data:
+                    from app.models import SiteContext
+                    project_req.site_context = SiteContext(**site_ctx_data)
+                
+                # [STATEFUL] 3. Recalculate (Call MCP Core)
+                # Re-use _build_design_response to get full formatted report + audit
+                return await self._build_design_response(project_req, req.language)
+            
+            else:
+                logger.warning(f"⚠️ Merge failed or no changes detected - falling back to normal flow")
+                # Log the attempt for audit
+                try:
+                    await log_conversation(session_id, "user", req.query)
+                except Exception as e:
+                    logger.warning(f"[AUDIT] Failed to log user message: {e}")
+        elif is_edit_mode and not session_id:
+            logger.warning(f"⚠️ EDIT intent detected but no session_id provided - falling back to CREATE mode")
+        
+        # =====================================================================
+
+
         # PHASE 0: DESIGN INTENT DETECTION (NEW FEATURE!)
         # =====================================================================
         # Check if user is asking for electrical design calculation

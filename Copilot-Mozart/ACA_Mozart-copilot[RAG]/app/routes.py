@@ -158,12 +158,16 @@ async def root():
 
 
 @app.post("/api/v1/ask", response_model=StandardResponse)
-async def ask_standard(req: QueryRequest, request: Request):
+async def ask_standard(req: QueryRequest, request: Request, session_id: str = None):
     """
     Ask a question about electrical standards
     
     This endpoint provides human-readable answers grounded in knowledge base.
     Rate limited: 20 requests/minute per user.
+    
+    🆕 Stateful Intelligence:
+    - Pass session_id query param to enable EDIT mode and Audit Trail
+    - Example: POST /api/v1/ask?session_id=xxx-xxx-xxx
     
     Errors:
     - 429: Rate limit exceeded
@@ -176,7 +180,9 @@ async def ask_standard(req: QueryRequest, request: Request):
         rate_limiter.check(user_id, "ask")
         logger.debug(f"⏱️ Rate check passed for {user_id} on /ask")
     
-    return await rag_service.process_ask(req)
+    # 🆕 Pass session_id to enable Stateful Intelligence
+    return await rag_service.process_ask(req, session_id=session_id)
+
 
 
 @app.post("/api/v1/mcp_spec", response_model=McpSpecResponse)

@@ -100,6 +100,9 @@ graph TB
 | `mcp_adapter.py` | `McpElectricalLoad` | Convert user input to MCP format | `@dataclass` → `to_dict()` |
 | `mcp_adapter.py` | `McpDesignRequest` | Wrap loads + panels for API call | `@dataclass` → `to_dict()` |
 | `mcp_client.py` | `McpDesignResponse` | Parse MCP Core response | `@dataclass` → `to_dict()` |
+| `merge_engine.py` | `merge_design_changes` | Logic for merging user edits | `Dict` (Merged Session) |
+| `session_injector.py` | `SessionData` | Database Schema Mirror | `@dataclass` → `to_dict()` |
+| `llm_parser.py` | `EditCommand` | User intent representation | `@dataclass` → `to_dict()` |
 
 ### MCP Core Classes
 
