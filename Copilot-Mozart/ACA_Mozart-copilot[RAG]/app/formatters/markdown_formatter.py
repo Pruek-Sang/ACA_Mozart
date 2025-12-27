@@ -507,7 +507,7 @@ class MarkdownFormatter(BaseFormatter):
         return lines
     
     def _create_footer(self) -> List[str]:
-        """Create professional footer."""
+        """Create professional footer with disclaimer."""
         # 🆕 FIX: Use Thailand timezone instead of UTC
         from zoneinfo import ZoneInfo
         today = datetime.now(ZoneInfo("Asia/Bangkok")).strftime("%d/%m/%Y %H:%M")
@@ -522,9 +522,12 @@ class MarkdownFormatter(BaseFormatter):
             "| NEC 2023 | Wire Sizing, Breaker Selection |",
             "| IEC 60364 | Low-voltage Installations |",
             "",
+            "> 📝 **หมายเหตุ:** ตารางโหลดนี้ออกแบบตามมาตรฐาน วสท. 2564 เพื่อความปลอดภัยสูงสุด "
+            "ผู้รับเหมาสามารถปรับแก้ได้ตามดุลยพินิจและข้อตกลงกับเจ้าของบ้าน",
+            "",
             "---",
             "",
-            f"*สร้างโดย MCP Core v2.0 | {today}*",
+            f"*สร้างโดย Mozart Electrical Design | {today}*",
         ]
 
 

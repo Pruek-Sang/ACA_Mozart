@@ -1330,3 +1330,31 @@ def group_loads(...) -> List[Dict[str, Any]]:
 
 *อัพเดทล่าสุด: 2025-12-24 03:30*
 *กู จะ ไม่ ทำ ผิด แบบ เดิม อีก! (รอบที่ 25 แล้ว...)*
+
+---
+
+## 🔴 ความผิดพลาดที่ 21: Formatter Slicing Limit ทำให้ข้อมูลสำคัญหาย (27 ธ.ค. 2024)
+
+> **อาการ:**
+> - ระบบคำนวณถูก (kA Warning ถูกสร้างใน logs)
+> - Data Flow ถูกต้อง (RAG -> MCP -> RAG)
+> - **แต่ Warning ไม่แสดงในผลลัพธ์สุดท้าย!**
+
+**สาเหตุ:**
+Formatter มีการจำกัดจำนวนการแสดงผล (Slicing) โดยไม่จัดลำดับความสำคัญ:
+```python
+# ❌ Original Code (Bug)
+for warn in warnings[:5]:  # แสดงแค่ 5 ตัวแรก
+    lines.append(f"- ⚠️ {warn}")
+```
+- Warnings ที่ไม่สำคัญ (VD info, AFCI) ถมเต็ม 5 ช่องแรก
+- Critical Warning (kA Safety) ถูก append ทีหลัง (index 29) -> **ถูกตัดทิ้ง!**
+
+**วิธีแก้:**
+1. **Prioritize Critical Items:** กรองหาคำสำคัญ (kA, อันตราย, RCBO) แล้วแสดงพวกนี้ก่อน
+2. **Consolidate Repetitive Items:** รวม warning ที่ซ้ำกัน (เช่น "VD 18 วงจร ใช้ระยะ default") เป็นบรรทัดเดียว
+
+**กฎเหล็ก:**
+22. **ถ้าข้อมูลมีใน Log แต่หายใน UI -> เช็ค Display Loop/Slicing Limit ([:X]) ทันที!**
+    - ห้ามใช้ `[:Limit]` กับข้อมูลความปลอดภัยโดยไม่ sort/filter ก่อนเสมอ
+
