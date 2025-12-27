@@ -106,7 +106,8 @@ class SessionInjector:
     Follows Injector Pattern for separation of concerns.
     """
     
-    TABLE = "mozart.sessions"
+    TABLE = "sessions"
+    SCHEMA = "mozart"
     
     def __init__(self):
         self._client = None
@@ -156,7 +157,12 @@ class SessionInjector:
             if initial_data:
                 data.update(initial_data)
             
-            result = self.client.table(self.TABLE).insert(data).execute()
+            result = (
+                self.client.schema(self.SCHEMA)
+                .table(self.TABLE)
+                .insert(data)
+                .execute()
+            )
             
             if result.data and len(result.data) > 0:
                 session = SessionData.from_dict(result.data[0])
@@ -189,7 +195,8 @@ class SessionInjector:
         
         try:
             result = (
-                self.client.table(self.TABLE)
+                self.client.schema(self.SCHEMA)
+                .table(self.TABLE)
                 .select("*")
                 .eq("id", session_id)
                 .eq("status", "active")
@@ -222,7 +229,8 @@ class SessionInjector:
         
         try:
             result = (
-                self.client.table(self.TABLE)
+                self.client.schema(self.SCHEMA)
+                .table(self.TABLE)
                 .select("*")
                 .eq("user_id", user_id)
                 .eq("status", "active")
@@ -261,7 +269,8 @@ class SessionInjector:
             safe_updates = {k: v for k, v in updates.items() if k not in ["id", "user_id", "created_at"]}
             
             result = (
-                self.client.table(self.TABLE)
+                self.client.schema(self.SCHEMA)
+                .table(self.TABLE)
                 .update(safe_updates)
                 .eq("id", session_id)
                 .execute()
@@ -352,7 +361,7 @@ class SessionInjector:
             return False
         
         try:
-            self.client.table(self.TABLE).delete().eq("id", session_id).execute()
+            self.client.schema(self.SCHEMA).table(self.TABLE).delete().eq("id", session_id).execute()
             logger.info(f"Hard deleted session {session_id}")
             return True
         except Exception as e:

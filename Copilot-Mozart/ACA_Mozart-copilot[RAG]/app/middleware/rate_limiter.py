@@ -27,8 +27,41 @@ from typing import Dict, Optional, Callable
 from collections import defaultdict
 from functools import wraps
 from dataclasses import dataclass
+from starlette.requests import Request
 
 logger = logging.getLogger("Aura.RateLimiter")
+
+
+def get_real_ip(request: Request) -> str:
+    """
+    Extract real client IP from request, handling Load Balancer/Proxy scenarios.
+    
+    Priority:
+    1. X-Forwarded-For header (first IP in chain)
+    2. X-Real-IP header
+    3. Direct client.host (fallback)
+    
+    Args:
+        request: FastAPI/Starlette Request object
+        
+    Returns:
+        Client IP address string
+    """
+    # X-Forwarded-For: client, proxy1, proxy2, ...
+    x_forwarded_for = request.headers.get("X-Forwarded-For", "")
+    if x_forwarded_for:
+        # First IP is the original client
+        client_ip = x_forwarded_for.split(",")[0].strip()
+        if client_ip:
+            return client_ip
+    
+    # X-Real-IP is sometimes set by proxies
+    x_real_ip = request.headers.get("X-Real-IP", "")
+    if x_real_ip:
+        return x_real_ip.strip()
+    
+    # Fallback to direct connection (may be Load Balancer IP)
+    return request.client.host if request.client else "unknown"
 
 
 class RateLimitExceeded(Exception):
@@ -57,14 +90,16 @@ class RateLimit:
 
 
 # Default rate limits for different endpoints
+# NOTE: Limits are set for ~20 concurrent users behind Cloud Run Load Balancer
+# Until we properly extract X-Forwarded-For, all users share these limits!
 DEFAULT_LIMITS: Dict[str, RateLimit] = {
-    "design": RateLimit(10, 60),        # 10 designs per minute (expensive!)
-    "ask": RateLimit(20, 60),           # 20 questions per minute
-    "chat": RateLimit(30, 60),          # 30 chat messages per minute
-    "session": RateLimit(50, 60),       # 50 session ops per minute
-    "project": RateLimit(30, 60),       # 30 project ops per minute
-    "health": RateLimit(100, 60),       # 100 health checks per minute
-    "default": RateLimit(30, 60),       # Default: 30 per minute
+    "design": RateLimit(200, 60),       # 200 designs per minute (~10 per user × 20 users)
+    "ask": RateLimit(400, 60),          # 400 questions per minute (~20 per user × 20 users)
+    "chat": RateLimit(600, 60),         # 600 chat messages per minute
+    "session": RateLimit(1000, 60),     # 1000 session ops per minute
+    "project": RateLimit(600, 60),      # 600 project ops per minute
+    "health": RateLimit(2000, 60),      # 2000 health checks per minute
+    "default": RateLimit(600, 60),      # Default: 600 per minute
 }
 
 

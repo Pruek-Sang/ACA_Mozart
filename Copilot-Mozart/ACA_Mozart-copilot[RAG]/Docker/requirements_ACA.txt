@@ -58,6 +58,10 @@ pytest-asyncio==0.23.3
 # Vector Database
 chromadb==0.4.22
 
+# Supabase Integration (Backend Database)
+supabase>=2.0.0
+gotrue>=2.0.0
+
 # Code Quality (Development)
 black==24.1.1
 ruff==0.1.13
