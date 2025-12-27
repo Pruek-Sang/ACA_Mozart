@@ -8578,3 +8578,28 @@ site_context = request.site_context or {}
 *Grep searched codebase*
 
 *Grep searched codebase*
+---
+
+
+---
+
+## ✅ Final Resolution: kA Warning Not Showing (27 Dec 2024)
+
+### 🔴 The Problem
+Despite kA logic being correct in MCP Core, the users never saw the warning "ระยะหม้อแปลง < 50m: แนะนำใช้ Main Breaker ≥10kA".
+
+### 🔍 Root Cause Analysis
+1. **Data Flow:** Confirmed `site_context` passed correctly from RAG -> MCP.
+2. **Logic Check:** Confirmed `ka_rating_injector` generated the warning.
+3. **The Culprit:** `markdown_formatter.py`
+   - The formatter had a hard limit: `warnings[:5]`
+   - The kA warning was appended *after* all circuit-level warnings (VD, AFCI).
+   - With ~30 warnings total, the kA warning (index ~29) was silently sliced off.
+
+### 🛠️ The Fix
+1. **Priority Display:** Modified formatter to filter and show **Critical Warnings** (kA, N-G, RCBO) *first*, regardless of position in array.
+2. **Consolidation:** Grouped repetitive warnings (e.g., 18x VD warnings) into a single summary line ("มี 18 วงจร ใช้ระยะ Default").
+
+### 🎓 Lesson Learned
+**"Invisible Limits"**: When data exists in backend but vanishes in frontend, explicitly check for array slicing (`[:x]`) or pagination limits in the presentation layer.
+
