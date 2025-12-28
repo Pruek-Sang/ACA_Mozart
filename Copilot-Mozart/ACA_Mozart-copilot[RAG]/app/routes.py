@@ -51,6 +51,13 @@ except ImportError as e:
     rate_limiter = None
     RateLimitExceeded = Exception  # Fallback
 
+try:
+    from app.middleware.admin_auth import verify_admin_access
+    ADMIN_AUTH_AVAILABLE = True
+except ImportError:
+    ADMIN_AUTH_AVAILABLE = False
+    verify_admin_access = lambda: None
+
 logger = logging.getLogger("Aura.Routes")
 
 # Initialize FastAPI app
@@ -298,26 +305,32 @@ async def design_electrical_system(req: ProjectRequirements, request: Request):
         }
 
 
-@app.post("/api/v1/retrieve_raw")
+# =============================================================================
+# ADMIN ROUTES (Protected by Header X-Admin-Key)
+# =============================================================================
+
+@app.post("/api/v1/admin/retrieve_raw", dependencies=[Depends(verify_admin_access)])
 async def retrieve_raw(req: RawRetrieveRequest):
     """
     Debug endpoint: Raw retrieval without LLM processing
     
-    Note: This endpoint is for DEV/AGENT DEBUG only.
+    [ADMIN ONLY]
     Returns raw vector search results.
     """
     return await rag_service.retrieve_raw(req)
 
 
-@app.post("/api/v1/ingest")
+@app.post("/api/v1/admin/ingest", dependencies=[Depends(verify_admin_access)])
 async def ingest(req: IngestRequest, bg_tasks: BackgroundTasks):
     """
     Ingest a document into vector database
     
+    [ADMIN ONLY]
     Processing happens in background.
     
     Errors:
     - 400: File not found
+    - 401: Unauthorized (Missing/Wrong Key)
     """
     # Pre-check file existence
     if not os.path.exists(req.file_path):
@@ -346,11 +359,12 @@ async def ingest(req: IngestRequest, bg_tasks: BackgroundTasks):
     }
 
 
-@app.post("/api/v1/delete")
+@app.post("/api/v1/admin/delete", dependencies=[Depends(verify_admin_access)])
 async def delete_doc(req: DeleteRequest):
     """
     Delete documents from vector database by source path
     
+    [ADMIN ONLY]
     Returns number of documents deleted.
     """
     db = get_vector_db()
