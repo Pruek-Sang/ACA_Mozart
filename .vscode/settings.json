@@ -1,5 +1,5 @@
 {
-    "editor.fontSize": 30,
+    "editor.fontSize": 12,
     "window.zoomLevel": 2.5,
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "python-envs.pythonProjects": []
