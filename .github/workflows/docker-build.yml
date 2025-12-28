@@ -146,6 +146,10 @@ jobs:
           cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf" ./nginx-cloudrun.conf
           echo "📁 Copying Dockerfile..."
           cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/Dockerfile.frontend-cloudrun" ./Dockerfile.frontend-cloudrun
+          echo "📝 Creating .env.production..."
+          echo "VITE_API_URL=https://gateway-203658178245.asia-southeast1.run.app" > ./frontend-src/.env.production
+          echo "VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> ./frontend-src/.env.production
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> ./frontend-src/.env.production
           echo "📋 .env.production contents:"
           cat ./frontend-src/.env.production
           echo "✅ Files ready for Docker build"
