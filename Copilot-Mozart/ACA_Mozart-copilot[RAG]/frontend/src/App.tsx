@@ -187,8 +187,8 @@ function App() {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT COLUMN: Controls */}
-        <div className="w-[400px] flex flex-col shrink-0">
+        {/* LEFT COLUMN: Controls - 480px (+20% from original 400px) */}
+        <div className="w-[480px] flex flex-col shrink-0">
           <div className="flex-1 min-h-0">
             <ChatPanel
               messages={messages}
