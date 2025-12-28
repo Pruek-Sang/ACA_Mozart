@@ -141,7 +141,7 @@ jobs:
       - name: 📁 Copy files to root (avoid special chars in path)
         run: |
           echo "📁 Copying frontend source to ./frontend-src..."
-          cp -r "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend_UI_UX/mozart-chat" ./frontend-src
+          cp -r "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend" ./frontend-src
           echo "📁 Copying nginx config..."
           cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf" ./nginx-cloudrun.conf
           echo "📁 Copying Dockerfile..."
