@@ -7,11 +7,11 @@ import { LoginPage } from './components/LoginPage';
 import type {
   ChatMessage,
   SiteContext,
-  DesignResult,
-  AskRequest
+  DesignResult
 } from './types';
-import { classifyError, buildApiUrl } from './lib/utils';
-import { supabase, getAccessToken, signOut } from './lib/supabase';
+import { classifyError } from './lib/utils';
+import { supabase, signOut } from './lib/supabase';
+import { askDesign } from './lib/api';
 import { LogOut, User as UserIcon } from 'lucide-react';
 
 /**
@@ -103,49 +103,14 @@ function App() {
     setIsDirty(false);
 
     try {
-      // 2. Get Auth Token
-      const token = await getAccessToken();
-
-      // 3. Prepare Payload (ตรงกับ API Contract)
-      const payload: AskRequest = {
+      // 2. Call API via centralized api.ts module
+      const data = await askDesign({
         query: userPrompt,
         language: 'th',
         site_context: context
-      };
-
-      console.log('🚀 SENDING REQUEST:', payload);
-      console.log('📍 API URL:', buildApiUrl('/api/v1/ask'));
-      console.log('🔐 AUTH:', token ? 'Token attached' : 'No token');
-
-      // 4. Make API Call with Auth Header
-      const response = await fetch(buildApiUrl('/api/v1/ask'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify(payload)
       });
 
-      console.log('📥 RESPONSE STATUS:', response.status);
-
-      // 5. Handle Non-OK Response
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const error = {
-          response: {
-            status: response.status,
-            data: errorData
-          }
-        };
-        throw error;
-      }
-
-      // 6. Parse Response
-      const data = await response.json();
-      console.log('📦 RESPONSE DATA:', data);
-
-      // 7. Add Success Message
+      // 3. Add Success Message
       const sysMsg: ChatMessage = {
         role: 'assistant',
         content: data.answer || '✅ คำนวณเสร็จสิ้น ดูผลลัพธ์ทางขวา',
@@ -153,7 +118,7 @@ function App() {
       };
       setMessages(prev => [...prev, sysMsg]);
 
-      // 8. Update Result Data
+      // 4. Update Result Data
       if (data.metadata?.readable_report) {
         setResultData({
           success: true,
