@@ -620,7 +620,11 @@ app = FastAPI(
 # Security: CORS configuration from environment
 # Set ALLOWED_ORIGINS=https://your-domain.com,https://app.your-domain.com
 # For development, use ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# 🆕 Include Frontend Cloud Run URL for production
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", 
+    "http://localhost:5173,http://localhost:3000,https://frontend-203658178245.asia-southeast1.run.app"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -680,6 +684,43 @@ async def health():
             "AMADEUS": AMADEUS_ENDPOINT
         }
     }
+
+
+# =============================================================================
+# 🆕 Direct Proxy Routes (Frontend-friendly)
+# =============================================================================
+
+@app.post("/api/v1/ask")
+async def proxy_ask(request: Request):
+    """
+    Proxy /api/v1/ask to RAG Service (MOZART)
+    
+    This endpoint allows Frontend to call /api/v1/ask directly on Gateway
+    instead of needing to know RAG Service URL.
+    """
+    try:
+        body = await request.json()
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{MOZART_ENDPOINT}/api/v1/ask",
+                json=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Forwarded-For": request.client.host if request.client else "unknown"
+                }
+            )
+            
+            return JSONResponse(
+                status_code=response.status_code,
+                content=response.json()
+            )
+    except Exception as e:
+        logger.error(f"Proxy /api/v1/ask failed: {e}")
+        return JSONResponse(
+            status_code=502,
+            content={"error": f"Gateway proxy error: {str(e)}"}
+        )
 
 
 @app.post("/orchestrate", response_model=GatewayResponse)
