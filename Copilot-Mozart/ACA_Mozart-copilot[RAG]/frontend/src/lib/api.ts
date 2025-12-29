@@ -15,7 +15,7 @@
 
 import { buildApiUrl } from './utils';
 import { getAccessToken } from './supabase';
-import type { SiteContext, DisplayData, AuditRow, PDFData } from '../types';
+import type { SiteContext, DisplayData, AuditRow, PDFData, SLDData } from '../types';
 
 // ============================================================================
 // Types
@@ -40,7 +40,7 @@ export interface AskResponse {
         display_data?: DisplayData;
         audit_results?: AuditRow[];
         pdf_data?: PDFData;
-        sld_data?: Record<string, unknown>;
+        sld_data?: SLDData;  // Fixed: was Record<string, unknown>
     };
     error?: string;
 }
