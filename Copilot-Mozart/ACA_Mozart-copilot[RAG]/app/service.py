@@ -57,8 +57,9 @@ from app.config import settings
 from app.knowledge_service import KnowledgeService
 from app.trust_log import trust_logger
 from app.formatters import format_design_report  # Card-style Markdown formatter
-# 🆕 Computed Data Layer - Phase 1
-from app.display import compute_display_data
+# 🆕 Computed Data Layer - Phase 1-3
+from app.display import compute_display_data, format_audit_for_frontend
+from app.formatters.pdf_formatter import format_pdf_table
 from core.privacy import PrivacyGuard
 
 # 🆕 Refactored Stateful Intelligence modules
@@ -1990,6 +1991,21 @@ Query: "{query}"
                     logger.error(f"[CP-DISPLAY] Compute failed, fallback: {compute_err}")
                     display_data_dict = None
                 
+                # 🆕 [CP-AUDIT-JSON] Format audit results for Frontend
+                audit_results_formatted = None
+                try:
+                    if audit_results:
+                        audit_results_formatted = format_audit_for_frontend(audit_results)
+                except Exception as audit_fmt_err:
+                    logger.warning(f"[CP-AUDIT-JSON] Failed to format audit: {audit_fmt_err}")
+                
+                # 🆕 [CP-BOQ] Format PDF/BOQ data for Frontend
+                pdf_data_dict = None
+                try:
+                    pdf_data_dict = format_pdf_table(result)
+                except Exception as pdf_err:
+                    logger.warning(f"[CP-BOQ] Failed to format PDF: {pdf_err}")
+                
                 return StandardResponse(
                     answer=final_text,
                     sources=[SourceRef(
@@ -2009,7 +2025,8 @@ Query: "{query}"
                         standards_markdown=mcp_response.standards_markdown,
                         # 🆕 Computed Data Layer - structured JSON for Frontend
                         display_data=display_data_dict,
-                        audit_results=audit_results if 'audit_results' in dir() and audit_results else None,
+                        audit_results=audit_results_formatted,
+                        pdf_data=pdf_data_dict,
                     )
                 )
             else:
