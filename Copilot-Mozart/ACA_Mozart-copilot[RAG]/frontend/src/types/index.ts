@@ -81,7 +81,74 @@ export interface AskResponse {
         retrieved_docs?: string[];
         readable_report?: string;
         autolisp_code?: string;
+        // 🆕 Computed Data Layer - structured JSON
+        display_data?: DisplayData;
+        audit_results?: AuditRow[];
+        pdf_data?: PDFData;
+        sld_data?: Record<string, unknown>;
     };
+}
+
+/**
+ * 🆕 Computed Display Data from Backend
+ */
+export interface DisplayData {
+    project_name: string;
+    total_watts: number;
+    total_kw: number;
+    demand_current: number;
+    design_current: number;
+    meter_size: string;
+    main_wire: string;
+    main_breaker: string;
+    circuits: CircuitData[];
+    circuit_count: number;
+    warnings: string[];
+    errors: string[];
+    phase_balance?: Record<string, number>;
+}
+
+/**
+ * 🆕 Circuit Data from Backend
+ */
+export interface CircuitData {
+    circuit_name: string;
+    circuit_id: string;
+    floor: string;
+    room: string;
+    total_watts: number;
+    total_kw: number;
+    total_current: number;
+    breaker_rating: number;
+    breaker_poles: number;
+    breaker_type: string;
+    wire_size: string;
+    ground_size: string;
+    conduit_size: string;
+    vd_percent: number;
+    requires_rcbo: boolean;
+    num_loads: number;
+    notes: string[];
+}
+
+/**
+ * 🆕 PDF/BOQ Data from Backend
+ */
+export interface PDFData {
+    project_info: {
+        name: string;
+        total_kw: number;
+        demand_current: number;
+        design_current: number;
+    };
+    floors: Array<{
+        floor: string;
+        display_name: string;
+        circuits: Array<Record<string, unknown>>;
+        total_kw: number;
+    }>;
+    main_equipment: Record<string, string>;
+    phase_balance: Record<string, number>;
 }
 
 /**

@@ -245,4 +245,41 @@ class McpDesignResponse:
 
 ---
 
+## 🆕 Computed Data Layer (2025-12-30)
+
+### Data Flow:
+```
+mcp_result (from to_dict())
+       │
+       └──→ compute.py ──→ DisplayData (JSON dict)
+                          ↓
+             ┌────────────┼────────────┐
+             │            │            │
+             ↓            ↓            ↓
+         markdown_    audit_      pdf_
+         renderer     document    formatter
+             │            │            │
+             ↓            ↓            ↓
+         Markdown    Audit MD      BOQ
+```
+
+### New Files:
+| File | Purpose |
+|------|---------|
+| `app/display/__init__.py` | Package exports |
+| `app/display/compute.py` | **Source of Truth** - compute once |
+| `app/display/markdown_renderer.py` | Render Markdown (no calc) |
+
+### Modified Files:
+| File | Change |
+|------|--------|
+| `app/models.py` | Added: `display_data`, `audit_results`, `pdf_data`, `sld_data` |
+| `app/service.py` | Import compute_display_data + send in metadata |
+| `frontend/src/App.tsx` | Use display_data from API |
+| `frontend/src/types/index.ts` | Added DisplayData, CircuitData, PDFData |
+| `frontend/src/lib/api.ts` | Added types in AskResponse |
+
+---
+
 *สร้างโดย: Mozart Architecture Team | 2025-12-24*
+*อัปเดต: Fixia | 2025-12-30 (Computed Data Layer)*
