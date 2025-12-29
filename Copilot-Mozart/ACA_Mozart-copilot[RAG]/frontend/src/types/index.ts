@@ -152,6 +152,54 @@ export interface PDFData {
 }
 
 /**
+ * 🆕 SLD (Single Line Diagram) Node
+ */
+export interface SLDNode {
+    id: string;
+    type: 'meter' | 'main_breaker' | 'branch_breaker' | 'rcbo' | 'load';
+    label: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    data: {
+        icon?: string;
+        breaker?: string;
+        wire?: string;
+        current?: string;
+        kw?: number;
+        rcbo?: boolean;
+        [key: string]: unknown;
+    };
+}
+
+/**
+ * 🆕 SLD Edge (connection between nodes)
+ */
+export interface SLDEdge {
+    id: string;
+    source: string;
+    target: string;
+    style: 'solid' | 'dashed';
+}
+
+/**
+ * 🆕 Complete SLD Data from Backend
+ */
+export interface SLDData {
+    nodes: SLDNode[];
+    edges: SLDEdge[];
+    metadata: {
+        project_name: string;
+        total_kw: number;
+        demand_current: number;
+        circuit_count: number;
+        canvas_width: number;
+        canvas_height: number;
+    };
+}
+
+/**
  * โหลดไฟฟ้าที่คำนวณแล้ว (Response)
  */
 export interface LoadResult {
