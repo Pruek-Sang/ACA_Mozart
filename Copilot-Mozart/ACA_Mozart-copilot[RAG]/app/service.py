@@ -57,6 +57,8 @@ from app.config import settings
 from app.knowledge_service import KnowledgeService
 from app.trust_log import trust_logger
 from app.formatters import format_design_report  # Card-style Markdown formatter
+# 🆕 Computed Data Layer - Phase 1
+from app.display import compute_display_data
 from core.privacy import PrivacyGuard
 
 # 🆕 Refactored Stateful Intelligence modules
@@ -1981,6 +1983,13 @@ Query: "{query}"
                 if audit_report_text:
                     final_text = formatted_text + audit_report_text
                 
+                # 🆕 [CP-DISPLAY] Compute display data for Frontend
+                try:
+                    display_data_dict = compute_display_data(result)
+                except Exception as compute_err:
+                    logger.error(f"[CP-DISPLAY] Compute failed, fallback: {compute_err}")
+                    display_data_dict = None
+                
                 return StandardResponse(
                     answer=final_text,
                     sources=[SourceRef(
@@ -1996,8 +2005,11 @@ Query: "{query}"
                         retrieved_docs=["mcp_calculation"],
                         retrieval_group="mcp",
                         autolisp_code=mcp_response.autolisp_code,
-                        readable_report=final_text,  # Use combined output
-                        standards_markdown=mcp_response.standards_markdown
+                        readable_report=final_text,
+                        standards_markdown=mcp_response.standards_markdown,
+                        # 🆕 Computed Data Layer - structured JSON for Frontend
+                        display_data=display_data_dict,
+                        audit_results=audit_results if 'audit_results' in dir() and audit_results else None,
                     )
                 )
             else:

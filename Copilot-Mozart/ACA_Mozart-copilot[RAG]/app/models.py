@@ -106,6 +106,11 @@ class AnswerMetadata(BaseModel):
     autolisp_code: Optional[str] = Field(None, description="Generated AutoLISP code for AutoCAD")
     readable_report: Optional[str] = Field(None, description="Human-readable report from MCP (Markdown)")
     standards_markdown: Optional[str] = Field(None, description="Design standards summary")
+    # 🆕 Computed Data Layer - Structured JSON for Frontend
+    display_data: Optional[Dict[str, Any]] = Field(None, description="Computed display data for Load Table tab")
+    audit_results: Optional[List[Dict[str, Any]]] = Field(None, description="Audit results for Audit tab")
+    pdf_data: Optional[Dict[str, Any]] = Field(None, description="BOQ data for PDF/Excel export")
+    sld_data: Optional[Dict[str, Any]] = Field(None, description="SLD data for Single Line Diagram (future)")
 
 
 class StandardResponse(BaseModel):

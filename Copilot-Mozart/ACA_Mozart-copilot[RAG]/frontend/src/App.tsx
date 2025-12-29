@@ -118,14 +118,48 @@ function App() {
       };
       setMessages(prev => [...prev, sysMsg]);
 
-      // 4. Update Result Data
-      if (data.metadata?.readable_report) {
+      // 4. Update Result Data from Computed Data Layer
+      const displayData = data.metadata?.display_data;
+      if (displayData) {
+        // 🆕 Use structured data from Backend
         setResultData({
           success: true,
           message: 'Design calculated',
           data: {
+            loads: (displayData.circuits || []).map((ckt: {
+              room?: string;
+              floor?: string;
+              circuit_name: string;
+              total_kw: number;
+              total_current: number;
+              breaker_rating: number;
+              wire_size: string;
+              conduit_size?: string;
+              vd_percent?: number;
+            }) => ({
+              room_name: ckt.room || ckt.floor || '',
+              device_name: ckt.circuit_name,
+              power_kw: ckt.total_kw,
+              current_a: ckt.total_current,
+              breaker_size: ckt.breaker_rating,
+              wire_size: `${ckt.wire_size} mm²`,
+              conduit_size: ckt.conduit_size,
+              voltage_drop_percent: ckt.vd_percent,
+            })),
+            warnings: displayData.warnings || [],
+            total_power_kw: displayData.total_kw,
+            main_breaker: Number.parseInt(displayData.main_breaker) || 0,
+            audit_table: data.metadata?.audit_results || undefined,
+          }
+        });
+      } else if (data.metadata?.readable_report) {
+        // Fallback: Backend ยังไม่ส่ง display_data (backward compat)
+        setResultData({
+          success: true,
+          message: 'Design calculated (legacy mode)',
+          data: {
             loads: [],
-            warnings: []
+            warnings: ['ระบบยังใช้ format เก่า ดู Markdown report'],
           }
         });
       }

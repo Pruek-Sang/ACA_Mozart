@@ -15,7 +15,7 @@
 
 import { buildApiUrl } from './utils';
 import { getAccessToken } from './supabase';
-import type { SiteContext } from '../types';
+import type { SiteContext, DisplayData, AuditRow, PDFData } from '../types';
 
 // ============================================================================
 // Types
@@ -31,10 +31,16 @@ export interface AskRequest {
 export interface AskResponse {
     answer: string;
     grounding_status?: string;
+    confidence?: 'High' | 'Medium' | 'Low';
     metadata?: {
         readable_report?: string;
-        mcp_result?: any;
+        mcp_result?: unknown;
         session_id?: string;
+        // 🆕 Computed Data Layer
+        display_data?: DisplayData;
+        audit_results?: AuditRow[];
+        pdf_data?: PDFData;
+        sld_data?: Record<string, unknown>;
     };
     error?: string;
 }
