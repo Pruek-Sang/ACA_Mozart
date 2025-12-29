@@ -57,8 +57,8 @@ from app.config import settings
 from app.knowledge_service import KnowledgeService
 from app.trust_log import trust_logger
 from app.formatters import format_design_report  # Card-style Markdown formatter
-# 🆕 Computed Data Layer - Phase 1-3
-from app.display import compute_display_data, format_audit_for_frontend
+# 🆕 Computed Data Layer - Phase 1-4
+from app.display import compute_display_data, format_audit_for_frontend, render_sld
 from app.formatters.pdf_formatter import format_pdf_table
 from core.privacy import PrivacyGuard
 
@@ -2006,6 +2006,14 @@ Query: "{query}"
                 except Exception as pdf_err:
                     logger.warning(f"[CP-BOQ] Failed to format PDF: {pdf_err}")
                 
+                # 🆕 [CP-SLD] Generate SLD data for Frontend
+                sld_data_dict = None
+                try:
+                    if display_data_dict:
+                        sld_data_dict = render_sld(display_data_dict)
+                except Exception as sld_err:
+                    logger.warning(f"[CP-SLD] Failed to generate SLD: {sld_err}")
+                
                 return StandardResponse(
                     answer=final_text,
                     sources=[SourceRef(
@@ -2023,10 +2031,11 @@ Query: "{query}"
                         autolisp_code=mcp_response.autolisp_code,
                         readable_report=final_text,
                         standards_markdown=mcp_response.standards_markdown,
-                        # 🆕 Computed Data Layer - structured JSON for Frontend
+                        # 🆕 Computed Data Layer - ALL 4 Phases JSON for Frontend
                         display_data=display_data_dict,
                         audit_results=audit_results_formatted,
                         pdf_data=pdf_data_dict,
+                        sld_data=sld_data_dict,
                     )
                 )
             else:
