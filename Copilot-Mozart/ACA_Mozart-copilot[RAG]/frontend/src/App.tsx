@@ -7,7 +7,8 @@ import { LoginPage } from './components/LoginPage';
 import type {
   ChatMessage,
   SiteContext,
-  DesignResult
+  DesignResult,
+  SLDData
 } from './types';
 import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
@@ -49,6 +50,7 @@ function App() {
   const [isDirty, setIsDirty] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [resultData, setResultData] = useState<DesignResult | null>(null);
+  const [sldData, setSldData] = useState<SLDData | null>(null);  // 🆕 SLD data
 
   // === AUTH EFFECT ===
   useEffect(() => {
@@ -152,6 +154,11 @@ function App() {
             audit_table: data.metadata?.audit_results || undefined,
           }
         });
+
+        // 🆕 Set SLD data from API response
+        if (data.metadata?.sld_data) {
+          setSldData(data.metadata.sld_data as unknown as SLDData);
+        }
       } else if (data.metadata?.readable_report) {
         // Fallback: Backend ยังไม่ส่ง display_data (backward compat)
         setResultData({
@@ -242,6 +249,7 @@ function App() {
           <ResultViewer
             data={resultData}
             isLoading={isLoading}
+            sldData={sldData}
           />
         </div>
       </div>

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Table, FileImage, ClipboardCheck, Box, Download } from 'lucide-react';
-import type { DesignResult, LoadResult } from '../types';
+import type { DesignResult, LoadResult, SLDData } from '../types';
 import { cn } from '../lib/utils';
+import { SLDViewer } from './SLDViewer';
 
 type ViewMode = 'table' | 'audit' | 'sld';
 
 interface ResultViewerProps {
     data: DesignResult | null;
     isLoading: boolean;
+    sldData?: SLDData | null;  // 🆕 SLD data from API
 }
 
 /**
@@ -16,7 +18,7 @@ interface ResultViewerProps {
  * ตำแหน่ง: ขวา (กินพื้นที่หลัก)
  * หน้าที่: แสดง Table, Audit Report, SLD Image
  */
-export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading }) => {
+export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sldData }) => {
     const [activeTab, setActiveTab] = useState<ViewMode>('table');
 
     // Loading State
@@ -178,21 +180,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading }) =
 
                 {/* SLD Tab */}
                 {activeTab === 'sld' && (
-                    <div className="flex justify-center items-start">
-                        {data.data?.sld_image_url ? (
-                            <img
-                                src={data.data.sld_image_url}
-                                alt="Single Line Diagram"
-                                className="max-w-full border border-slate-800 rounded-lg shadow-2xl"
-                            />
-                        ) : (
-                            <div className="text-center text-slate-500 py-20">
-                                <FileImage size={48} className="mx-auto mb-4 text-slate-700" />
-                                <p>ยังไม่มี SLD</p>
-                                <p className="text-xs text-slate-600 mt-2">Backend ยังไม่ส่งภาพมา</p>
-                            </div>
-                        )}
-                    </div>
+                    <SLDViewer data={sldData || null} />
                 )}
 
                 {/* Warnings */}
