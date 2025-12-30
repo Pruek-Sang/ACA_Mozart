@@ -91,8 +91,10 @@ export interface AskResponse {
 
 /**
  * 🆕 Computed Display Data from Backend
+ * Updated: Added summary section fields for professional load table
  */
 export interface DisplayData {
+    // === EXISTING FIELDS (KEEP - DO NOT REMOVE!) ===
     project_name: string;
     total_watts: number;
     total_kw: number;
@@ -106,12 +108,38 @@ export interface DisplayData {
     warnings: string[];
     errors: string[];
     phase_balance?: Record<string, number>;
+
+    // === NEW FIELDS (Optional - Summary Section) ===
+    // Total Load by Phase
+    total_load_va?: number;         // Total VA
+    total_load_va_l1?: number;      // Phase L1 total
+    total_load_va_l2?: number;      // Phase L2 total
+    total_load_va_l3?: number;      // Phase L3 total
+
+    // Demand Calculation
+    demand_factor?: number;         // 0.78 etc.
+    demand_load_va?: number;        // After demand factor
+
+    // Main Equipment Details
+    main_cb_type?: string;          // MCCB 3P 100AF/100AT
+    main_cb_ic_ka?: number;         // 10kA at 400V
+    main_feeder_size?: string;      // 50 Sq.mm
+    main_feeder_type?: string;      // IEC01 (THW)
+    main_feeder_grd?: string;       // G-16 Sq.mm
+    main_raceway_type?: string;     // IMC / PVC / EMT
+    main_raceway_size?: string;     // 2"
+
+    // Audit Summary (for when all values are correct)
+    rcbo_count?: number;            // Count of RCBO circuits
+    mcb_count?: number;             // Count of MCB circuits
 }
 
 /**
  * 🆕 Circuit Data from Backend
+ * Updated: Added professional load table fields (all new fields are optional for backward compat)
  */
 export interface CircuitData {
+    // === EXISTING FIELDS (KEEP - DO NOT REMOVE!) ===
     circuit_name: string;
     circuit_id: string;
     floor: string;
@@ -129,6 +157,32 @@ export interface CircuitData {
     requires_rcbo: boolean;
     num_loads: number;
     notes: string[];
+
+    // === NEW FIELDS (Optional - Professional Load Table) ===
+    circuit_no?: number;           // CCT No. (1, 2, 3...)
+
+    // Connection Load (VA) - 3-phase ready
+    load_va_l1?: number;           // Phase L1 (for 1-phase: all here)
+    load_va_l2?: number;           // Phase L2 (0 for 1-phase)
+    load_va_l3?: number;           // Phase L3 (0 for 1-phase)
+    total_va?: number;             // Total VA
+
+    // Circuit Breaker Details
+    breaker_ic_ka?: number;        // kA rating (6, 10, 15)
+    breaker_af?: number;           // Frame size (AF)
+    breaker_at?: number;           // Trip rating (AT)
+
+    // Wire/Cable Details
+    wire_size_l?: string;          // Line wire (copy of wire_size)
+    wire_size_n?: string;          // Neutral wire
+    wire_size_grd?: string;        // Ground wire (copy of ground_size)
+    wire_type?: string;            // IEC01 (THW)
+
+    // Raceway Details
+    conduit_type?: string;         // PVC / EMT / IMC
+
+    // Summary
+    remark?: string;               // Combined notes as string
 }
 
 /**
@@ -250,7 +304,20 @@ export interface DesignResult {
         house_layout?: HouseBlock[];
         total_power_kw?: number;
         main_breaker?: number;
+        main_wire?: string;  // 🆕 Main wire size
         warnings?: string[];
+
+        // 🆕 Summary Section (from DisplayData)
+        demand_factor?: number;
+        main_cb_type?: string;
+        main_cb_ic_ka?: number;
+        main_feeder_size?: string;
+        main_feeder_type?: string;
+        main_feeder_grd?: string;
+        main_raceway_type?: string;
+        main_raceway_size?: string;
+        rcbo_count?: number;
+        mcb_count?: number;
     };
 }
 

@@ -24,16 +24,10 @@ logger = logging.getLogger("Aura.Display.Compute")
 
 # =============================================================================
 # Type Definitions (Contract)
-# NOTE: Do NOT remove existing fields! Only ADD new ones.
 # =============================================================================
 
 class CircuitData(TypedDict):
-    """Single circuit data for display.
-    
-    Updated: Added professional load table fields.
-    IMPORTANT: Keep all existing fields for backward compatibility!
-    """
-    # === EXISTING FIELDS (DO NOT REMOVE!) ===
+    """Single circuit data for display."""
     circuit_name: str
     circuit_id: str
     floor: str
@@ -51,41 +45,10 @@ class CircuitData(TypedDict):
     requires_rcbo: bool
     num_loads: int
     notes: List[str]
-    
-    # === NEW FIELDS (Professional Load Table) ===
-    circuit_no: int                  # CCT No. (1, 2, 3...)
-    
-    # Connection Load (VA) - 3-phase ready
-    load_va_l1: float                # Phase L1 (for 1-phase: all here)
-    load_va_l2: float                # Phase L2 (0 for 1-phase)
-    load_va_l3: float                # Phase L3 (0 for 1-phase)
-    total_va: float                  # Total VA
-    
-    # Circuit Breaker Details
-    breaker_ic_ka: int               # kA rating (6, 10, 15)
-    breaker_af: int                  # Frame size (AF)
-    breaker_at: int                  # Trip rating (AT) = breaker_rating
-    
-    # Wire/Cable Details
-    wire_size_l: str                 # Line wire (copy of wire_size)
-    wire_size_n: str                 # Neutral wire
-    wire_size_grd: str               # Ground wire (copy of ground_size)
-    wire_type: str                   # IEC01 (THW)
-    
-    # Raceway Details
-    conduit_type: str                # PVC / EMT / IMC
-    
-    # Summary
-    remark: str                      # Combined notes as string
 
 
 class DisplayData(TypedDict):
-    """Complete display data - Source of Truth for all renderers.
-    
-    Updated: Added summary section fields for professional load table.
-    IMPORTANT: Keep all existing fields for backward compatibility!
-    """
-    # === EXISTING FIELDS (DO NOT REMOVE!) ===
+    """Complete display data - Source of Truth for all renderers."""
     # Project Info
     project_name: str
     
@@ -110,30 +73,6 @@ class DisplayData(TypedDict):
     
     # Phase Balance (optional)
     phase_balance: Optional[Dict[str, float]]
-    
-    # === NEW FIELDS (Summary Section) ===
-    # Total Load by Phase
-    total_load_va: float              # Total VA
-    total_load_va_l1: float           # Phase L1 total
-    total_load_va_l2: float           # Phase L2 total
-    total_load_va_l3: float           # Phase L3 total
-    
-    # Demand Calculation
-    demand_factor: float              # 0.78 etc.
-    demand_load_va: float             # After demand factor
-    
-    # Main Equipment Details
-    main_cb_type: str                 # MCCB 3P 100AF/100AT
-    main_cb_ic_ka: int                # 10kA at 400V
-    main_feeder_size: str             # 50 Sq.mm
-    main_feeder_type: str             # IEC01 (THW)
-    main_feeder_grd: str              # G-16 Sq.mm
-    main_raceway_type: str            # IMC / PVC / EMT
-    main_raceway_size: str            # 2"
-    
-    # Audit Summary
-    rcbo_count: int                   # Count of RCBO circuits
-    mcb_count: int                    # Count of MCB circuits
 
 
 # =============================================================================
@@ -222,32 +161,7 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         # Process circuits
         circuits = _process_circuits(grouped_circuits, wire_sizing, conduit_sizing)
         
-        # === NEW: Calculate summary fields ===
-        # Total load by phase (1-phase: all in L1)
-        total_load_va = sum(c.get('total_va', 0) for c in circuits)
-        total_load_va_l1 = sum(c.get('load_va_l1', 0) for c in circuits)
-        total_load_va_l2 = 0  # 0 for 1-phase
-        total_load_va_l3 = 0  # 0 for 1-phase
-        
-        # Demand calculation
-        demand_factor = 0.78  # Standard for residential
-        demand_load_va = round_up(total_load_va * demand_factor)
-        
-        # Count breaker types
-        rcbo_count = sum(1 for c in circuits if c.get('requires_rcbo', False))
-        mcb_count = len(circuits) - rcbo_count
-        
-        # Main equipment details
-        main_cb_type = f"MCCB 2P {main_breaker}"
-        main_cb_ic_ka = 10  # 10kA at 230V
-        main_feeder_size = main_wire.replace(' mm²', '')
-        main_feeder_type = 'IEC01 (THW)'
-        main_feeder_grd = f"G-{main_feeder_size} Sq.mm"
-        main_raceway_type = 'PVC'
-        main_raceway_size = '1"' if demand_current <= 45 else '2"'
-        
         display_data: DisplayData = {
-            # === EXISTING FIELDS ===
             'project_name': project_name,
             'total_watts': total_watts,
             'total_kw': total_kw,
@@ -260,27 +174,10 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
             'circuit_count': len(circuits),
             'warnings': warnings,
             'errors': errors,
-            'phase_balance': None,
-            
-            # === NEW FIELDS (Summary Section) ===
-            'total_load_va': total_load_va,
-            'total_load_va_l1': total_load_va_l1,
-            'total_load_va_l2': total_load_va_l2,
-            'total_load_va_l3': total_load_va_l3,
-            'demand_factor': demand_factor,
-            'demand_load_va': demand_load_va,
-            'main_cb_type': main_cb_type,
-            'main_cb_ic_ka': main_cb_ic_ka,
-            'main_feeder_size': main_feeder_size,
-            'main_feeder_type': main_feeder_type,
-            'main_feeder_grd': main_feeder_grd,
-            'main_raceway_type': main_raceway_type,
-            'main_raceway_size': main_raceway_size,
-            'rcbo_count': rcbo_count,
-            'mcb_count': mcb_count,
+            'phase_balance': None,  # TODO: Add phase balance calculation
         }
         
-        logger.info(f"[CP-COMPUTE] Computed: {total_kw}kW, {demand_current}A, {len(circuits)} circuits ({rcbo_count} RCBO, {mcb_count} MCB)")
+        logger.info(f"[CP-COMPUTE] Computed: {total_kw}kW, {demand_current}A, {len(circuits)} circuits")
         return display_data
         
     except Exception as e:
@@ -293,29 +190,16 @@ def _process_circuits(
     wire_sizing: Dict[str, Any],
     conduit_sizing: Dict[str, Any]
 ) -> List[CircuitData]:
-    """Process grouped_circuits into CircuitData list.
-    
-    Updated: Now includes professional load table fields.
-    """
+    """Process grouped_circuits into CircuitData list."""
     circuits: List[CircuitData] = []
     
-    for idx, circuit in enumerate(grouped_circuits, start=1):
+    for circuit in grouped_circuits:
         try:
             ckt_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
             circuit_id = circuit.get('circuit_id') or circuit.get('id') or ckt_name
             
             total_watts = circuit.get('total_watts', 0)
             total_current = circuit.get('total_current', 0)
-            breaker_rating = circuit.get('breaker_rating', 15)
-            breaker_poles = circuit.get('breaker_poles', 1)
-            wire_size = str(circuit.get('wire_size', '2.5'))
-            requires_rcbo = circuit.get('requires_rcbo', False)
-            floor_str = str(circuit.get('floor', '1'))
-            room = circuit.get('room', '')
-            
-            # Room fallback: if empty, use floor + circuit type
-            if not room:
-                room = f"ชั้น {floor_str}"
             
             # Get VD% from wire_sizing
             vd_data = wire_sizing.get(circuit_id, {})
@@ -331,55 +215,24 @@ def _process_circuits(
             if isinstance(num_loads, list):
                 num_loads = len(num_loads)
             
-            # Notes handling
-            notes = circuit.get('notes', [])
-            remark = '; '.join(notes) if notes else ''
-            
             circuit_data: CircuitData = {
-                # === EXISTING FIELDS (unchanged) ===
                 'circuit_name': ckt_name,
                 'circuit_id': circuit_id,
-                'floor': floor_str,
-                'room': room,
+                'floor': str(circuit.get('floor', '1')),
+                'room': circuit.get('room', ''),
                 'total_watts': round_up(total_watts),
                 'total_kw': round_up(total_watts / 1000, 2),
                 'total_current': round_up(total_current, 1),
-                'breaker_rating': breaker_rating,
-                'breaker_poles': breaker_poles,
-                'breaker_type': 'RCBO' if requires_rcbo else 'MCB',
-                'wire_size': wire_size,
+                'breaker_rating': circuit.get('breaker_rating', 15),
+                'breaker_poles': circuit.get('breaker_poles', 1),
+                'breaker_type': 'RCBO' if circuit.get('requires_rcbo') else 'MCB',
+                'wire_size': str(circuit.get('wire_size', '2.5')),
                 'ground_size': ground_size,
                 'conduit_size': conduit_size,
                 'vd_percent': round_up(vd_percent, 1),
-                'requires_rcbo': requires_rcbo,
+                'requires_rcbo': circuit.get('requires_rcbo', False),
                 'num_loads': num_loads,
-                'notes': notes,
-                
-                # === NEW FIELDS (Professional Load Table) ===
-                'circuit_no': idx,  # CCT No. from enumerate
-                
-                # Connection Load (VA) - 1-phase: all in L1
-                'load_va_l1': round_up(total_watts),  # All in L1 for 1-phase
-                'load_va_l2': 0,  # 0 for 1-phase
-                'load_va_l3': 0,  # 0 for 1-phase
-                'total_va': round_up(total_watts),
-                
-                # Circuit Breaker Details
-                'breaker_ic_ka': 6,  # Default 6kA for residential
-                'breaker_af': breaker_rating,  # AF = AT for residential MCB
-                'breaker_at': breaker_rating,  # AT = rating
-                
-                # Wire/Cable Details (copy from existing for compatibility)
-                'wire_size_l': wire_size,  # Same as wire_size
-                'wire_size_n': wire_size,  # Same for 1-phase
-                'wire_size_grd': ground_size,  # Same as ground_size
-                'wire_type': 'IEC01 (THW)',  # Standard for Thai
-                
-                # Raceway Details
-                'conduit_type': 'PVC',  # Default for residential
-                
-                # Summary
-                'remark': remark,
+                'notes': circuit.get('notes', []),
             }
             
             circuits.append(circuit_data)
@@ -392,12 +245,8 @@ def _process_circuits(
 
 
 def _empty_display_data() -> DisplayData:
-    """Return empty DisplayData for fallback.
-    
-    IMPORTANT: Include all fields (existing + new) to prevent KeyError.
-    """
+    """Return empty DisplayData for fallback."""
     return {
-        # === EXISTING FIELDS ===
         'project_name': 'ไม่ระบุ',
         'total_watts': 0,
         'total_kw': 0,
@@ -411,21 +260,4 @@ def _empty_display_data() -> DisplayData:
         'warnings': [],
         'errors': ['No data available'],
         'phase_balance': None,
-        
-        # === NEW FIELDS (with fallback defaults) ===
-        'total_load_va': 0,
-        'total_load_va_l1': 0,
-        'total_load_va_l2': 0,
-        'total_load_va_l3': 0,
-        'demand_factor': 0.78,
-        'demand_load_va': 0,
-        'main_cb_type': '-',
-        'main_cb_ic_ka': 0,
-        'main_feeder_size': '-',
-        'main_feeder_type': '-',
-        'main_feeder_grd': '-',
-        'main_raceway_type': '-',
-        'main_raceway_size': '-',
-        'rcbo_count': 0,
-        'mcb_count': 0,
     }
