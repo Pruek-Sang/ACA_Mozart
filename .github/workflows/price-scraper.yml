@@ -1,12 +1,12 @@
-# 💰 Daily Price Scraper
+# 💰 Monthly Price Scraper
 # Scrapes electrical equipment prices and commits to prices.csv
 
-name: 💰 Daily Price Scraper
+name: 💰 Monthly Price Scraper
 
 on:
   schedule:
-    # 00:00 Thailand Time (UTC+7) = 17:00 UTC previous day
-    - cron: '0 17 * * *'
+    # 1st day of every month, 00:00 Thailand Time (UTC+7) = 17:00 UTC previous day
+    - cron: '0 17 1 * *'
   workflow_dispatch:  # Allow manual trigger
 
 # 🆕 Fix: Required for git push to work
