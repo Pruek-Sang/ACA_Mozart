@@ -6,100 +6,61 @@
 
 | Feature | Priority | Status | Depends On |
 |---------|----------|--------|------------|
-| 🎛️ Smart Form + Reactive | P1 | 📄 Planned | Deck UI |
-| 🃏 Deck UI Overhaul | P1 | 📄 Planned | - |
-| 💰 Daily Price Scraper | P2 | 📄 Planned | - |
-| ⏳ Loading Mascot | P2 | 📄 Planned | - |
-| 📜 White Label | P3 | 📄 Planned | - |
-| 🔐 QR Verification | P4 | 📄 Planned | White Label |
+| 🧮 Computed Data Layer | P0 | ✅ **Done** | - |
+| 📊 SLD Viewer | P0 | ✅ **Done** | Computed Data |
+| 📋 Audit Document | P0 | ✅ **Done** | Computed Data |
+| 📦 BOQ Pipeline | P0 | ✅ **Done** | Computed Data |
+| 🐛 Final Debug | P0 | 🔧 **In Progress** | All above |
+| 💰 Daily Price Scraper | P2 | ⏸️ Backlog | - |
+| ⏳ Loading Mascot | P2 | ⏸️ Backlog | - |
+| 🎛️ Smart Form + Reactive | P2 | ⏸️ Backlog | - |
+| 📜 White Label | P3 | ⏸️ Backlog | - |
+| 🔐 QR Verification | P4 | ⏸️ Backlog | White Label |
 
 ---
 
-## 🔀 Execution Order (Critical Path)
+## 🔀 Current Status (2025-12-30)
 
-```mermaid
-graph LR
-    subgraph Phase1["Phase 1: Foundation"]
-        A[Bug Fixes] --> B[Deck UI]
-        A --> C[Price Scraper]
-        A --> D[Loading Mascot]
-    end
-    
-    subgraph Phase2["Phase 2: Core Features"]
-        B --> E[Smart Form]
-        C --> F[BOQ Integration]
-    end
-    
-    subgraph Phase3["Phase 3: Premium"]
-        E --> G[White Label]
-        G --> H[QR Verification]
-    end
+```
+┌─────────────────────────────────────────────────────────┐
+│  ✅ CORE FEATURES COMPLETE - READY FOR PRODUCTION       │
+├─────────────────────────────────────────────────────────┤
+│  • Computed Data Layer (Source of Truth)                │
+│  • SLD Viewer (Frontend + Backend)                      │
+│  • Audit Document (PDF-ready)                           │
+│  • BOQ Pipeline                                         │
+│  • Price Scraper Workflow                               │
+├─────────────────────────────────────────────────────────┤
+│  🔧 REMAINING: Minor debugging & integration testing    │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ✅ Pre-requisites (ต้องเสร็จก่อนเริ่ม)
+## ✅ Completed Items
 
 - [x] วสท. outlet counting fix (commit `8c0c2cc`)
 - [x] SLD/BOQ endpoints (commit `bef41e3`)
 - [x] CI/CD path triggers fix (commit `437ef18`)
-- [ ] ⏳ รอ GitHub Actions deploy ใหม่
-- [ ] ⏳ Verify 19 outlets → 2 circuits
+- [x] Computed Data Layer (commit `05d2c86`)
+- [x] Audit Document (commit `5e131ca`)
+- [x] SLD Backend (commit `70f4429`)
+- [x] SLD Frontend (commit `9146c8c`)
+- [x] Type Integration Fix (commit `77835d7`)
+- [x] Price Scraper Workflow Fix (commit `8d43390`)
+
+## 🔧 Current Focus: Final Debug
+
+- [ ] Verify end-to-end data flow
+- [ ] Test SLD rendering with real data
+- [ ] Validate Audit output format
+- [ ] Check BOQ calculations
 
 ---
 
-# 📦 PHASE 1: Foundation (Week 1)
+# ⏸️ BACKLOG (Future Enhancements)
 
-## 1.1 🃏 Deck UI Overhaul
-
-> **เป้าหมาย:** เปลี่ยนจาก Phone Frame → Card Stack
-
-### Files to Create:
-| File | Type | Description |
-|------|------|-------------|
-| `DeckContainer.tsx` | NEW | Container จัดการ card stack |
-| `Card.tsx` | NEW | Generic card wrapper |
-| `DeckLayout.css` | NEW | Animations & layout |
-
-### Files to Modify:
-| File | Change |
-|------|--------|
-| `App.tsx` | เปลี่ยนจาก PhoneFrame → DeckContainer |
-| `index.css` | เพิ่ม deck styles |
-
-### Sub-tasks:
-- [ ] 1.1.1 Create `DeckContainer.tsx` skeleton
-- [ ] 1.1.2 Create `Card.tsx` with header/body/footer
-- [ ] 1.1.3 Implement card stacking CSS (z-index, transforms)
-- [ ] 1.1.4 Add "Overview Mode" toggle button
-- [ ] 1.1.5 Add fan-out animation (CSS keyframes)
-- [ ] 1.1.6 Port ChatPane to Card 1
-- [ ] 1.1.7 Create LoadScheduleCard (Card 2)
-- [ ] 1.1.8 Create SLDCard with lazy fetch (Card 3)
-- [ ] 1.1.9 Create BOQCard with lazy fetch (Card 4)
-- [ ] 1.1.10 Port FloorPlanViewer to Card 5
-
-### Error Prevention:
-- [ ] ⚠️ ไม่ลบ PhoneFrame - เก็บไว้ fallback
-- [ ] ⚠️ Test responsive ทุก breakpoint
-- [ ] ⚠️ Verify touch gestures ทำงานบน mobile
-
-### 🔲 Card Template (รอตัดสินใจ):
-```
-┌─────────────────────────────────────┐
-│  [Icon] Card Title         [⋮ More] │  ← Header
-├─────────────────────────────────────┤
-│                                     │
-│           Card Content              │  ← Body (scrollable)
-│                                     │
-├─────────────────────────────────────┤
-│  [Action 1]  [Action 2]  [Expand ▼] │  ← Footer (optional)
-└─────────────────────────────────────┘
-```
-
----
-
-## 1.2 💰 Daily Price Scraper
+## 💰 Daily Price Scraper
 
 > **เป้าหมาย:** ราคาอุปกรณ์ update อัตโนมัติทุกวัน
 

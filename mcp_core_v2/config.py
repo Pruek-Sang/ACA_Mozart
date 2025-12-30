@@ -16,6 +16,7 @@ load_dotenv(dotenv_path=load_env_path)
 # Based on typical Thai residential/commercial buildings
 # ============================================================
 DEFAULT_BRANCH_DISTANCE_M: Dict[str, Dict[str, float]] = {
+    # === Thai Keys (Original) ===
     "บ้านเดี่ยว_1ชั้น": {"floor_1": 15.0, "default": 15.0},
     "บ้านเดี่ยว_2ชั้น": {"floor_1": 15.0, "floor_2": 25.0, "default": 20.0},
     "บ้านเดี่ยว_3ชั้น": {"floor_1": 15.0, "floor_2": 25.0, "floor_3": 35.0, "default": 25.0},
@@ -25,6 +26,18 @@ DEFAULT_BRANCH_DISTANCE_M: Dict[str, Dict[str, float]] = {
     "อพาร์ทเมนต์": {"default": 12.0},
     "สำนักงาน": {"default": 20.0},
     "โรงงาน": {"default": 30.0},
+    
+    # === English Keys (NEW - RAG Compatibility) ===
+    "residential": {"floor_1": 15.0, "floor_2": 25.0, "floor_3": 35.0, "default": 20.0},
+    "บ้านพักอาศัย": {"floor_1": 15.0, "floor_2": 25.0, "floor_3": 35.0, "default": 20.0},
+    "commercial": {"floor_1": 20.0, "floor_2": 30.0, "floor_3": 40.0, "default": 25.0},
+    "townhouse": {"floor_1": 10.0, "floor_2": 18.0, "floor_3": 26.0, "default": 18.0},
+    "condo": {"default": 10.0},
+    "apartment": {"default": 12.0},
+    "office": {"default": 20.0},
+    "factory": {"default": 30.0},
+    
+    # === Fallback ===
     "default": {"default": 15.0}  # Fallback for unknown types
 }
 

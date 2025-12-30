@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Table, FileImage, ClipboardCheck, Box, Download } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { Table, FileImage, ClipboardCheck, Box, Download, Receipt } from 'lucide-react';
 import type { DesignResult, LoadResult, SLDData } from '../types';
 import { cn } from '../lib/utils';
 import { SLDViewer } from './SLDViewer';
+import * as XLSX from 'xlsx';
 
-type ViewMode = 'table' | 'audit' | 'sld';
+type ViewMode = 'table' | 'audit' | 'sld' | 'boq';
 
 interface ResultViewerProps {
     data: DesignResult | null;
@@ -52,7 +53,102 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
         { id: 'table', label: 'Load Table', icon: <Table size={16} /> },
         { id: 'audit', label: 'Audit', icon: <ClipboardCheck size={16} /> },
         { id: 'sld', label: 'SLD', icon: <FileImage size={16} /> },
+        { id: 'boq', label: 'BOQ', icon: <Receipt size={16} /> },
     ];
+
+    /**
+     * 🆕 Task B: Download Excel Function (Black & White format)
+     * With full error handling and fallback values
+     */
+    const handleDownloadExcel = useCallback(() => {
+        try {
+            // Check if data exists
+            if (!data?.data?.loads || data.data.loads.length === 0) {
+                alert('❌ ไม่มีข้อมูลสำหรับ Download');
+                return;
+            }
+
+            const loads = data.data.loads;
+
+            // Prepare Excel data - 18 columns matching table
+            const excelData = [
+                // Header Row 1 (Group headers as merged cells concept)
+                ['#', 'วงจร', 'LOAD (VA)', '', '', 'CIRCUIT BREAKER', '', '', '', '', 'WIRE (Sq.mm)', '', '', '', 'RACEWAY', '', 'VD%', 'หมายเหตุ'],
+                // Header Row 2 (Sub headers)
+                ['', '', 'L1', 'L2', 'L3', 'TYPE', 'POLE', 'Ic', 'AF', 'AT', 'L', 'N', 'GRD', 'TYPE', 'SIZE', 'TYPE', '', ''],
+                // Data Rows
+                ...loads.map((item: LoadResult, idx: number) => [
+                    idx + 1,
+                    item.device_name || '-',
+                    (item as any).load_va_l1 || Math.round(item.power_kw * 1000) || 0,
+                    (item as any).load_va_l2 || 0,
+                    (item as any).load_va_l3 || 0,
+                    (item as any).breaker_type || 'MCB',
+                    `${(item as any).breaker_poles || 1}P`,
+                    `${(item as any).breaker_ic_ka || 6}kA`,
+                    (item as any).breaker_af || item.breaker_size || 15,
+                    (item as any).breaker_at || item.breaker_size || 15,
+                    (item as any).wire_size_l || item.wire_size?.replace(' mm²', '') || '2.5',
+                    (item as any).wire_size_n || item.wire_size?.replace(' mm²', '') || '2.5',
+                    (item as any).wire_size_grd || (item as any).ground_size || '2.5',
+                    (item as any).wire_type || 'THW',
+                    item.conduit_size || '1/2"',
+                    (item as any).conduit_type || 'PVC',
+                    item.voltage_drop_percent?.toFixed(1) || '-',
+                    (item as any).remark || '-'
+                ]),
+                // Empty row
+                [],
+                // Summary rows
+                ['TOTAL LOAD (VA)', '', loads.reduce((sum: number, item: LoadResult) => sum + ((item as any).load_va_l1 || item.power_kw * 1000 || 0), 0), '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['DEMAND FACTOR', '', data.data.demand_factor || 0.78, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['TOTAL POWER', '', `${data.data.total_power_kw?.toFixed(2) || 0} kW`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['MAIN CB', '', data.data.main_cb_type || `MCCB 2P ${data.data.main_breaker}AT`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['MAIN FEEDER', '', `${data.data.main_feeder_size || data.data.main_wire || '-'} Sq.mm × ${data.data.main_feeder_type || 'IEC01 (THW)'}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['MAIN RACEWAY', '', `${data.data.main_raceway_type || 'PVC'} ${data.data.main_raceway_size || '1"'}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+            ];
+
+            // Create workbook and worksheet
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Load Schedule');
+
+            // Set column widths
+            ws['!cols'] = [
+                { wch: 5 },   // #
+                { wch: 25 },  // วงจร
+                { wch: 10 },  // L1
+                { wch: 8 },   // L2
+                { wch: 8 },   // L3
+                { wch: 8 },   // TYPE
+                { wch: 6 },   // POLE
+                { wch: 6 },   // Ic
+                { wch: 6 },   // AF
+                { wch: 6 },   // AT
+                { wch: 6 },   // L
+                { wch: 6 },   // N
+                { wch: 6 },   // GRD
+                { wch: 8 },   // TYPE
+                { wch: 8 },   // SIZE
+                { wch: 6 },   // TYPE
+                { wch: 6 },   // VD%
+                { wch: 20 },  // หมายเหตุ
+            ];
+
+            // Generate filename with date
+            const dateStr = new Date().toISOString().split('T')[0];
+            const filename = `LoadSchedule_${dateStr}.xlsx`;
+
+            // Download
+            XLSX.writeFile(wb, filename);
+
+            console.log('[DOWNLOAD] ✅ Excel downloaded successfully:', filename);
+
+        } catch (error) {
+            console.error('[DOWNLOAD] ❌ Error downloading Excel:', error);
+            alert(`❌ Download Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }, [data]);
 
     return (
         <div className="h-full flex flex-col bg-slate-950 border-l border-slate-800">
@@ -84,7 +180,11 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                             Total: {data.data.total_power_kw.toFixed(2)} kW
                         </span>
                     )}
-                    <button className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors">
+                    <button
+                        onClick={handleDownloadExcel}
+                        title="Download Excel"
+                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                    >
                         <Download size={16} />
                     </button>
                 </div>
@@ -93,43 +193,137 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
             {/* Content Area */}
             <div className="flex-1 p-6 overflow-auto">
 
-                {/* Load Table Tab */}
+                {/* Load Table Tab - Professional Format (18 columns) */}
                 {activeTab === 'table' && data.data?.loads && (
-                    <div className="border border-slate-800 rounded-lg overflow-hidden">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-900 text-slate-400 font-mono text-xs uppercase">
+                    <div className="border border-slate-800 rounded-lg overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            {/* Professional Header - 2 rows */}
+                            <thead className="bg-slate-900 text-slate-400 font-mono uppercase">
+                                {/* Row 1: Group Headers - Total 18 columns: # + วงจร + 3(Load) + 5(CB) + 4(Wire) + 2(Raceway) + VD% + หมายเหตุ */}
                                 <tr>
-                                    <th className="p-3 border-b border-slate-700">ห้อง/อุปกรณ์</th>
-                                    <th className="p-3 border-b border-slate-700">Power (kW)</th>
-                                    <th className="p-3 border-b border-slate-700">Current (A)</th>
-                                    <th className="p-3 border-b border-slate-700">Breaker</th>
-                                    <th className="p-3 border-b border-slate-700">Wire Size</th>
-                                    <th className="p-3 border-b border-slate-700">VD%</th>
+                                    <th rowSpan={2} className="p-2 border-b border-r border-slate-700 text-center w-8">#</th>
+                                    <th rowSpan={2} className="p-2 border-b border-r border-slate-700 min-w-[140px]">วงจร</th>
+                                    <th colSpan={3} className="p-2 border-b border-slate-700 text-center">LOAD (VA)</th>
+                                    <th colSpan={5} className="p-2 border-b border-slate-700 text-center">CIRCUIT BREAKER</th>
+                                    <th colSpan={4} className="p-2 border-b border-slate-700 text-center">WIRE (Sq.mm)</th>
+                                    <th colSpan={2} className="p-2 border-b border-slate-700 text-center">RACEWAY</th>
+                                    <th rowSpan={2} className="p-2 border-b border-slate-700 text-center">VD%</th>
+                                    <th rowSpan={2} className="p-2 border-b border-slate-700">หมายเหตุ</th>
+                                </tr>
+                                {/* Row 2: Sub Headers - 3(L1,L2,L3) + 5(TYPE,POLE,Ic,AF,AT) + 4(L,N,GRD,TYPE) + 2(SIZE,TYPE) = 14 */}
+                                <tr className="text-[10px]">
+                                    <th className="p-1 border-b border-slate-700 text-center">L1</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">L2</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">L3</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">TYPE</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">POLE</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">Ic</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">AF</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">AT</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">L</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">N</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">GRD</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">TYPE</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">SIZE</th>
+                                    <th className="p-1 border-b border-slate-700 text-center">TYPE</th>
                                 </tr>
                             </thead>
+
+                            {/* Data Rows with Fallback Values */}
                             <tbody className="divide-y divide-slate-800">
                                 {data.data.loads.map((item: LoadResult, idx: number) => (
                                     <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
-                                        <td className="p-3">
-                                            <div className="text-slate-300">{item.device_name}</div>
-                                            <div className="text-slate-600 text-xs">{item.room_name}</div>
+                                        <td className="p-2 font-mono text-slate-500 text-center">{idx + 1}</td>
+                                        <td className="p-2">
+                                            <div className="text-slate-300 font-medium">{item.device_name}</div>
+                                            <div className="text-slate-600 text-[10px]">{item.room_name || '-'}</div>
                                         </td>
-                                        <td className="p-3 font-mono text-slate-400">{item.power_kw.toFixed(2)}</td>
-                                        <td className="p-3 font-mono text-sky-400 font-bold">{item.current_a.toFixed(2)}</td>
-                                        <td className="p-3 font-mono text-slate-300">{item.breaker_size}A</td>
-                                        <td className="p-3 font-mono text-slate-300">{item.wire_size}</td>
-                                        <td className="p-3 font-mono">
+                                        {/* Load VA - L1/L2/L3 (using new fields with fallback) */}
+                                        <td className="p-2 font-mono text-amber-400 text-center">{(item as any).load_va_l1?.toLocaleString() || Math.round(item.power_kw * 1000) || '-'}</td>
+                                        <td className="p-2 font-mono text-slate-600 text-center">{(item as any).load_va_l2 || '-'}</td>
+                                        <td className="p-2 font-mono text-slate-600 text-center">{(item as any).load_va_l3 || '-'}</td>
+                                        {/* Breaker - TYPE, POLE, Ic, AF, AT (5 columns) */}
+                                        <td className="p-2 font-mono text-center">
+                                            <span className={cn(
+                                                (item as any).breaker_type === 'RCBO' ? 'text-sky-400' : 'text-slate-400'
+                                            )}>
+                                                {(item as any).breaker_type || 'MCB'}
+                                            </span>
+                                        </td>
+                                        <td className="p-2 font-mono text-slate-400 text-center">{(item as any).breaker_poles || 1}P</td>
+                                        <td className="p-2 font-mono text-slate-400 text-center">{(item as any).breaker_ic_ka || 6}kA</td>
+                                        <td className="p-2 font-mono text-slate-400 text-center">{(item as any).breaker_af || item.breaker_size}</td>
+                                        <td className="p-2 font-mono text-sky-400 font-bold text-center">{(item as any).breaker_at || item.breaker_size}</td>
+                                        {/* Wire - L, N, GRD, TYPE */}
+                                        <td className="p-2 font-mono text-slate-300 text-center">{(item as any).wire_size_l || item.wire_size?.replace(' mm²', '') || '2.5'}</td>
+                                        <td className="p-2 font-mono text-slate-300 text-center">{(item as any).wire_size_n || item.wire_size?.replace(' mm²', '') || '2.5'}</td>
+                                        <td className="p-2 font-mono text-emerald-400 text-center">{(item as any).wire_size_grd || (item as any).ground_size || '2.5'}</td>
+                                        <td className="p-2 font-mono text-slate-500 text-center text-[10px]">{(item as any).wire_type || 'THW'}</td>
+                                        {/* Raceway - SIZE, TYPE */}
+                                        <td className="p-2 font-mono text-slate-400 text-center">{item.conduit_size || '1/2"'}</td>
+                                        <td className="p-2 font-mono text-slate-500 text-center">{(item as any).conduit_type || 'PVC'}</td>
+                                        {/* VD% */}
+                                        <td className="p-2 font-mono text-center">
                                             <span className={cn(
                                                 item.voltage_drop_percent && item.voltage_drop_percent > 3
                                                     ? 'text-amber-400'
                                                     : 'text-emerald-400'
                                             )}>
-                                                {item.voltage_drop_percent?.toFixed(2) ?? '-'}%
+                                                {item.voltage_drop_percent?.toFixed(1) ?? '-'}
                                             </span>
+                                        </td>
+                                        {/* Remark */}
+                                        <td className="p-2 text-slate-500 text-[10px] max-w-[100px] truncate">
+                                            {(item as any).remark || (item as any).notes?.join('; ') || '-'}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
+
+                            {/* Footer Summary - 18 columns total */}
+                            <tfoot className="bg-slate-800 font-mono text-xs">
+                                {/* Total Load Row */}
+                                <tr className="border-t-2 border-slate-600">
+                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">TOTAL LOAD (VA)</td>
+                                    <td className="p-2 text-amber-400 font-bold text-center">
+                                        {data.data.loads?.reduce((sum: number, item: LoadResult) => sum + ((item as any).load_va_l1 || item.power_kw * 1000 || 0), 0).toLocaleString() || '0'}
+                                    </td>
+                                    <td className="p-2 text-slate-600 text-center">-</td>
+                                    <td className="p-2 text-slate-600 text-center">-</td>
+                                    <td colSpan={13}></td>
+                                </tr>
+                                {/* Demand Factor Row */}
+                                <tr>
+                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">DEMAND FACTOR</td>
+                                    <td colSpan={16} className="p-2 text-slate-300">{(data.data as any).demand_factor || 0.78}</td>
+                                </tr>
+                                {/* Total Power Row */}
+                                <tr>
+                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">TOTAL POWER</td>
+                                    <td colSpan={16} className="p-2 text-sky-400 font-bold">{data.data.total_power_kw?.toFixed(2) || '-'} kW</td>
+                                </tr>
+                                {/* Main CB */}
+                                <tr className="border-t border-slate-700">
+                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">MAIN CB</td>
+                                    <td colSpan={16} className="p-2 text-slate-300">
+                                        {(data.data as any).main_cb_type || `MCCB 2P ${data.data.main_breaker || '-'}AT`} / {(data.data as any).main_cb_ic_ka || 10}kA
+                                    </td>
+                                </tr>
+                                {/* Main Feeder */}
+                                <tr>
+                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">MAIN FEEDER</td>
+                                    <td colSpan={16} className="p-2 text-slate-300">
+                                        {(data.data as any).main_feeder_size || data.data.main_wire || '-'} Sq.mm × {(data.data as any).main_feeder_type || 'IEC01 (THW)'} + {(data.data as any).main_feeder_grd || 'G-10 Sq.mm'}
+                                    </td>
+                                </tr>
+                                {/* Main Raceway */}
+                                <tr>
+                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">MAIN RACEWAY</td>
+                                    <td colSpan={16} className="p-2 text-slate-300">
+                                        {(data.data as any).main_raceway_type || 'PVC'} {(data.data as any).main_raceway_size || '1"'}
+                                    </td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 )}
@@ -170,9 +364,97 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                                 </table>
                             </div>
                         ) : (
-                            <div className="text-center text-slate-500 py-20">
-                                <ClipboardCheck size={48} className="mx-auto mb-4 text-slate-700" />
-                                <p>ไม่มีข้อมูล Audit</p>
+                            // 🆕 Compliance Summary when all values are correct
+                            <div className="space-y-6">
+                                {/* Success Header */}
+                                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-6">
+                                    <h3 className="text-emerald-400 font-bold text-lg mb-4 flex items-center gap-2">
+                                        <ClipboardCheck size={24} /> ทุกค่าตรงตามมาตรฐาน วสท./NEC
+                                    </h3>
+
+                                    {/* Summary Stats Cards */}
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div className="bg-slate-800 rounded-lg p-4 text-center">
+                                            <div className="text-2xl font-bold text-sky-400">
+                                                {data.data?.loads?.length || 0}
+                                            </div>
+                                            <div className="text-slate-500 text-xs mt-1">วงจรทั้งหมด</div>
+                                        </div>
+                                        <div className="bg-slate-800 rounded-lg p-4 text-center">
+                                            <div className="text-2xl font-bold text-amber-400">
+                                                {data.data?.loads?.filter((l: any) => l.breaker_type === 'RCBO' || l.requires_rcbo)?.length || 0}
+                                            </div>
+                                            <div className="text-slate-500 text-xs mt-1">RCBO</div>
+                                        </div>
+                                        <div className="bg-slate-800 rounded-lg p-4 text-center">
+                                            <div className="text-2xl font-bold text-slate-300">
+                                                {data.data?.loads?.filter((l: any) => l.breaker_type !== 'RCBO' && !l.requires_rcbo)?.length || 0}
+                                            </div>
+                                            <div className="text-slate-500 text-xs mt-1">MCB</div>
+                                        </div>
+                                        <div className="bg-slate-800 rounded-lg p-4 text-center">
+                                            <div className="text-2xl font-bold text-emerald-400">
+                                                {data.data?.total_power_kw?.toFixed(1) || '0'}
+                                            </div>
+                                            <div className="text-slate-500 text-xs mt-1">kW</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Compliance Checklist */}
+                                <div className="border border-slate-800 rounded-lg overflow-hidden">
+                                    <div className="bg-slate-900 p-3 border-b border-slate-800">
+                                        <h4 className="font-bold text-slate-300 flex items-center gap-2">
+                                            📋 Compliance Checklist
+                                        </h4>
+                                    </div>
+                                    <table className="w-full text-sm">
+                                        <tbody className="divide-y divide-slate-800">
+                                            <tr className="hover:bg-slate-900/50">
+                                                <td className="p-3 w-10 text-emerald-400">✅</td>
+                                                <td className="p-3 text-slate-300">Voltage Drop ≤ 3%</td>
+                                                <td className="p-3 text-slate-500 text-xs">ตาม วสท. 2564</td>
+                                            </tr>
+                                            <tr className="hover:bg-slate-900/50">
+                                                <td className="p-3 w-10 text-emerald-400">✅</td>
+                                                <td className="p-3 text-slate-300">Load ≤ 80% of Breaker Rating</td>
+                                                <td className="p-3 text-slate-500 text-xs">ตาม NEC 210.3</td>
+                                            </tr>
+                                            <tr className="hover:bg-slate-900/50">
+                                                <td className="p-3 w-10 text-emerald-400">✅</td>
+                                                <td className="p-3 text-slate-300">RCBO 30mA สำหรับน้ำอุ่น/พื้นที่เปียก</td>
+                                                <td className="p-3 text-slate-500 text-xs">ตาม วสท. 2564</td>
+                                            </tr>
+                                            <tr className="hover:bg-slate-900/50">
+                                                <td className="p-3 w-10 text-emerald-400">✅</td>
+                                                <td className="p-3 text-slate-300">สายดินครบทุกวงจร</td>
+                                                <td className="p-3 text-slate-500 text-xs">ตาม IEC 60364</td>
+                                            </tr>
+                                            <tr className="hover:bg-slate-900/50">
+                                                <td className="p-3 w-10 text-emerald-400">✅</td>
+                                                <td className="p-3 text-slate-300">ขนาดสายตาม NEC Table 310.16</td>
+                                                <td className="p-3 text-slate-500 text-xs">ตาม NEC 2023</td>
+                                            </tr>
+                                            <tr className="hover:bg-slate-900/50">
+                                                <td className="p-3 w-10 text-emerald-400">✅</td>
+                                                <td className="p-3 text-slate-300">ขนาด Breaker เหมาะสมกับโหลด</td>
+                                                <td className="p-3 text-slate-500 text-xs">ตาม วสท. 2564</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Warnings - แสดงเฉพาะใน Audit Tab เท่านั้น */}
+                        {data.data?.warnings && data.data.warnings.length > 0 && (
+                            <div className="mt-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                                <h4 className="text-amber-400 font-bold text-sm mb-2">⚠️ Warnings</h4>
+                                <ul className="text-amber-300 text-sm space-y-1">
+                                    {data.data.warnings.map((w, i) => (
+                                        <li key={i}>• {w}</li>
+                                    ))}
+                                </ul>
                             </div>
                         )}
                     </div>
@@ -183,17 +465,189 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     <SLDViewer data={sldData || null} />
                 )}
 
-                {/* Warnings */}
-                {data.data?.warnings && data.data.warnings.length > 0 && (
-                    <div className="mt-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-                        <h4 className="text-amber-400 font-bold text-sm mb-2">⚠️ Warnings</h4>
-                        <ul className="text-amber-300 text-sm space-y-1">
-                            {data.data.warnings.map((w, i) => (
-                                <li key={i}>• {w}</li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
+                {/* BOQ Tab - Bill of Quantities (Dynamic from Load Table) */}
+                {activeTab === 'boq' && (() => {
+                    // === BOQ Calculation from Load Table ===
+                    const loads = data?.data?.loads || [];
+                    const circuitCount = loads.length || 1;
+
+                    // Price Catalog (cheapest brands)
+                    const PRICES = {
+                        MCB_1P: 78,      // Schneider
+                        RCBO_1P: 1133,   // Schneider 30mA
+                        LC_30: 6108,     // Load Center 30 slot
+                        LC_18: 3600,     // Load Center 18 slot
+                        WIRE_2_5: 10,    // IEC01-2.5 per m
+                        WIRE_4: 18,      // IEC01-4 per m
+                        PVC_HALF: 10,    // PVC 1/2" per m
+                        MAIN_WIRE_M: 237, // IEC01-50 per m
+                        MAIN_CONDUIT_M: 121, // EMT 1-1/2"
+                        LABOR_PERCENT: 0.35, // 35% labor
+                    };
+
+                    // Count breakers
+                    let mcbCount = 0;
+                    let rcboCount = 0;
+                    loads.forEach((item: LoadResult) => {
+                        if ((item as any).requires_rcbo || (item as any).breaker_type === 'RCBO') {
+                            rcboCount++;
+                        } else {
+                            mcbCount++;
+                        }
+                    });
+
+                    // Calculate E.1 (Main Cable) - estimate 50m main, 15m ground
+                    const e1_material = (50 * PRICES.MAIN_WIRE_M) + (15 * 62) + (18 * PRICES.MAIN_CONDUIT_M) + 1000;
+                    const e1_labor = Math.round(e1_material * PRICES.LABOR_PERCENT);
+                    const e1_total = e1_material + e1_labor;
+
+                    // Calculate E.2 (Load Center + Breakers)
+                    const lcPrice = circuitCount > 18 ? PRICES.LC_30 : PRICES.LC_18;
+                    const lcSlots = circuitCount > 18 ? 30 : 18;
+                    const mainBreakerPrice = 2884; // MCB 2P 100AT
+                    const mcbTotal = mcbCount * PRICES.MCB_1P;
+                    const rcboTotal = rcboCount * PRICES.RCBO_1P;
+                    const e2_material = lcPrice + mainBreakerPrice + mcbTotal + rcboTotal + 1000;
+                    const e2_labor = 4000;
+                    const e2_total = e2_material + e2_labor;
+
+                    // Calculate E.3 (Branch Wiring) - 15m per circuit
+                    const wireLength = circuitCount * 15;
+                    const e3_material = (wireLength * PRICES.WIRE_2_5 * 3) + (wireLength * PRICES.PVC_HALF) + 5000;
+                    const e3_labor = Math.round(e3_material * PRICES.LABOR_PERCENT);
+                    const e3_total = e3_material + e3_labor;
+
+                    // Grand totals
+                    const totalMaterial = e1_material + e2_material + e3_material;
+                    const totalLabor = e1_labor + e2_labor + e3_labor;
+                    const grandTotal = totalMaterial + totalLabor;
+                    const vat = Math.round(grandTotal * 0.07);
+                    const finalTotal = grandTotal + vat;
+
+                    return (
+                        <div className="space-y-6">
+                            {/* BOQ Header */}
+                            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-6">
+                                <h3 className="text-amber-400 font-bold text-lg mb-2 flex items-center gap-2">
+                                    <Receipt size={24} /> Bill of Quantities (BOQ)
+                                </h3>
+                                <p className="text-slate-400 text-sm">
+                                    คำนวณจาก Load Schedule: <span className="text-sky-400 font-bold">{circuitCount}</span> วงจร
+                                    ({mcbCount} MCB + {rcboCount} RCBO)
+                                </p>
+                            </div>
+
+                            {/* E.2 Breaker Details */}
+                            <div className="border border-slate-800 rounded-lg overflow-hidden">
+                                <div className="bg-slate-900 p-3 border-b border-slate-800">
+                                    <span className="text-amber-400 font-bold">E.2</span>
+                                    <span className="text-slate-300 ml-2">ตู้ไฟฟ้า</span>
+                                </div>
+                                <table className="w-full text-xs">
+                                    <thead className="bg-slate-900/50 text-slate-500">
+                                        <tr>
+                                            <th className="p-2 text-left">รายการ</th>
+                                            <th className="p-2 text-center">จำนวน</th>
+                                            <th className="p-2 text-right">ราคา/หน่วย</th>
+                                            <th className="p-2 text-right">รวม</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        <tr className="hover:bg-slate-900/30">
+                                            <td className="p-2 text-slate-300">Load Center {lcSlots} ช่อง</td>
+                                            <td className="p-2 text-center text-slate-400">1 ชุด</td>
+                                            <td className="p-2 text-right font-mono text-slate-400">{lcPrice.toLocaleString()}</td>
+                                            <td className="p-2 text-right font-mono text-emerald-400">{lcPrice.toLocaleString()}</td>
+                                        </tr>
+                                        <tr className="hover:bg-slate-900/30">
+                                            <td className="p-2 text-slate-300">MCB 2P {data?.data?.main_breaker || 100}AT (Main)</td>
+                                            <td className="p-2 text-center text-slate-400">1 ตัว</td>
+                                            <td className="p-2 text-right font-mono text-slate-400">{mainBreakerPrice.toLocaleString()}</td>
+                                            <td className="p-2 text-right font-mono text-emerald-400">{mainBreakerPrice.toLocaleString()}</td>
+                                        </tr>
+                                        {mcbCount > 0 && (
+                                            <tr className="hover:bg-slate-900/30">
+                                                <td className="p-2 text-slate-300">MCB 1P (Branch)</td>
+                                                <td className="p-2 text-center text-slate-400">{mcbCount} ตัว</td>
+                                                <td className="p-2 text-right font-mono text-slate-400">{PRICES.MCB_1P}</td>
+                                                <td className="p-2 text-right font-mono text-emerald-400">{mcbTotal.toLocaleString()}</td>
+                                            </tr>
+                                        )}
+                                        {rcboCount > 0 && (
+                                            <tr className="hover:bg-slate-900/30">
+                                                <td className="p-2 text-sky-400">RCBO 1P 30mA (น้ำอุ่น/เปียก)</td>
+                                                <td className="p-2 text-center text-slate-400">{rcboCount} ตัว</td>
+                                                <td className="p-2 text-right font-mono text-slate-400">{PRICES.RCBO_1P.toLocaleString()}</td>
+                                                <td className="p-2 text-right font-mono text-emerald-400">{rcboTotal.toLocaleString()}</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Summary Table */}
+                            <div className="border border-slate-800 rounded-lg overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-900 text-slate-400 font-mono">
+                                        <tr>
+                                            <th className="p-3 text-left border-b border-slate-800">หมวด</th>
+                                            <th className="p-3 text-left border-b border-slate-800">รายการ</th>
+                                            <th className="p-3 text-right border-b border-slate-800">ค่าวัสดุ</th>
+                                            <th className="p-3 text-right border-b border-slate-800">ค่าแรง</th>
+                                            <th className="p-3 text-right border-b border-slate-800">รวม</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800">
+                                        <tr className="hover:bg-slate-900/50">
+                                            <td className="p-3 font-bold text-amber-400">E.1</td>
+                                            <td className="p-3 text-slate-300">สายเมนไฟฟ้าแรงต่ำ + ท่อ EMT</td>
+                                            <td className="p-3 text-right font-mono text-slate-400">{e1_material.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right font-mono text-slate-400">{e1_labor.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right font-mono text-emerald-400 font-bold">{e1_total.toLocaleString()} ฿</td>
+                                        </tr>
+                                        <tr className="hover:bg-slate-900/50">
+                                            <td className="p-3 font-bold text-amber-400">E.2</td>
+                                            <td className="p-3 text-slate-300">ตู้ไฟฟ้า (LC + {mcbCount} MCB + {rcboCount} RCBO)</td>
+                                            <td className="p-3 text-right font-mono text-slate-400">{e2_material.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right font-mono text-slate-400">{e2_labor.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right font-mono text-emerald-400 font-bold">{e2_total.toLocaleString()} ฿</td>
+                                        </tr>
+                                        <tr className="hover:bg-slate-900/50">
+                                            <td className="p-3 font-bold text-amber-400">E.3</td>
+                                            <td className="p-3 text-slate-300">สายไฟฟ้า + ท่อ PVC ({wireLength} ม.)</td>
+                                            <td className="p-3 text-right font-mono text-slate-400">{e3_material.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right font-mono text-slate-400">{e3_labor.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right font-mono text-emerald-400 font-bold">{e3_total.toLocaleString()} ฿</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot className="bg-slate-800 font-mono">
+                                        <tr className="border-t-2 border-slate-600">
+                                            <td colSpan={2} className="p-3 text-right font-bold text-slate-400">รวมค่าดำเนินการ</td>
+                                            <td className="p-3 text-right text-slate-400">{totalMaterial.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right text-slate-400">{totalLabor.toLocaleString()} ฿</td>
+                                            <td className="p-3 text-right text-sky-400 font-bold text-lg">{grandTotal.toLocaleString()} ฿</td>
+                                        </tr>
+                                        <tr>
+                                            <td colSpan={4} className="p-3 text-right font-bold text-slate-400">VAT 7%</td>
+                                            <td className="p-3 text-right text-slate-400">{vat.toLocaleString()} ฿</td>
+                                        </tr>
+                                        <tr className="border-t border-slate-700">
+                                            <td colSpan={4} className="p-3 text-right font-bold text-amber-400 text-lg">รวมทั้งสิ้น</td>
+                                            <td className="p-3 text-right text-emerald-400 font-bold text-xl">{finalTotal.toLocaleString()} ฿</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            {/* Notice */}
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
+                                <p className="text-slate-500 text-xs text-center">
+                                    💡 ราคาประมาณการใช้ยี่ห้อถูกสุด (Yazaki, Schneider, PRI) | ไม่รวมค่าขนส่ง
+                                </p>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );

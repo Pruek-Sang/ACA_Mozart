@@ -1947,6 +1947,7 @@ Query: "{query}"
                 # 2. Validate user-specified values against auto values
                 # 3. Format audit report and append to response
                 audit_report_text = ""
+                audit_results = None  # 🆕 Initialize to prevent UnboundLocalError
                 try:
                     from app.audit_validator import validate_user_specs
                     from app.formatters.audit_formatter import format_audit_report as format_audit
