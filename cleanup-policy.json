@@ -5,7 +5,17 @@
             "type": "Keep"
         },
         "mostRecentVersions": {
-            "keepCount": 5
+            "keepCount": 3
+        }
+    },
+    {
+        "name": "delete-old-tagged",
+        "action": {
+            "type": "Delete"
+        },
+        "condition": {
+            "olderThan": "259200s",
+            "tagState": "TAGGED"
         }
     },
     {
@@ -14,7 +24,7 @@
             "type": "Delete"
         },
         "condition": {
-            "olderThan": "604800s",
+            "olderThan": "86400s",
             "tagState": "UNTAGGED"
         }
     }
