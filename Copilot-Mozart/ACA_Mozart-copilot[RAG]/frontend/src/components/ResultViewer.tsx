@@ -231,7 +231,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
 
                             {/* Data Rows with Fallback Values */}
                             <tbody className="divide-y divide-slate-800">
-                                {data.data.loads.map((item: LoadResult, idx: number) => (
+                                {(data.data?.loads || []).map((item: LoadResult, idx: number) => (
                                     <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
                                         <td className="p-2 font-mono text-slate-500 text-center">{idx + 1}</td>
                                         <td className="p-2">
@@ -343,7 +343,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800">
-                                        {data.data.audit_table.map((row, idx) => (
+                                        {(data.data?.audit_table || []).map((row, idx) => (
                                             <tr key={idx} className="hover:bg-slate-900/50">
                                                 <td className="p-3 text-slate-300">{row.check}</td>
                                                 <td className="p-3 font-mono text-slate-400">{String(row.user_value)}</td>
