@@ -193,138 +193,108 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
             {/* Content Area */}
             <div className="flex-1 p-6 overflow-auto">
 
-                {/* Load Table Tab - Professional Format (18 columns) */}
+                {/* Load Table Tab - Compact Format (7 columns for performance) */}
                 {activeTab === 'table' && data.data?.loads && (
-                    <div className="border border-slate-800 rounded-lg overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            {/* Professional Header - 2 rows */}
-                            <thead className="bg-slate-900 text-slate-400 font-mono uppercase">
-                                {/* Row 1: Group Headers - Total 18 columns: # + วงจร + 3(Load) + 5(CB) + 4(Wire) + 2(Raceway) + VD% + หมายเหตุ */}
-                                <tr>
-                                    <th rowSpan={2} className="p-2 border-b border-r border-slate-700 text-center w-8">#</th>
-                                    <th rowSpan={2} className="p-2 border-b border-r border-slate-700 min-w-[140px]">วงจร</th>
-                                    <th colSpan={3} className="p-2 border-b border-slate-700 text-center">LOAD (VA)</th>
-                                    <th colSpan={5} className="p-2 border-b border-slate-700 text-center">CIRCUIT BREAKER</th>
-                                    <th colSpan={4} className="p-2 border-b border-slate-700 text-center">WIRE (Sq.mm)</th>
-                                    <th colSpan={2} className="p-2 border-b border-slate-700 text-center">RACEWAY</th>
-                                    <th rowSpan={2} className="p-2 border-b border-slate-700 text-center">VD%</th>
-                                    <th rowSpan={2} className="p-2 border-b border-slate-700">หมายเหตุ</th>
-                                </tr>
-                                {/* Row 2: Sub Headers - 3(L1,L2,L3) + 5(TYPE,POLE,Ic,AF,AT) + 4(L,N,GRD,TYPE) + 2(SIZE,TYPE) = 14 */}
-                                <tr className="text-[10px]">
-                                    <th className="p-1 border-b border-slate-700 text-center">L1</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">L2</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">L3</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">TYPE</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">POLE</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">Ic</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">AF</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">AT</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">L</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">N</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">GRD</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">TYPE</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">SIZE</th>
-                                    <th className="p-1 border-b border-slate-700 text-center">TYPE</th>
-                                </tr>
-                            </thead>
+                    <div className="space-y-4">
+                        {/* Summary Banner */}
+                        <div className="bg-gradient-to-r from-sky-500/10 to-emerald-500/10 border border-sky-500/30 rounded-lg p-4 flex justify-between items-center">
+                            <div>
+                                <p className="text-slate-400 text-sm">
+                                    <span className="text-sky-400 font-bold">{data.data.loads.length}</span> วงจร |
+                                    <span className="text-amber-400 font-bold ml-2">{data.data.total_power_kw?.toFixed(2) || 0}</span> kW |
+                                    Main CB <span className="text-emerald-400 font-bold">{data.data.main_breaker || '-'}A</span>
+                                </p>
+                            </div>
+                            <p className="text-slate-600 text-xs">📥 กด Download สำหรับตารางละเอียด 18 columns</p>
+                        </div>
 
-                            {/* Data Rows with Fallback Values */}
-                            <tbody className="divide-y divide-slate-800">
-                                {(data.data?.loads || []).map((item: LoadResult, idx: number) => (
-                                    <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
-                                        <td className="p-2 font-mono text-slate-500 text-center">{idx + 1}</td>
-                                        <td className="p-2">
-                                            <div className="text-slate-300 font-medium">{item.device_name}</div>
-                                            <div className="text-slate-600 text-[10px]">{item.room_name || '-'}</div>
-                                        </td>
-                                        {/* Load VA - L1/L2/L3 (using new fields with fallback) */}
-                                        <td className="p-2 font-mono text-amber-400 text-center">{(item as any).load_va_l1?.toLocaleString() || Math.round(item.power_kw * 1000) || '-'}</td>
-                                        <td className="p-2 font-mono text-slate-600 text-center">{(item as any).load_va_l2 || '-'}</td>
-                                        <td className="p-2 font-mono text-slate-600 text-center">{(item as any).load_va_l3 || '-'}</td>
-                                        {/* Breaker - TYPE, POLE, Ic, AF, AT (5 columns) */}
-                                        <td className="p-2 font-mono text-center">
-                                            <span className={cn(
-                                                (item as any).breaker_type === 'RCBO' ? 'text-sky-400' : 'text-slate-400'
-                                            )}>
-                                                {(item as any).breaker_type || 'MCB'}
-                                            </span>
-                                        </td>
-                                        <td className="p-2 font-mono text-slate-400 text-center">{(item as any).breaker_poles || 1}P</td>
-                                        <td className="p-2 font-mono text-slate-400 text-center">{(item as any).breaker_ic_ka || 6}kA</td>
-                                        <td className="p-2 font-mono text-slate-400 text-center">{(item as any).breaker_af || item.breaker_size}</td>
-                                        <td className="p-2 font-mono text-sky-400 font-bold text-center">{(item as any).breaker_at || item.breaker_size}</td>
-                                        {/* Wire - L, N, GRD, TYPE */}
-                                        <td className="p-2 font-mono text-slate-300 text-center">{(item as any).wire_size_l || item.wire_size?.replace(' mm²', '') || '2.5'}</td>
-                                        <td className="p-2 font-mono text-slate-300 text-center">{(item as any).wire_size_n || item.wire_size?.replace(' mm²', '') || '2.5'}</td>
-                                        <td className="p-2 font-mono text-emerald-400 text-center">{(item as any).wire_size_grd || (item as any).ground_size || '2.5'}</td>
-                                        <td className="p-2 font-mono text-slate-500 text-center text-[10px]">{(item as any).wire_type || 'THW'}</td>
-                                        {/* Raceway - SIZE, TYPE */}
-                                        <td className="p-2 font-mono text-slate-400 text-center">{item.conduit_size || '1/2"'}</td>
-                                        <td className="p-2 font-mono text-slate-500 text-center">{(item as any).conduit_type || 'PVC'}</td>
-                                        {/* VD% */}
-                                        <td className="p-2 font-mono text-center">
-                                            <span className={cn(
-                                                item.voltage_drop_percent && item.voltage_drop_percent > 3
-                                                    ? 'text-amber-400'
-                                                    : 'text-emerald-400'
-                                            )}>
-                                                {item.voltage_drop_percent?.toFixed(1) ?? '-'}
-                                            </span>
-                                        </td>
-                                        {/* Remark */}
-                                        <td className="p-2 text-slate-500 text-[10px] max-w-[100px] truncate">
-                                            {(item as any).remark || (item as any).notes?.join('; ') || '-'}
-                                        </td>
+                        {/* Compact Table - 7 Columns */}
+                        <div className="border border-slate-800 rounded-lg overflow-hidden">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-900 text-slate-400 font-mono uppercase text-xs">
+                                    <tr>
+                                        <th className="p-3 border-b border-slate-700 text-center w-12">#</th>
+                                        <th className="p-3 border-b border-slate-700">วงจร</th>
+                                        <th className="p-3 border-b border-slate-700 text-right">VA</th>
+                                        <th className="p-3 border-b border-slate-700 text-center">Breaker</th>
+                                        <th className="p-3 border-b border-slate-700 text-center">Wire</th>
+                                        <th className="p-3 border-b border-slate-700 text-center">VD%</th>
+                                        <th className="p-3 border-b border-slate-700 text-center">สถานะ</th>
                                     </tr>
-                                ))}
-                            </tbody>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800">
+                                    {(data.data?.loads || []).map((item: LoadResult, idx: number) => {
+                                        const va = (item as any).load_va_l1 || Math.round(item.power_kw * 1000) || 0;
+                                        const breakerType = (item as any).breaker_type || 'MCB';
+                                        const breakerAt = (item as any).breaker_at || item.breaker_size || 16;
+                                        const wireSize = (item as any).wire_size_l || item.wire_size?.replace(' mm²', '') || '2.5';
+                                        const vd = item.voltage_drop_percent;
+                                        const isPass = !vd || vd <= 3;
 
-                            {/* Footer Summary - 18 columns total */}
-                            <tfoot className="bg-slate-800 font-mono text-xs">
-                                {/* Total Load Row */}
-                                <tr className="border-t-2 border-slate-600">
-                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">TOTAL LOAD (VA)</td>
-                                    <td className="p-2 text-amber-400 font-bold text-center">
-                                        {data.data.loads?.reduce((sum: number, item: LoadResult) => sum + ((item as any).load_va_l1 || item.power_kw * 1000 || 0), 0).toLocaleString() || '0'}
-                                    </td>
-                                    <td className="p-2 text-slate-600 text-center">-</td>
-                                    <td className="p-2 text-slate-600 text-center">-</td>
-                                    <td colSpan={13}></td>
-                                </tr>
-                                {/* Demand Factor Row */}
-                                <tr>
-                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">DEMAND FACTOR</td>
-                                    <td colSpan={16} className="p-2 text-slate-300">{(data.data as any).demand_factor || 0.78}</td>
-                                </tr>
-                                {/* Total Power Row */}
-                                <tr>
-                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">TOTAL POWER</td>
-                                    <td colSpan={16} className="p-2 text-sky-400 font-bold">{data.data.total_power_kw?.toFixed(2) || '-'} kW</td>
-                                </tr>
-                                {/* Main CB */}
-                                <tr className="border-t border-slate-700">
-                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">MAIN CB</td>
-                                    <td colSpan={16} className="p-2 text-slate-300">
-                                        {(data.data as any).main_cb_type || `MCCB 2P ${data.data.main_breaker || '-'}AT`} / {(data.data as any).main_cb_ic_ka || 10}kA
-                                    </td>
-                                </tr>
-                                {/* Main Feeder */}
-                                <tr>
-                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">MAIN FEEDER</td>
-                                    <td colSpan={16} className="p-2 text-slate-300">
-                                        {(data.data as any).main_feeder_size || data.data.main_wire || '-'} Sq.mm × {(data.data as any).main_feeder_type || 'IEC01 (THW)'} + {(data.data as any).main_feeder_grd || 'G-10 Sq.mm'}
-                                    </td>
-                                </tr>
-                                {/* Main Raceway */}
-                                <tr>
-                                    <td colSpan={2} className="p-2 text-right font-bold text-slate-400">MAIN RACEWAY</td>
-                                    <td colSpan={16} className="p-2 text-slate-300">
-                                        {(data.data as any).main_raceway_type || 'PVC'} {(data.data as any).main_raceway_size || '1"'}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                                        return (
+                                            <tr key={`circuit-${idx}`} className="hover:bg-slate-900/50 transition-colors">
+                                                <td className="p-3 font-mono text-slate-500 text-center">{idx + 1}</td>
+                                                <td className="p-3">
+                                                    <div className="text-slate-300 font-medium">{item.device_name}</div>
+                                                    <div className="text-slate-600 text-xs">{item.room_name || '-'}</div>
+                                                </td>
+                                                <td className="p-3 font-mono text-amber-400 text-right">{va.toLocaleString()}</td>
+                                                <td className="p-3 font-mono text-center">
+                                                    <span className={cn(
+                                                        'px-2 py-0.5 rounded text-xs',
+                                                        breakerType === 'RCBO'
+                                                            ? 'bg-sky-500/20 text-sky-400'
+                                                            : 'bg-slate-700 text-slate-300'
+                                                    )}>
+                                                        {breakerType} {breakerAt}A
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 font-mono text-slate-300 text-center">{wireSize}mm²</td>
+                                                <td className="p-3 font-mono text-center">
+                                                    <span className={cn(vd && vd > 3 ? 'text-amber-400' : 'text-emerald-400')}>
+                                                        {vd?.toFixed(1) ?? '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-center">
+                                                    <span className={cn(
+                                                        'px-2 py-1 rounded text-xs font-bold',
+                                                        isPass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+                                                    )}>
+                                                        {isPass ? '✓' : '⚠'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Summary Footer */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                            <div className="bg-slate-900 rounded-lg p-3 border border-slate-800">
+                                <p className="text-slate-500">Main CB</p>
+                                <p className="text-sky-400 font-mono font-bold">
+                                    {(data.data as any).main_cb_type || `MCCB 2P ${data.data.main_breaker || '-'}AT`}
+                                </p>
+                            </div>
+                            <div className="bg-slate-900 rounded-lg p-3 border border-slate-800">
+                                <p className="text-slate-500">Main Feeder</p>
+                                <p className="text-slate-300 font-mono">
+                                    {(data.data as any).main_feeder_size || data.data.main_wire || '-'} mm²
+                                </p>
+                            </div>
+                            <div className="bg-slate-900 rounded-lg p-3 border border-slate-800">
+                                <p className="text-slate-500">Raceway</p>
+                                <p className="text-slate-300 font-mono">
+                                    {(data.data as any).main_raceway_type || 'PVC'} {(data.data as any).main_raceway_size || '1"'}
+                                </p>
+                            </div>
+                            <div className="bg-slate-900 rounded-lg p-3 border border-slate-800">
+                                <p className="text-slate-500">Demand Factor</p>
+                                <p className="text-slate-300 font-mono">{(data.data as any).demand_factor || 0.78}</p>
+                            </div>
+                        </div>
                     </div>
                 )}
 
