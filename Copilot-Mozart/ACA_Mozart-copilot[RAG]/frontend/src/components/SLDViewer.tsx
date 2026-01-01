@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SLDData, SLDNode, SLDEdge } from '../types';
+import { SldSymbolMeter, SldSymbolCB, SldSymbolMCB } from './sld-symbols';
 
 interface SLDViewerProps {
     data: SLDData | null;
@@ -116,38 +117,32 @@ const NodeBox: React.FC<{ node: SLDNode }> = ({ node }) => {
     const colors = getNodeColors(node.type);
     const lines = node.label.split('\n');
 
+    // Select Symbol
+    const isMeter = node.type === 'meter';
+    const isMain = node.type === 'main_breaker';
+
+    // Scale symbol to fit node height (leaving space for text)
+    const symbolSize = Math.min(node.width, node.height * 0.6);
+    const symbolX = node.x + (node.width - symbolSize) / 2;
+    const symbolY = node.y + (node.height - symbolSize) / 2 - 10;
+
     return (
         <g>
-            {/* Node rectangle */}
-            <rect
-                x={node.x}
-                y={node.y}
-                width={node.width}
-                height={node.height}
-                rx={8}
-                ry={8}
-                fill={colors.bg}
-                stroke={colors.border}
-                strokeWidth={2}
-                filter={colors.glow ? `url(#${colors.glow})` : undefined}
-                className="transition-all duration-300 hover:brightness-125"
-            />
-
-            {/* Icon */}
-            {node.data?.icon && (
-                <text
-                    x={node.x + 10}
-                    y={node.y + node.height / 2 + 5}
-                    fontSize={16}
-                >
-                    {node.data.icon}
-                </text>
-            )}
+            {/* Symbol Layer */}
+            <g transform={`translate(${symbolX}, ${symbolY})`}>
+                {isMeter ? (
+                    <SldSymbolMeter size={symbolSize} color={colors.border} />
+                ) : isMain ? (
+                    <SldSymbolCB size={symbolSize} color={colors.border} />
+                ) : (
+                    <SldSymbolMCB size={symbolSize} color={colors.border} />
+                )}
+            </g>
 
             {/* Label - first line */}
             <text
                 x={node.x + node.width / 2}
-                y={node.y + node.height / 2 - (lines.length > 1 ? 6 : 0)}
+                y={node.y + node.height - 25}
                 textAnchor="middle"
                 fill={colors.text}
                 fontSize={11}
@@ -161,7 +156,7 @@ const NodeBox: React.FC<{ node: SLDNode }> = ({ node }) => {
             {lines[1] && (
                 <text
                     x={node.x + node.width / 2}
-                    y={node.y + node.height / 2 + 12}
+                    y={node.y + node.height - 12}
                     textAnchor="middle"
                     fill={colors.subtext}
                     fontSize={10}
@@ -171,11 +166,11 @@ const NodeBox: React.FC<{ node: SLDNode }> = ({ node }) => {
                 </text>
             )}
 
-            {/* Wire size (if exists) */}
+            {/* Wire Info */}
             {node.data?.wire && (
                 <text
                     x={node.x + node.width / 2}
-                    y={node.y + node.height + 12}
+                    y={node.y + node.height + 10} // Below node
                     textAnchor="middle"
                     fill="#64748b"
                     fontSize={9}
