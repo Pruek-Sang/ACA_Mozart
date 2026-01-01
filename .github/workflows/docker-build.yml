@@ -72,20 +72,42 @@ jobs:
           pip install -e . || pip install -r requirements.txt || true
 
       - name: 🧪 Run E2E Data Flow Tests
+        id: e2e-test
         run: |
           cd mcp_core_v2
           export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-          python -m pytest ../tests/test_e2e_data_flow.py -v --tb=short || true
-          # Note: 'true' allows build to continue if tests fail (remove for strict mode)
-          echo "✅ E2E tests completed"
+          python -m pytest ../tests/test_e2e_data_flow.py -v --tb=short
+          echo "✅ E2E tests PASSED"
 
       - name: 🛡️ Run MCP Core Input Sanitizer Tests
+        id: sanitizer-test
         run: |
           cd mcp_core_v2
           export PYTHONPATH="${PYTHONPATH}:$(pwd)"
           echo "🧪 Running Input Sanitizer validation tests..."
           python -m pytest tests/test_input_sanitizer.py -v --tb=short
-          echo "✅ Input Sanitizer tests completed"
+          echo "✅ Input Sanitizer tests PASSED"
+
+      - name: 🧠 Run RAG Backend Tests
+        id: rag-test
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]"
+          pip install --quiet pydantic pytest
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          echo "🧪 Running parser logic and merge tests..."
+          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py -v --tb=short
+          echo "✅ RAG Backend tests PASSED"
+
+      - name: 📊 Backend Test Summary
+        if: always()
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║            🧪 BACKEND TEST RESULTS SUMMARY                 ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║ E2E Data Flow:      ${{ steps.e2e-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ Input Sanitizer:    ${{ steps.sanitizer-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ RAG Backend:        ${{ steps.rag-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "╚════════════════════════════════════════════════════════════╝"
 
   # ═══════════════════════════════════════════════════════════════════════
   # 🔍 Frontend Lint Test - Catch React Hooks violations BEFORE deploy
@@ -111,6 +133,7 @@ jobs:
           npm ci
 
       - name: 🔍 Run ESLint (React Hooks + TypeScript)
+        id: eslint-check
         run: |
           cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
           echo "🔍 Running ESLint with React Hooks rules..."
@@ -118,18 +141,19 @@ jobs:
             echo "❌ ESLint found ERRORS! Fix before deploy."
             exit 1
           }
-          echo "✅ ESLint passed - no hooks violations (warnings OK)"
+          echo "✅ ESLint PASSED - no hooks violations"
 
       - name: 🏗️ TypeScript Type Check
+        id: ts-check
+        continue-on-error: true
         run: |
           cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
           echo "🔍 Running TypeScript type check..."
-          npx tsc --noEmit || {
-            echo "⚠️ TypeScript has type errors (non-blocking)"
-          }
-          echo "✅ TypeScript check completed"
+          npx tsc --noEmit
+          echo "✅ TypeScript check PASSED"
 
       - name: 🧪 Run Unit Tests (Vitest)
+        id: unit-test
         run: |
           cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
           echo "🧪 Running Vitest unit tests..."
@@ -137,7 +161,18 @@ jobs:
             echo "❌ Unit tests FAILED! Fix before deploy."
             exit 1
           }
-          echo "✅ All unit tests passed"
+          echo "✅ All unit tests PASSED"
+
+      - name: 📊 Frontend Test Summary
+        if: always()
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║           🎨 FRONTEND TEST RESULTS SUMMARY              ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║ ESLint (Hooks):  ${{ steps.eslint-check.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ TypeScript:      ${{ steps.ts-check.outcome == 'success' && '✅ PASSED' || '⚠️ WARNINGS' }}"
+          echo "║ Unit Tests:      ${{ steps.unit-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "╚════════════════════════════════════════════════════════════╝"
 
   # ═══════════════════════════════════════════════════════════════════════
   # Build Gateway Image (Artifact Registry - avoids cache issue!)
