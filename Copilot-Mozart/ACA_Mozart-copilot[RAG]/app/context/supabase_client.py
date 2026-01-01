@@ -79,7 +79,7 @@ class SupabaseHealthCheck:
         
         try:
             # Simple query to check connection
-            client.table("mozart.sessions").select("id").limit(1).execute()
+            client.schema("mozart").table("sessions").select("id").limit(1).execute()
             return True
         except Exception as e:
             logger.warning(f"Supabase health check failed: {e}")
@@ -101,7 +101,7 @@ class SupabaseHealthCheck:
             }
         
         try:
-            result = client.table("mozart.sessions").select("id").limit(1).execute()
+            result = client.schema("mozart").table("sessions").select("id").limit(1).execute()
             return {
                 "available": True,
                 "tables_accessible": True,

@@ -145,7 +145,7 @@ async def root():
         if client:
             try:
                 # Simple query to keep project alive (SELECT on sessions table)
-                client.table("mozart.sessions").select("id").limit(1).execute()
+                client.schema("mozart").table("sessions").select("id").limit(1).execute()
                 supabase_status = "connected"
                 logger.debug("🔌 Supabase keepalive: ping success")
             except Exception as e:
