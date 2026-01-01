@@ -145,7 +145,7 @@ jobs:
   build-gateway:
     name: 🚀 Build Gateway
     runs-on: ubuntu-latest
-    needs: [test-e2e]  # 🆕 Depends on E2E tests
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
     if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
     
     steps:
@@ -184,7 +184,7 @@ jobs:
   build-frontend:
     name: 🎨 Build Frontend
     runs-on: ubuntu-latest
-    needs: [test-frontend-lint]  # 🆕 Frontend lint must pass first!
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
     if: ${{ github.event_name == 'push' || github.event.inputs.build_frontend == 'true' }}
     
     steps:
@@ -239,6 +239,7 @@ jobs:
   build-mcp-core:
     name: ⚡ Build MCP Core
     runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
     if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
     
     steps:
@@ -277,6 +278,7 @@ jobs:
   build-rag:
     name: 🧠 Build Mozart RAG
     runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
     if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
     
     steps:
