@@ -18,10 +18,12 @@ on:
       # ═══════════════════════════════════════════════════════════════
       - 'Copilot-Mozart/**'         # RAG, Gateway, Frontend
       - 'mcp_core_v2/**'            # MCP Core (CRITICAL - was missing!)
+      - 'tests/**'                  # Test files (NEW!)
       - 'scripts/**'                # Build/Deploy scripts
       - 'docker-compose*.yml'       # Docker configs
       - '.github/workflows/**'      # Workflow changes
       - 'frontend-dist/**'          # Pre-built frontend (if any)
+
   
   # Allow manual trigger from GitHub UI
   workflow_dispatch:
