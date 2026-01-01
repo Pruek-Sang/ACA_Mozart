@@ -60,7 +60,8 @@ from app.formatters import format_design_report  # Card-style Markdown formatter
 # 🆕 Computed Data Layer - Phase 1-4
 from app.display import compute_display_data, format_audit_for_frontend, render_sld
 from app.formatters.pdf_formatter import format_pdf_table
-from app.utils.formatting import format_wire_size  # 🆕 Wire formatting utility
+from app.utils.formatting import format_wire_size
+from app.logic.validation import LogicValidator  # 🆕 Wire formatting utility
 from core.privacy import PrivacyGuard
 
 # 🆕 Refactored Stateful Intelligence modules
@@ -225,6 +226,7 @@ class RagService:
         
         self.privacy = PrivacyGuard()
         self.knowledge = KnowledgeService()
+        self.validator = LogicValidator()
         self.use_google_ai: bool = False
         self.model: Any = None  # Will be set below
         
@@ -962,9 +964,38 @@ Query: "{query}"
         mcp_response = await mcp_client.design(mcp_request)
         
         if mcp_response.success:
+            design_dict = mcp_response.to_dict()
+
+            # 🆕 [VAL-LOGIC] Logic Validator Injection
+            try:
+                # 1. Sanity Check (Inputs)
+                input_warnings = self.validator.validate_sanity(extracted.get("loads", []))
+                
+                # 2. Output Check (Transformer/Phase - post-calc)
+                total_kw = design_dict.get("data", {}).get("total_power_kw", 0)
+                output_warnings = self.validator.validate_transformer_capacity(total_kw)
+
+                # 3. Phase Balance
+                if total_kw > 15:
+                    phase_loads = extracted.get("loads", [])
+                    # Convert to required format if needed
+                    phase_info = self.validator.calculate_phase_balance(phase_loads)
+                    if phase_info.get("warnings"):
+                        output_warnings.extend(phase_info["warnings"])
+
+                # Inject
+                if input_warnings or output_warnings:
+                    if "data" not in design_dict: design_dict["data"] = {}
+                    if "warnings" not in design_dict["data"]: design_dict["data"]["warnings"] = []
+                    
+                    design_dict["data"]["warnings"].extend(input_warnings + output_warnings)
+
+            except Exception as e:
+                logger.error(f"Validator error: {e}")
+
             return {
                 "status": "complete",
-                "design_result": mcp_response.to_dict(),
+                "design_result": design_dict,
                 "spec": spec_response.model_dump()
             }
         else:
@@ -1046,6 +1077,23 @@ Query: "{query}"
             lines.append("📐 มาตรฐาน: วสท. 2001-56 / NEC 2023 / IEC 60364")
             lines.append("")
             lines.append("─" * 65)
+
+            # 🆕 [VAL-LOGIC] Validation Warnings
+            # Note: result structure is {'status': 'complete', 'design_result': {'data': ...}}
+            # Need to traverse carefully
+            design_warnings = []
+            if "data" in result and "warnings" in result["data"]:
+                 design_warnings = result["data"]["warnings"]
+            elif "design_result" in result:
+                 # In case we look at the wrapper
+                 design_warnings = result["design_result"].get("data", {}).get("warnings", [])
+
+            if design_warnings:
+                lines.append("")
+                lines.append("⚠️  ข้อควรระวัง (Validation Warnings):")
+                for w in design_warnings:
+                    lines.append(f"  • {w}")
+                lines.append("─" * 65)
             
             # ═══════════════════════════════════════════
             # Section 0: Meter & Main Service
