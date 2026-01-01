@@ -1358,3 +1358,87 @@ for warn in warnings[:5]:  # แสดงแค่ 5 ตัวแรก
 22. **ถ้าข้อมูลมีใน Log แต่หายใน UI -> เช็ค Display Loop/Slicing Limit ([:X]) ทันที!**
     - ห้ามใช้ `[:Limit]` กับข้อมูลความปลอดภัยโดยไม่ sort/filter ก่อนเสมอ
 
+---
+
+## 🔴 ความผิดพลาดที่ 22: React Hooks Violation - Regression Bug (1 ม.ค. 2026)
+
+> **อาการ:**
+> - User เปิดเว็บแล้วเจอ "เกิดข้อผิดพลาดในการแสดงผล" (ErrorBoundary)
+> - Console: **"Rendered more hooks than during the previous render"** (React Error #310)
+> - Production พังหลังจาก deploy Compact Table feature
+
+**ผู้ทำผิด:** AI (Estrella/Antigravity)
+
+### สาเหตุ:
+
+Estrella แก้ code Compact Table แล้ว **ย้าย useCallback ไปผิดที่:**
+
+```tsx
+// ❌ หลัง Estrella แก้ (ผิด!)
+function ResultViewer() {
+  const [activeTab, setActiveTab] = useState('table');  // hook 1
+  
+  if (isLoading) return <Loading />;  // ← early return ก่อน hook 2!
+  if (!data) return <Empty />;
+  
+  const handleDownloadExcel = useCallback(...);  // ← hook 2 หลัง early return!
+}
+```
+
+**ผลลัพธ์:**
+
+| Render ครั้งที่ | สถานะ | Hooks ที่เรียก |
+|:---------------:|-------|:--------------:|
+| 1 | `isLoading = true` | **1** (useState) |
+| 2 | `data = มีค่า` | **2** (useState + useCallback) |
+
+**React เห็นจำนวน hooks ไม่เท่ากัน → CRASH!**
+
+### ทำไม npm build ไม่จับ:
+
+- `npm run build` เช็คแค่ TypeScript syntax
+- **ไม่ได้ run React จริง** → ไม่เห็น hooks order issue
+- **ไม่มี ESLint hooks rules ใน CI** ← Root cause ของการหลุด Production!
+
+### วิธีแก้:
+
+```tsx
+// ✅ ถูกต้อง: hooks ทั้งหมดก่อน early returns
+function ResultViewer() {
+  const [activeTab, setActiveTab] = useState('table');
+  const handleDownloadExcel = useCallback(...);  // ← ย้ายขึ้นมา!
+  
+  if (isLoading) return <Loading />;
+  if (!data) return <Empty />;
+  // ... render
+}
+```
+
+### Prevention ที่เพิ่มแล้ว:
+
+1. **ESLint + React Hooks Plugin** (`react-hooks/rules-of-hooks: error`)
+2. **Frontend Lint Job ใน CI** (ต้องผ่านก่อน build)
+3. **Unit Tests** (Vitest + React Testing Library)
+4. **Hooks Stability Tests** (ทดสอบ re-render ไม่ crash)
+
+### 🚨 กฎเหล็กใหม่:
+
+37. **React Hooks ต้องอยู่ก่อน early returns เสมอ!**
+    - useState, useCallback, useMemo, useEffect ต้องอยู่บนสุดของ function
+    - อย่า put hooks หลัง `if (...) return`
+
+38. **แก้ Frontend ต้อง:**
+    - [ ] รัน `npm run lint` ก่อน commit
+    - [ ] เปิด browser ดูจริงก่อน push
+    - [ ] มี unit tests สำหรับ component สำคัญ
+
+39. **npm build ผ่าน ≠ Code ถูกต้อง!**
+    - Build เช็คแค่ syntax
+    - ต้องมี ESLint + Tests ด้วย
+
+---
+
+*เพิ่มเติมเมื่อ: 2026-01-01 22:00*
+*สรุป: Regression Bug ที่ Estrella สร้างขึ้นเองตอนแก้ code โดยไม่ test ใน browser ก่อน push!*
+*ความผิดของ Estrella 100% - ไม่ใช่ปัญหาระบบหรือ user*
+
