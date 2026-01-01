@@ -19,5 +19,16 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    // ═══════════════════════════════════════════════════════════════
+    // Custom rules: hooks = ERROR (blocks CI), any type = WARN only
+    // ═══════════════════════════════════════════════════════════════
+    rules: {
+      // 🔴 CRITICAL: React Hooks violations MUST block CI
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+
+      // 🟡 NON-CRITICAL: Allow 'any' type for now (legacy code)
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
   },
 ])
