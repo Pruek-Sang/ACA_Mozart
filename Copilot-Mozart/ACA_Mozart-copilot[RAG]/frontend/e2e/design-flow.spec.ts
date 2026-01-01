@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 /**
  * Mozart E2E Browser Tests
@@ -70,6 +70,11 @@ test.describe('Mozart Design Flow', () => {
         if (await auditTab.isVisible({ timeout: 3000 }).catch(() => false)) {
             await auditTab.click();
             await expect(auditTab).toHaveAttribute('aria-selected', 'true');
+        }
+
+        if (await sldTab.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await sldTab.click();
+            await expect(sldTab).toHaveAttribute('aria-selected', 'true');
         }
     });
 
