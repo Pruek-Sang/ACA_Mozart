@@ -129,6 +129,16 @@ jobs:
           }
           echo "✅ TypeScript check completed"
 
+      - name: 🧪 Run Unit Tests (Vitest)
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
+          echo "🧪 Running Vitest unit tests..."
+          npm run test || {
+            echo "❌ Unit tests FAILED! Fix before deploy."
+            exit 1
+          }
+          echo "✅ All unit tests passed"
+
   # ═══════════════════════════════════════════════════════════════════════
   # Build Gateway Image (Artifact Registry - avoids cache issue!)
   # ═══════════════════════════════════════════════════════════════════════
