@@ -38,7 +38,7 @@ class TestMergeLogic(unittest.TestCase):
         cmd = EditCommand(
             action=EditAction.CHANGE,
             device_type="AC",
-            target_room="ห้องนอน 2"
+            room_name="ห้องนอน 2"
         )
         indices = find_target_loads(self.loads, cmd)
         self.assertEqual(indices, [1]) # Should match "ห้องนอน 2" only
@@ -48,7 +48,7 @@ class TestMergeLogic(unittest.TestCase):
         cmd = EditCommand(
             action=EditAction.CHANGE,
             device_type="HEATER",
-            target_room="ห้องน้ำ" # partial match
+            room_name="ห้องน้ำ" # partial match
         )
         indices = find_target_loads(self.loads, cmd)
         self.assertEqual(indices, [2]) # Should match "ห้องน้ำ 1"
@@ -74,7 +74,7 @@ class TestMergeLogic(unittest.TestCase):
             device_type="PUMP",
             new_value=750,
             unit="W",
-            target_room="โรงรถ"
+            room_name="โรงรถ"
         )
         updated = apply_add(self.loads.copy(), cmd, self.rooms)
         

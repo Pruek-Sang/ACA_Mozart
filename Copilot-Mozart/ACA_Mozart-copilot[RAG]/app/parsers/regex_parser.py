@@ -177,7 +177,7 @@ def _build_command_from_match(match: Match, pattern_name: str, raw_input: str) -
     cmd = EditCommand(
         action=action,
         device_type=device_type,
-        target_room=target_room,
+        room_name=target_room,
         target_floor=None,  # Could extract from room name
         new_value=new_value,
         unit=unit,

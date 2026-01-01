@@ -124,7 +124,7 @@ async def test_real_supabase_lifecycle():
              expected_cmd = EditCommand(
                  action=EditAction.CHANGE,
                  device_type="AC",
-                 target_room="ห้องนอน 1",
+                 room_name="ห้องนอน 1",
                  new_value=18000,
                  unit="BTU",
                  confidence=1.0,
