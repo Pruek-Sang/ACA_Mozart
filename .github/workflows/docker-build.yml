@@ -74,16 +74,17 @@ jobs:
       - name: 🧪 Run E2E Data Flow Tests
         id: e2e-test
         run: |
+          # PYTHONPATH needs project root AND mcp_core_v2 for imports
+          export PYTHONPATH="${PYTHONPATH}:$(pwd):$(pwd)/mcp_core_v2"
           cd mcp_core_v2
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
           python -m pytest ../tests/test_e2e_data_flow.py -v --tb=short
           echo "✅ E2E tests PASSED"
 
       - name: 🛡️ Run MCP Core Input Sanitizer Tests
         id: sanitizer-test
         run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd):$(pwd)/mcp_core_v2"
           cd mcp_core_v2
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
           echo "🧪 Running Input Sanitizer validation tests..."
           python -m pytest tests/test_input_sanitizer.py -v --tb=short
           echo "✅ Input Sanitizer tests PASSED"
