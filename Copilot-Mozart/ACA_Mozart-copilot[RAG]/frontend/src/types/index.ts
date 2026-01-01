@@ -318,6 +318,13 @@ export interface DesignResult {
         main_raceway_size?: string;
         rcbo_count?: number;
         mcb_count?: number;
+
+        // 🆕 PDF/UI Explicit Fields
+        project_name?: string;
+        building_type?: string;
+        meter_size?: string;
+        main_cb_rating?: number;  // Alias for main_breaker if used
+        calculations?: any;       // Allow any calculation data
     };
 }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import type { ChatMessage } from '../types';
+import Markdown from 'react-markdown';
 import { cn } from '../lib/utils';
 
 interface ChatPanelProps {
@@ -66,7 +67,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, i
                                     {msg.error_type.replace('_', ' ')}
                                 </div>
                             )}
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            <Markdown
+                                className="markdown-content"
+                                components={{
+                                    p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                    li: ({ children }) => <li className="mb-0.5">{children}</li>,
+                                    strong: ({ children }) => <strong className={cn(
+                                        "font-bold",
+                                        msg.role === 'user' ? "text-white" : "text-sky-200"
+                                    )}>{children}</strong>,
+                                    code: ({ children }) => <code className={cn(
+                                        "px-1 py-0.5 rounded font-mono text-xs",
+                                        msg.role === 'user' ? "bg-white/20" : "bg-black/30"
+                                    )}>{children}</code>,
+                                    pre: ({ children }) => <pre className="bg-black/50 p-2 rounded-md overflow-x-auto text-xs my-2">{children}</pre>
+                                }}
+                            >
+                                {msg.content}
+                            </Markdown>
                         </div>
                     </div>
                 ))}

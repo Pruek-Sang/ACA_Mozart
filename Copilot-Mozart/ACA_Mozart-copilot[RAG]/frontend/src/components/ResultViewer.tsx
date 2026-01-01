@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { Table, FileImage, ClipboardCheck, Box, Download, Receipt } from 'lucide-react';
+import { Table, FileImage, ClipboardCheck, Box, Download, Receipt, Printer } from 'lucide-react';
 import type { DesignResult, LoadResult, SLDData } from '../types';
 import { cn } from '../lib/utils';
 import { SLDViewer } from './SLDViewer';
+import { PDFPreviewModal } from './PDFPreviewModal';
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'table' | 'audit' | 'sld' | 'boq';
@@ -22,6 +23,7 @@ interface ResultViewerProps {
 export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sldData }) => {
     // === ALL HOOKS MUST BE CALLED FIRST (before any early returns) ===
     const [activeTab, setActiveTab] = useState<ViewMode>('table');
+    const [isPDFPreviewOpen, setPDFPreviewOpen] = useState(false);
 
     // Tab Buttons (constant, not a hook, but define early for consistency)
     const tabs: { id: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -189,8 +191,22 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     >
                         <Download size={16} />
                     </button>
+                    <button
+                        onClick={() => setPDFPreviewOpen(true)}
+                        title="Print Preview / Download PDF"
+                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+                    >
+                        <Printer size={16} />
+                    </button>
                 </div>
             </div>
+
+            {/* Print Preview Modal */}
+            <PDFPreviewModal
+                data={data}
+                isOpen={isPDFPreviewOpen}
+                onClose={() => setPDFPreviewOpen(false)}
+            />
 
             {/* Content Area */}
             <div className="flex-1 p-6 overflow-auto">

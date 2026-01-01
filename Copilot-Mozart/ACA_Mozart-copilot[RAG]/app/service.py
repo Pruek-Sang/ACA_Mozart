@@ -60,6 +60,7 @@ from app.formatters import format_design_report  # Card-style Markdown formatter
 # 🆕 Computed Data Layer - Phase 1-4
 from app.display import compute_display_data, format_audit_for_frontend, render_sld
 from app.formatters.pdf_formatter import format_pdf_table
+from app.utils.formatting import format_wire_size  # 🆕 Wire formatting utility
 from core.privacy import PrivacyGuard
 
 # 🆕 Refactored Stateful Intelligence modules
@@ -629,6 +630,43 @@ Query: "{query}"
         
         return result
 
+    def _extract_floor_distances(self, text: str) -> Dict[int, float]:
+        """
+        Extract average branch distances per floor from text using regex.
+        Supports:
+        - "Floor 1 15m"
+        - "ชั้น 1 สาย 20 เมตร"
+        - "ชั้นล่าง 15 เมตร" (Floor 1)
+        - "ชั้นบน 25 เมตร" (Floor 2)
+        """
+        import re
+        distances = {}
+        
+        # Pattern for explicit floor numbers: "ชั้น X ... Y เมตร"
+        # Matches: "ชั้น 1 ยาว 15เมตร", "ชั้น 2 สาย 20 m"
+        floor_matches = re.finditer(r'ชั้น\s*(\d+).*?(\d+)\s*(?:เมตร|m)', text)
+        for m in floor_matches:
+            try:
+                floor = int(m.group(1))
+                dist = float(m.group(2))
+                distances[floor] = dist
+            except (ValueError, IndexError):
+                pass
+                
+        # Pattern for generic keywords
+        if 'ชั้นล่าง' in text or 'ground' in text.lower():
+            m = re.search(r'(?:ชั้นล่าง|ground).*?(\d+)\s*(?:เมตร|m)', text, re.IGNORECASE)
+            if m:
+                distances[1] = float(m.group(1))
+                
+        if 'ชั้นบน' in text or 'upper' in text.lower():
+            m = re.search(r'(?:ชั้นบน|upper).*?(\d+)\s*(?:เมตร|m)', text, re.IGNORECASE)
+            if m:
+                # Assuming 2-story house, "upper" is floor 2
+                distances[2] = float(m.group(1))
+                
+        return distances
+
     def _should_ask_back(self, extracted_data: Dict[str, Any]) -> Tuple[bool, str]:
         """
         [CP-ASK] Check if we need to ask user for clarification.
@@ -821,6 +859,27 @@ Query: "{query}"
                 # เก็บ original query ไว้สำหรับ auto-fill checks
                 extracted["original_query"] = normalized_query
                 
+                # 🆕 [RAG-FIX] Backfill floor distances if not specified on individual loads
+                floor_distances = self._extract_floor_distances(normalized_query)
+                if floor_distances:
+                    logger.info(f"📏 Extracted floor distances: {floor_distances}")
+                    for load in extracted.get("loads", []):
+                        # Only apply if load doesn't have specific distance AND no user-specified override
+                        if not load.get("branch_distance_m"):
+                            # Get load's floor via room
+                            room_name = load.get("room_name")
+                            room_floor = 1 # Default
+                            
+                            # Find room in extracted['rooms']
+                            for r in extracted.get("rooms", []):
+                                if r["name"] == room_name:
+                                    room_floor = r.get("floor", 1)
+                                    break
+                            
+                            if room_floor in floor_distances:
+                                load["branch_distance_m"] = floor_distances[room_floor]
+                                logger.info(f"  └─ Applied {floor_distances[room_floor]}m to {load['device']} in {room_name}")
+
                 # 🆕 Validation: Check if extraction actually succeeded
                 rooms_count = len(extracted.get('rooms', []))
                 loads_count = len(extracted.get('loads', []))
@@ -1135,7 +1194,9 @@ Query: "{query}"
                         display_name = display_name[:27] + "..."
                     
                     # Wire/conduit info
-                    wire_conduit = f"{wire_size}mm²/½\""
+                    # Use utility for clean formatting (e.g., "2.5 mm²")
+                    formatted_wire = format_wire_size(wire_size)
+                    wire_conduit = f"{formatted_wire}/½\""
                     
                     # Format as table row
                     lines.append(f"│ {circuit_num:>3} │ {display_name:<30} │ {load_current:>6.1f} │{breaker_str:>7}│ {wire_conduit:<13} │")
