@@ -1,14 +1,14 @@
 device_code,source,price_thb,unit,url,last_updated
-COMP-OUTLET-16A,ThaiWatsadu,120.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-30
-COMP-OUTLET-16A,HomePro,135.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-30
-COMP-OUTLET-16A,Lazada,89.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-30
-COMP-OUTLET-16A,Shopee,95.0,set,https://mock.example.com/COMP-OUTLET-16A,2025-12-30
-COMP-DOWNLIGHT-9W,ThaiWatsadu,250.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2025-12-30
-COMP-DOWNLIGHT-9W,HomePro,280.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2025-12-30
-COMP-DOWNLIGHT-9W,Shopee,199.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2025-12-30
-CB-1P-16A,Schneider Official,150.0,set,https://mock.example.com/CB-1P-16A,2025-12-30
-CB-1P-16A,ABB Official,148.0,set,https://mock.example.com/CB-1P-16A,2025-12-30
-CB-1P-16A,Lazada,120.0,set,https://mock.example.com/CB-1P-16A,2025-12-30
-WIRE-THW-2.5,Yazaki,12.5,meter,https://mock.example.com/WIRE-THW-2.5,2025-12-30
-WIRE-THW-2.5,Phelps Dodge,14.0,meter,https://mock.example.com/WIRE-THW-2.5,2025-12-30
-WIRE-THW-2.5,BCC,11.8,meter,https://mock.example.com/WIRE-THW-2.5,2025-12-30
+COMP-OUTLET-16A,ThaiWatsadu,120.0,set,https://mock.example.com/COMP-OUTLET-16A,2026-01-01
+COMP-OUTLET-16A,HomePro,135.0,set,https://mock.example.com/COMP-OUTLET-16A,2026-01-01
+COMP-OUTLET-16A,Lazada,89.0,set,https://mock.example.com/COMP-OUTLET-16A,2026-01-01
+COMP-OUTLET-16A,Shopee,95.0,set,https://mock.example.com/COMP-OUTLET-16A,2026-01-01
+COMP-DOWNLIGHT-9W,ThaiWatsadu,250.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2026-01-01
+COMP-DOWNLIGHT-9W,HomePro,280.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2026-01-01
+COMP-DOWNLIGHT-9W,Shopee,199.0,set,https://mock.example.com/COMP-DOWNLIGHT-9W,2026-01-01
+CB-1P-16A,Schneider Official,150.0,set,https://mock.example.com/CB-1P-16A,2026-01-01
+CB-1P-16A,ABB Official,148.0,set,https://mock.example.com/CB-1P-16A,2026-01-01
+CB-1P-16A,Lazada,120.0,set,https://mock.example.com/CB-1P-16A,2026-01-01
+WIRE-THW-2.5,Yazaki,12.5,meter,https://mock.example.com/WIRE-THW-2.5,2026-01-01
+WIRE-THW-2.5,Phelps Dodge,14.0,meter,https://mock.example.com/WIRE-THW-2.5,2026-01-01
+WIRE-THW-2.5,BCC,11.8,meter,https://mock.example.com/WIRE-THW-2.5,2026-01-01
