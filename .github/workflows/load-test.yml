@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Mozart Load Testing - K6 Performance Tests
+# ═══════════════════════════════════════════════════════════════════════════
+# Runs weekly and on-demand to test system performance under load
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: 📊 Load Testing
+
+on:
+  # Run weekly on Sunday at 4 AM Thailand time (21:00 UTC Saturday)
+  schedule:
+    - cron: '0 21 * * 6'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      vus:
+        description: 'Number of virtual users'
+        type: number
+        default: 10
+      duration:
+        description: 'Test duration (e.g., 1m, 5m)'
+        type: string
+        default: '2m'
+
+env:
+  RAG_URL: https://mozart-rag-203658178245.asia-southeast1.run.app
+
+jobs:
+  load-test:
+    name: 📊 K6 Load Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Install K6
+        run: |
+          curl -L https://github.com/grafana/k6/releases/download/v0.47.0/k6-v0.47.0-linux-amd64.tar.gz | tar xz
+          sudo mv k6-v0.47.0-linux-amd64/k6 /usr/local/bin/
+
+      - name: 📊 Run Load Test
+        run: |
+          k6 run tests/load/stress-test.js \
+            --out json=results.json \
+            --summary-export=summary.json
+        env:
+          K6_RAG_URL: ${{ env.RAG_URL }}
+          K6_VUS: ${{ github.event.inputs.vus || '10' }}
+          K6_DURATION: ${{ github.event.inputs.duration || '2m' }}
+
+      - name: 📊 Parse Results
+        if: always()
+        run: |
+          echo "## 📊 Load Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f summary.json ]; then
+            echo "### Metrics" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat summary.json | python3 -m json.tool >> $GITHUB_STEP_SUMMARY || cat summary.json >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No summary file generated" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📊 Upload Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: k6-results
+          path: |
+            results.json
+            summary.json
+          retention-days: 30

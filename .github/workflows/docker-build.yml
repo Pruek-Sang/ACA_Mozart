@@ -111,6 +111,44 @@ jobs:
           echo "╚════════════════════════════════════════════════════════════╝"
 
   # ═══════════════════════════════════════════════════════════════════════
+  # 🗃️ Supabase Schema Test - Prevents Error #310
+  # ═══════════════════════════════════════════════════════════════════════
+  test-supabase:
+    name: 🗃️ Supabase Schema Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: pip install supabase pytest
+
+      - name: 🗃️ Test Supabase Schema
+        id: supabase-test
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          echo "🧪 Testing Supabase schema access..."
+          python -m pytest tests/test_supabase_schema.py -v --tb=short
+          echo "✅ Supabase schema test PASSED"
+
+      - name: 📊 Supabase Test Summary
+        if: always()
+        run: |
+          echo "## 🗃️ Supabase Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Schema Access | ${{ steps.supabase-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
   # 🔍 Frontend Lint Test - Catch React Hooks violations BEFORE deploy
   # ═══════════════════════════════════════════════════════════════════════
   test-frontend-lint:
@@ -602,12 +640,115 @@ jobs:
           echo "✅ Deploy job completed!"
 
   # ═══════════════════════════════════════════════════════════════════════
+  # 🔥 Smoke Test - Verify deployment works
+  # ═══════════════════════════════════════════════════════════════════════
+  smoke-test:
+    name: 🔥 Post-Deploy Smoke Test
+    runs-on: ubuntu-latest
+    needs: [deploy-to-cloudrun]
+    if: success()
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install test dependencies
+        run: pip install requests pytest
+
+      - name: 🔥 Run Smoke Tests
+        id: smoke
+        run: |
+          echo "🔥 Running post-deploy smoke tests..."
+          python -m pytest tests/test_smoke_production.py -v --tb=short
+          echo "✅ Smoke tests PASSED"
+
+      - name: 📊 Smoke Test Summary
+        if: always()
+        run: |
+          echo "## 🔥 Smoke Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ steps.smoke.outcome }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 🔄 Auto-Rollback - Revert on smoke failure
+  # ═══════════════════════════════════════════════════════════════════════
+  rollback:
+    name: 🔄 Auto-Rollback
+    runs-on: ubuntu-latest
+    needs: [smoke-test]
+    if: failure()
+    
+    steps:
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🔄 Rollback to previous revisions
+        run: |
+          echo "🚨 Smoke tests failed! Rolling back..."
+          
+          for svc in frontend gateway mozart-rag mcp-core; do
+            echo "📦 Rolling back $svc..."
+            PREV=$(gcloud run revisions list --service=$svc --region=asia-southeast1 --limit=2 --format="value(name)" 2>/dev/null | tail -1)
+            
+            if [ -n "$PREV" ]; then
+              gcloud run services update-traffic $svc \
+                --region=asia-southeast1 \
+                --to-revisions=$PREV=100 2>/dev/null || true
+              echo "✅ Rolled back $svc to $PREV"
+            else
+              echo "⚠️ Could not find previous revision for $svc"
+            fi
+          done
+          
+          echo "🔄 Rollback complete!"
+
+      - name: 📊 Rollback Summary
+        run: |
+          echo "## 🔄 Rollback Executed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Smoke tests failed!** Traffic reverted to previous revisions." >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 📢 Alert on Failure
+  # ═══════════════════════════════════════════════════════════════════════
+  alert:
+    name: 📢 Failure Alert
+    runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint, smoke-test]
+    if: failure()
+    
+    steps:
+      - name: 📢 Create failure summary
+        run: |
+          echo "## 🚨 CI/CD Pipeline Failed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.test-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Lint | ${{ needs.test-frontend-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
   # Summary
   # ═══════════════════════════════════════════════════════════════════════
   summary:
     name: 📊 Build Summary
     runs-on: ubuntu-latest
-    needs: [build-gateway, build-frontend, build-mcp-core, build-rag, deploy-to-cloudrun]
+    needs: [build-gateway, build-frontend, build-mcp-core, build-rag, deploy-to-cloudrun, smoke-test]
     if: always()
     
     steps:
@@ -615,12 +756,12 @@ jobs:
         run: |
           echo "## 🐳 Docker Build & Deploy Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Service | Build | Deploy |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Gateway | ${{ needs.build-gateway.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend | ${{ needs.build-frontend.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| MCP Core | ${{ needs.build-mcp-core.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Mozart RAG | ${{ needs.build-rag.result }} | ${{ needs.deploy-to-cloudrun.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Build | Deploy | Smoke |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Gateway | ${{ needs.build-gateway.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.build-frontend.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| MCP Core | ${{ needs.build-mcp-core.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mozart RAG | ${{ needs.build-rag.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 

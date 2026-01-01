@@ -1442,3 +1442,71 @@ function ResultViewer() {
 *สรุป: Regression Bug ที่ Estrella สร้างขึ้นเองตอนแก้ code โดยไม่ test ใน browser ก่อน push!*
 *ความผิดของ Estrella 100% - ไม่ใช่ปัญหาระบบหรือ user*
 
+---
+
+## 🔴 ความผิดพลาดที่ 40: Supabase Query Syntax (Error #310)
+
+**อาการ:**
+- Frontend แสดง "Error #310"
+- Health check บอก `supabase: "error"`
+- Pytest error: `table not found`
+
+**สาเหตุ:**
+ใช้ syntax ผิด: `client.table("mozart.sessions")`
+
+**วิธีแก้:**
+```python
+# ❌ WRONG
+client.table("mozart.sessions").select("*")
+
+# ✅ CORRECT
+client.schema("mozart").table("sessions").select("*")
+```
+
+**ไฟล์ที่ต้องแก้:**
+- `app/context/supabase_client.py` (line 80-83)
+- `app/routes.py` (line 147-149)
+
+---
+
+## 🔴 ความผิดพลาดที่ 41: Deploy สำเร็จแต่ App พัง
+
+**อาการ:**
+- GitHub Actions Deploy: ✅
+- Health check: 200 OK
+- แต่ใช้งานจริงไม่ได้!
+
+**สาเหตุ:**
+Health check เดิมแค่เช็ค `status: alive` แต่ไม่ validate Supabase connection
+
+**วิธีแก้:**
+1. เพิ่ม Smoke Test หลัง deploy
+2. ต้อง assert `supabase: "connected"` ไม่ใช่แค่ status
+3. เพิ่ม Auto-Rollback ถ้า smoke fail
+
+**ไฟล์ใหม่:**
+- `tests/test_smoke_production.py`
+- `.github/workflows/docker-build.yml` (smoke-test, rollback jobs)
+
+---
+
+## 🔴 ความผิดพลาดที่ 42: AI รับงานต่อแล้วหา Bug ไม่เจอ
+
+**อาการ:**
+- AI ใหม่มา debug แต่ไม่รู้จะเริ่มจากไหน
+- พยายาม fix random โดยไม่เข้าใจ architecture
+
+**สาเหตุ:**
+ไม่มี documentation สำหรับ debugging
+
+**วิธีแก้:**
+อ่านไฟล์เหล่านี้ก่อน debug:
+1. `QC_ACA/CI_CD_Debugging_Guide.md` ← Quick diagnosis
+2. `QC_ACA/Blackbox_Workflow_Architecture.md` ← Data flow
+3. `QC_ACA/🧠 MEMORY - ความผิดพลาดที่ห้ามทำซ้ำ.md` ← ไฟล์นี้!
+
+---
+
+*เพิ่มเติมเมื่อ: 2026-01-02 00:26*
+*สรุป: เพิ่ม CI/CD Testing + Debugging Guide สำหรับ AI/Dev handover*
+

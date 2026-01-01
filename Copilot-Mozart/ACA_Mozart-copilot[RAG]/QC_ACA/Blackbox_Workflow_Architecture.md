@@ -1,39 +1,52 @@
-# 🏛️ Mozart Architecture: RAG ↔ MCP Core Data Flow
+# 🏛️ Mozart Architecture: Full System Data Flow
 
-> **เอกสารนี้สำหรับ:** Debug ปัญหา "กล่องว่าง" (Null/Empty Data) ที่มักเกิดขึ้นบ่อย
-> **อัพเดท:** 2025-12-24 03:35
+> **เอกสารนี้สำหรับ:** Debug ปัญหา "กล่องว่าง" (Null/Empty Data) และ E2E Flow Reference
+> **อัพเดท:** 2026-01-01 (Added Gateway, Supabase, Computed Data Layer)
 
 ---
 
-## 📊 System Overview Diagram
+## 📊 System Overview Diagram (Updated 2026-01)
 
 ```mermaid
 graph TB
+    subgraph "Frontend (React/Vite)"
+        FE[App.tsx] --> API[api.ts]
+    end
+    
+    subgraph "Gateway (Port 8000)"
+        API --> GW[gate_way_new.py]
+        GW --> |LLM Router| ROUTER{Intent Router}
+        ROUTER --> |MOZART| RAG_PROXY[/api/v1/ask proxy/]
+    end
+    
     subgraph "RAG Service (Port 8080)"
-        A[User Request] --> B[service.py]
-        B --> C[mcp_adapter.py]
-        C --> D[McpElectricalLoad]
-        D --> E[mcp_client.py]
-        E --> F[McpDesignResponse]
-        F --> G[formatters/markdown_formatter.py]
+        RAG_PROXY --> ROUTES[routes.py]
+        ROUTES --> SVC[service.py]
+        SVC --> |"Design Flow"| ADAPTER[mcp_adapter.py]
+        ADAPTER --> CLIENT[mcp_client.py]
+        CLIENT --> |HTTP POST| MCP_API
+        
+        SVC --> |"Q&A Flow"| QA[Knowledge + LLM]
+        
+        SVC --> COMPUTE[display/compute.py]
+        COMPUTE --> |DisplayData| RESPONSE[JSON Response]
     end
     
     subgraph "MCP Core (Port 5001)"
-        H[api.py] --> I[LoadInput]
-        I --> J[_convert_to_internal]
-        J --> K[ElectricalLoad]
-        K --> L[pipeline.py]
-        L --> M[circuit_grouper.py]
-        M --> N[GroupedCircuit]
-        N --> O[result_builder.py]
-        O --> P[DesignResult]
-        P --> Q[_convert_to_output]
-        Q --> R[DesignResultOutput]
+        MCP_API[api.py] --> PIPELINE[pipeline.py]
+        PIPELINE --> GROUPER[circuit_grouper.py]
+        GROUPER --> BUILDER[result_builder.py]
+        BUILDER --> OUTPUT[DesignResultOutput]
     end
     
-    E -->|HTTP POST /api/v1/design| H
-    R -->|JSON Response| F
+    subgraph "Supabase (PostgreSQL)"
+        SVC -.->|Session CRUD| SUPABASE[(mozart.sessions)]
+    end
+    
+    OUTPUT --> |JSON Response| CLIENT
+    RESPONSE --> |metadata.display_data| FE
 ```
+
 
 ---
 
