@@ -20,35 +20,10 @@ interface ResultViewerProps {
  * หน้าที่: แสดง Table, Audit Report, SLD Image
  */
 export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sldData }) => {
+    // === ALL HOOKS MUST BE CALLED FIRST (before any early returns) ===
     const [activeTab, setActiveTab] = useState<ViewMode>('table');
 
-    // Loading State
-    if (isLoading) {
-        return (
-            <div className="h-full flex items-center justify-center bg-slate-950">
-                <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="font-mono text-sky-500 animate-pulse">CALCULATING...</p>
-                    <p className="text-slate-600 text-xs mt-2">กำลังคำนวณระบบไฟฟ้า</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Empty State
-    if (!data) {
-        return (
-            <div className="h-full flex items-center justify-center bg-slate-950 border-l border-slate-800">
-                <div className="text-center">
-                    <Box size={48} className="text-slate-800 mx-auto mb-4" />
-                    <p className="text-slate-500 font-mono text-sm">NO DATA LOADED</p>
-                    <p className="text-slate-700 text-xs mt-2">พิมพ์คำสั่งเพื่อเริ่มออกแบบ</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Tab Buttons
+    // Tab Buttons (constant, not a hook, but define early for consistency)
     const tabs: { id: ViewMode; label: string; icon: React.ReactNode }[] = [
         { id: 'table', label: 'Load Table', icon: <Table size={16} /> },
         { id: 'audit', label: 'Audit', icon: <ClipboardCheck size={16} /> },
@@ -58,7 +33,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
 
     /**
      * 🆕 Task B: Download Excel Function (Black & White format)
-     * With full error handling and fallback values
+     * MUST be defined before any early returns due to React Hooks rules
      */
     const handleDownloadExcel = useCallback(() => {
         try {
@@ -101,11 +76,11 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                 [],
                 // Summary rows
                 ['TOTAL LOAD (VA)', '', loads.reduce((sum: number, item: LoadResult) => sum + ((item as any).load_va_l1 || item.power_kw * 1000 || 0), 0), '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                ['DEMAND FACTOR', '', data.data.demand_factor || 0.78, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                ['TOTAL POWER', '', `${data.data.total_power_kw?.toFixed(2) || 0} kW`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                ['MAIN CB', '', data.data.main_cb_type || `MCCB 2P ${data.data.main_breaker}AT`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                ['MAIN FEEDER', '', `${data.data.main_feeder_size || data.data.main_wire || '-'} Sq.mm × ${data.data.main_feeder_type || 'IEC01 (THW)'}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
-                ['MAIN RACEWAY', '', `${data.data.main_raceway_type || 'PVC'} ${data.data.main_raceway_size || '1"'}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['DEMAND FACTOR', '', data.data?.demand_factor || 0.78, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['TOTAL POWER', '', `${data.data?.total_power_kw?.toFixed(2) || 0} kW`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['MAIN CB', '', data.data?.main_cb_type || `MCCB 2P ${data.data?.main_breaker}AT`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['MAIN FEEDER', '', `${data.data?.main_feeder_size || data.data?.main_wire || '-'} Sq.mm × ${data.data?.main_feeder_type || 'IEC01 (THW)'}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+                ['MAIN RACEWAY', '', `${data.data?.main_raceway_type || 'PVC'} ${data.data?.main_raceway_size || '1"'}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
             ];
 
             // Create workbook and worksheet
@@ -150,6 +125,33 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
         }
     }, [data]);
 
+    // === EARLY RETURNS AFTER ALL HOOKS ===
+
+    // Loading State
+    if (isLoading) {
+        return (
+            <div className="h-full flex items-center justify-center bg-slate-950">
+                <div className="text-center">
+                    <div className="w-12 h-12 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="font-mono text-sky-500 animate-pulse">CALCULATING...</p>
+                    <p className="text-slate-600 text-xs mt-2">กำลังคำนวณระบบไฟฟ้า</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Empty State
+    if (!data) {
+        return (
+            <div className="h-full flex items-center justify-center bg-slate-950 border-l border-slate-800">
+                <div className="text-center">
+                    <Box size={48} className="text-slate-800 mx-auto mb-4" />
+                    <p className="text-slate-500 font-mono text-sm">NO DATA LOADED</p>
+                    <p className="text-slate-700 text-xs mt-2">พิมพ์คำสั่งเพื่อเริ่มออกแบบ</p>
+                </div>
+            </div>
+        );
+    }
     return (
         <div className="h-full flex flex-col bg-slate-950 border-l border-slate-800">
             {/* Toolbar */}
