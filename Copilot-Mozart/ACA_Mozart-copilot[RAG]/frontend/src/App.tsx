@@ -4,6 +4,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { ContextPanel } from './components/ContextPanel';
 import { ResultViewer } from './components/ResultViewer';
 import { LoginPage } from './components/LoginPage';
+import { FeedbackModal } from './components/FeedbackModal';
 import type {
   ChatMessage,
   SiteContext,
@@ -13,7 +14,7 @@ import type {
 import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
 import { askDesign } from './lib/api';
-import { LogOut, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon, MessageSquareHeart } from 'lucide-react';
 
 /**
  * App - Main Application Controller
@@ -51,6 +52,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [resultData, setResultData] = useState<DesignResult | null>(null);
   const [sldData, setSldData] = useState<SLDData | null>(null);  // 🆕 SLD data
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);  // 🆕 Feedback modal
 
   // === AUTH EFFECT ===
   useEffect(() => {
@@ -89,6 +91,22 @@ function App() {
       setResultData(null);
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  };
+
+  // === FEEDBACK HANDLER ===
+  const handleFeedbackSubmit = async (feedback: {
+    type: string;
+    rating: string | null;
+    message: string;
+  }) => {
+    try {
+      console.log('[FEEDBACK] Submitted:', feedback);
+      // TODO: Send to backend when API ready
+      // await fetch('/api/feedback', { method: 'POST', body: JSON.stringify(feedback) });
+    } catch (error) {
+      console.error('[FEEDBACK] Submit error:', error);
+      throw error;  // Re-throw to show error in modal
     }
   };
 
@@ -149,6 +167,8 @@ function App() {
               voltage_drop_percent: ckt.vd_percent,
             })),
             warnings: displayData.warnings || [],
+            explainable_warnings: displayData.explainable_warnings,
+            assumptions: displayData.assumptions,
             total_power_kw: displayData.total_kw,
             main_breaker: Number.parseInt(displayData.main_breaker) || 0,
             audit_table: data.metadata?.audit_results || undefined,
@@ -253,6 +273,27 @@ function App() {
           />
         </div>
       </div>
+
+      {/* 🆕 Floating Feedback Button */}
+      <button
+        onClick={() => setIsFeedbackOpen(true)}
+        className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 
+                   bg-gradient-to-r from-cyan-600 to-blue-600 
+                   hover:from-cyan-500 hover:to-blue-500
+                   text-white rounded-full shadow-lg shadow-cyan-500/25
+                   transition-all z-40"
+        title="ให้ Feedback"
+      >
+        <MessageSquareHeart size={20} />
+        <span className="text-sm font-medium">Feedback</span>
+      </button>
+
+      {/* 🆕 Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        onSubmit={handleFeedbackSubmit}
+      />
     </div>
   );
 }
