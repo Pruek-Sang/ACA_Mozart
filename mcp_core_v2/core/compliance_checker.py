@@ -68,34 +68,46 @@ class ComplianceChecker:
     
     def _check_circuit_requirements(self, loads: List[ElectricalLoad]):
         """Check circuit-specific requirements."""
+        # Counters for consolidated warnings
+        afci_count = 0
+        gfci_count = 0
+        hvac_count = 0
+        
         for load in loads:
             # Check AFCI requirements (NEC 210.12)
             if load.load_type == LoadType.RECEPTACLE:
                 if not self._has_afci_protection(load):
-                    self.warnings.append({
-                        'code': 'NEC_210.12',
-                        'severity': 'warning',
-                        'load_id': load.id,
-                        'message': f'Load {load.name} may require AFCI protection in dwelling units'
-                    })
+                    afci_count += 1
             
             # Check GFCI requirements (NEC 210.8)
             if self._requires_gfci(load):
-                self.warnings.append({
-                    'code': 'NEC_210.8',
-                    'severity': 'warning',
-                    'load_id': load.id,
-                    'message': f'Load {load.name} may require GFCI protection based on location'
-                })
+                gfci_count += 1
             
             # Check dedicated circuit requirements
             if load.load_type == LoadType.HVAC:
-                self.warnings.append({
-                    'code': 'NEC_210.23',
-                    'severity': 'info',
-                    'load_id': load.id,
-                    'message': f'HVAC load {load.name} typically requires dedicated circuit'
-                })
+                hvac_count += 1
+        
+        # Add consolidated warnings
+        if afci_count > 0:
+            self.warnings.append({
+                'code': 'NEC_210.12',
+                'severity': 'info',
+                'message': f'ℹ️ เต้ารับ {afci_count} วงจร ควรพิจารณา AFCI protection ในบ้านพักอาศัย (NEC 210.12)'
+            })
+        
+        if gfci_count > 0:
+            self.warnings.append({
+                'code': 'NEC_210.8',
+                'severity': 'warning',
+                'message': f'⚠️ โหลด {gfci_count} รายการ ในพื้นที่เปียก/ชื้น ต้องมี GFCI protection (NEC 210.8)'
+            })
+        
+        if hvac_count > 0:
+            self.warnings.append({
+                'code': 'NEC_210.23',
+                'severity': 'info',
+                'message': f'ℹ️ HVAC {hvac_count} เครื่อง ควรใช้วงจรเฉพาะ (Dedicated Circuit)'
+            })
     
     def _check_panel_requirements(self, panels, loads):
         """Check panel-specific requirements."""
@@ -200,6 +212,10 @@ class ComplianceChecker:
         """
         vd_limit_branch = getattr(self.settings, 'vd_limit_branch_percent', 3.0)
         
+        # Collect stats for consolidated warning
+        default_distance_count = 0
+        default_distance_value = None
+        
         # Check for metadata warning (default distance used)
         metadata = wire_sizing.get('_metadata', {})
         if metadata.get('used_default_distance'):
@@ -239,14 +255,18 @@ class ComplianceChecker:
                     'message': f'⚠️ Voltage Drop {vd_percent:.1f}% ใกล้ถึงขีดจำกัด ({vd_limit_branch}%) ที่ระยะ {distance_m:.1f}m'
                 })
             
-            # Add info if default distance was used
-            if used_default and vd_percent > 0:
-                self.warnings.append({
-                    'code': 'VD_DEFAULT_USED',
-                    'severity': 'info',
-                    'load_id': load_id,
-                    'message': f'ℹ️ VD {vd_percent:.1f}% คำนวณจากระยะ Default {distance_m:.1f}m (ควรระบุระยะจริงเพื่อความแม่นยำ)'
-                })
+            # Count default distance usage (don't spam per-load warnings)
+            if used_default:
+                default_distance_count += 1
+                default_distance_value = distance_m
+        
+        # Add ONE consolidated warning for default distances
+        if default_distance_count > 0:
+            self.warnings.append({
+                'code': 'VD_DEFAULT_SUMMARY',
+                'severity': 'info',
+                'message': f'ℹ️ VD คำนวณจากระยะ Default {default_distance_value:.0f}m สำหรับ {default_distance_count} วงจร (ระบุระยะจริงเพื่อความแม่นยำ)'
+            })
 
     def _has_afci_protection(self, load: ElectricalLoad) -> bool:
         """Check if load has AFCI protection (simplified check)."""
