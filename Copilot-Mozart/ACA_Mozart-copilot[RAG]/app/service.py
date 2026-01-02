@@ -59,6 +59,9 @@ from app.trust_log import trust_logger
 from app.formatters import format_design_report  # Card-style Markdown formatter
 # 🆕 Computed Data Layer - Phase 1-4
 from app.display import compute_display_data, format_audit_for_frontend, render_sld
+from app.display.assumptions_renderer import collect_assumptions, format_assumptions_for_frontend
+from app.display.explainable_qc import convert_legacy_warnings
+from app.formatters.full_report_builder import build_full_report
 from app.formatters.pdf_formatter import format_pdf_table
 from app.utils.formatting import format_wire_size
 from app.logic.validation import LogicValidator  # 🆕 Wire formatting utility
@@ -2097,6 +2100,18 @@ Query: "{query}"
                 # 🆕 [CP-DISPLAY] Compute display data for Frontend
                 try:
                     display_data_dict = compute_display_data(result)
+                    
+                    if display_data_dict:
+                        # 1. Collect Assumptions
+                        site_ctx_dict = req.site_context.dict() if hasattr(req.site_context, 'dict') else (req.site_context.__dict__ if hasattr(req.site_context, '__dict__') else req.site_context)
+                        assumptions_data = collect_assumptions(display_data_dict, site_ctx_dict)
+                        display_data_dict['assumptions'] = format_assumptions_for_frontend(assumptions_data)
+                        
+                        # 2. Explainable QC
+                        warnings_list = display_data_dict.get('warnings', [])
+                        explainable = convert_legacy_warnings(warnings_list)
+                        display_data_dict['explainable_warnings'] = explainable
+                        
                 except Exception as compute_err:
                     logger.error(f"[CP-DISPLAY] Compute failed, fallback: {compute_err}")
                     display_data_dict = None

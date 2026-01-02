@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Table, FileImage, ClipboardCheck, Box, Receipt } from 'lucide-react';
+import { Table, FileImage, ClipboardCheck, Box, Receipt, BookOpen } from 'lucide-react';
 import type { DesignResult, LoadResult, SLDData } from '../types';
 import { cn } from '../lib/utils';
 import { SLDViewer } from './SLDViewer';
@@ -7,7 +7,11 @@ import { PDFPreviewModal } from './PDFPreviewModal';
 import { DownloadDropdown } from './DownloadDropdown';
 import * as XLSX from 'xlsx';
 
-type ViewMode = 'table' | 'audit' | 'sld' | 'boq';
+import { AssumptionsPanel } from './AssumptionsPanel';
+import { ExplainableWarningCard } from './ExplainableWarningCard';
+
+
+type ViewMode = 'table' | 'audit' | 'sld' | 'boq' | 'assumptions';
 
 interface ResultViewerProps {
     data: DesignResult | null;
@@ -32,6 +36,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
         { id: 'audit', label: 'Audit', icon: <ClipboardCheck size={16} /> },
         { id: 'sld', label: 'SLD', icon: <FileImage size={16} /> },
         { id: 'boq', label: 'BOQ', icon: <Receipt size={16} /> },
+        { id: 'assumptions', label: 'Assumptions', icon: <BookOpen size={16} /> },
     ];
 
     /**
@@ -438,7 +443,29 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                         )}
 
                         {/* Warnings - แสดงเฉพาะใน Audit Tab เท่านั้น */}
-                        {data.data?.warnings && data.data.warnings.length > 0 && (
+                        {(data.data?.explainable_warnings && data.data.explainable_warnings.length > 0) ? (
+                            <div className="mt-6 space-y-4">
+                                <h4 className="text-amber-400 font-bold text-sm mb-2 flex items-center gap-2">
+                                    ⚠️ Critical Warnings ({data.data.explainable_warnings.length})
+                                </h4>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {data.data.explainable_warnings.map((w, i) => (
+                                        <ExplainableWarningCard
+                                            key={i}
+                                            warning={{
+                                                code: w.code,
+                                                message: w.message,
+                                                reason: w.reason || '',
+                                                severity: w.severity,
+                                                standardRef: '-',
+                                                circuitName: w.circuit_name,
+                                                action: w.suggested_action || { type: 'none', description: '-', effort: 'low' }
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (data.data?.warnings && data.data.warnings.length > 0 && (
                             <div className="mt-6 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
                                 <h4 className="text-amber-400 font-bold text-sm mb-2">⚠️ Warnings</h4>
                                 <ul className="text-amber-300 text-sm space-y-1">
@@ -447,8 +474,23 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                                     ))}
                                 </ul>
                             </div>
-                        )}
+                        ))}
                     </div>
+                )}
+
+                {/* Assumptions Tab */}
+                {activeTab === 'assumptions' && data.data?.assumptions && (
+                    <AssumptionsPanel
+                        assumptions={data.data.assumptions.map(a => ({
+                            key: a.key,
+                            label: a.label,
+                            value: String(a.value),
+                            source: a.source,
+                            category: a.category,
+                            isDefault: a.source === 'default'
+                        }))}
+                        totalDefaults={data.data.assumptions.filter(a => a.source === 'default').length}
+                    />
                 )}
 
                 {/* SLD Tab */}
@@ -640,6 +682,6 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     );
                 })()}
             </div>
-        </div>
+        </div >
     );
 };

@@ -106,6 +106,8 @@ export interface DisplayData {
     circuits: CircuitData[];
     circuit_count: number;
     warnings: string[];
+    explainable_warnings?: ExplainableWarning[];
+    assumptions?: AssumptionItem[];
     errors: string[];
     phase_balance?: Record<string, number>;
 
@@ -306,6 +308,8 @@ export interface DesignResult {
         main_breaker?: number;
         main_wire?: string;  // 🆕 Main wire size
         warnings?: string[];
+        explainable_warnings?: ExplainableWarning[];
+        assumptions?: AssumptionItem[];
 
         // 🆕 Summary Section (from DisplayData)
         demand_factor?: number;
@@ -359,3 +363,28 @@ export const DEVICE_CODES = {
     'OUTLET-16A': { name: 'ปลั๊กไฟ 16A', power_kw: 0.18 },
     'LIGHT-10W': { name: 'หลอดไฟ LED 10W', power_kw: 0.01 },
 } as const;
+
+// === NEW TYPES FOR FEATURES ===
+
+export interface AssumptionItem {
+    key: string;
+    label: string;
+    value: string | number;
+    source: 'default' | 'user' | 'calculated';
+    category: string;
+}
+
+export interface SuggestedAction {
+    type: string;
+    description: string;
+    effort: 'low' | 'medium' | 'high';
+}
+
+export interface ExplainableWarning {
+    code: string;
+    message: string;
+    severity: 'critical' | 'warning' | 'info';
+    reason?: string;
+    suggested_action?: SuggestedAction;
+    circuit_name?: string;
+}
