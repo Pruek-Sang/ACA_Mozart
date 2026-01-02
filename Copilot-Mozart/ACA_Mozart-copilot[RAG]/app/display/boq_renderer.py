@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # === BOQ Type Definitions ===
 
 class BOQItem(TypedDict):
-    """Single BOQ line item"""
+    """Single BOQ line item with pack/wastage info"""
     item_no: str
     description: str
     quantity: float
@@ -29,6 +29,11 @@ class BOQItem(TypedDict):
     labor_total: float
     total_price: float
     remark: str
+    # 🆕 New fields for practical purchasing
+    pack_unit: str  # e.g., 'ม้วน', 'กล่อง', 'ชิ้น'
+    pack_size: float  # e.g., 100 (per roll), 12 (per box)
+    wastage_percent: float  # e.g., 10, 15
+    order_qty: float  # Quantity to order (with wastage, rounded to pack)
 
 
 class BOQSection(TypedDict):
@@ -52,50 +57,59 @@ class BOQData(TypedDict):
     final_total: float
 
 
-# === Price Catalog (Cheapest brands) ===
-# These are estimated prices - will be updated from real catalog
+# === Price Catalog (with pack sizes and wastage) ===
+# Updated with practical purchasing information
+import math
 
 PRICE_CATALOG: Dict[str, Dict[str, Any]] = {
-    # Main Cables
-    'IEC01-50': {'material': 237.00, 'labor': 30.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-35': {'material': 160.00, 'labor': 25.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-25': {'material': 110.00, 'labor': 20.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-16': {'material': 75.00, 'labor': 18.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-10': {'material': 62.00, 'labor': 13.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-6': {'material': 38.00, 'labor': 10.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-4': {'material': 18.00, 'labor': 9.00, 'unit': 'ม.', 'brand': 'Yazaki'},
-    'IEC01-2.5': {'material': 10.00, 'labor': 8.00, 'unit': 'ม.', 'brand': 'Yazaki'},
+    # Main Cables - Sold in 100m rolls
+    'IEC01-50': {'material': 237.00, 'labor': 30.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-35': {'material': 160.00, 'labor': 25.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-25': {'material': 110.00, 'labor': 20.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-16': {'material': 75.00, 'labor': 18.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-10': {'material': 62.00, 'labor': 13.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-6': {'material': 38.00, 'labor': 10.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-4': {'material': 18.00, 'labor': 9.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
+    'IEC01-2.5': {'material': 10.00, 'labor': 8.00, 'unit': 'ม.', 'brand': 'Yazaki', 'pack_unit': 'ม้วน', 'pack_size': 100, 'wastage': 0.10, 'alt_brands': ['Thai-Union', 'Phelps Dodge']},
     
-    # Conduit
-    'EMT-1-1/2': {'material': 121.00, 'labor': 40.00, 'unit': 'ม.', 'brand': 'Panasonic'},
-    'EMT-1': {'material': 73.00, 'labor': 32.00, 'unit': 'ม.', 'brand': 'Panasonic'},
-    'PVC-1': {'material': 28.00, 'labor': 34.00, 'unit': 'ม.', 'brand': 'PRI'},
-    'PVC-3/4': {'material': 17.00, 'labor': 32.00, 'unit': 'ม.', 'brand': 'PRI'},
-    'PVC-1/2': {'material': 10.00, 'labor': 30.00, 'unit': 'ม.', 'brand': 'PRI'},
+    # Conduit - Sold in 4m lengths (bundle of 10 = 40m)
+    'EMT-1-1/2': {'material': 121.00, 'labor': 40.00, 'unit': 'ม.', 'brand': 'Panasonic', 'pack_unit': 'มัด(10)', 'pack_size': 40, 'wastage': 0.15, 'alt_brands': ['BS', 'Super']},
+    'EMT-1': {'material': 73.00, 'labor': 32.00, 'unit': 'ม.', 'brand': 'Panasonic', 'pack_unit': 'มัด(10)', 'pack_size': 40, 'wastage': 0.15, 'alt_brands': ['BS', 'Super']},
+    'PVC-1': {'material': 28.00, 'labor': 34.00, 'unit': 'ม.', 'brand': 'PRI', 'pack_unit': 'เส้น(4m)', 'pack_size': 4, 'wastage': 0.15, 'alt_brands': ['SCG', 'Thai Pipe']},
+    'PVC-3/4': {'material': 17.00, 'labor': 32.00, 'unit': 'ม.', 'brand': 'PRI', 'pack_unit': 'เส้น(4m)', 'pack_size': 4, 'wastage': 0.15, 'alt_brands': ['SCG', 'Thai Pipe']},
+    'PVC-1/2': {'material': 10.00, 'labor': 30.00, 'unit': 'ม.', 'brand': 'PRI', 'pack_unit': 'เส้น(4m)', 'pack_size': 4, 'wastage': 0.15, 'alt_brands': ['SCG', 'Thai Pipe']},
     
-    # Load Center
-    'LC-30': {'material': 6108.00, 'labor': 3000.00, 'unit': 'ชุด', 'brand': 'Schneider'},
-    'LC-24': {'material': 4800.00, 'labor': 2500.00, 'unit': 'ชุด', 'brand': 'Schneider'},
-    'LC-18': {'material': 3600.00, 'labor': 2000.00, 'unit': 'ชุด', 'brand': 'Schneider'},
+    # Load Center - Sold individually
+    'LC-30': {'material': 6108.00, 'labor': 3000.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'LC-24': {'material': 4800.00, 'labor': 2500.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'LC-18': {'material': 3600.00, 'labor': 2000.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
     
-    # MCB (per pole)
-    'MCB-1P-10AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'MCB-1P-16AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'MCB-1P-20AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'MCB-1P-32AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'MCB-1P-40AT': {'material': 595.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'MCB-2P-10AT': {'material': 156.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'MCB-2P-100AT': {'material': 2884.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
+    # MCB (per pole) - Sold individually, often box of 6
+    'MCB-1P-10AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-1P-16AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-1P-20AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-1P-32AT': {'material': 78.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-1P-40AT': {'material': 595.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-2P-10AT': {'material': 156.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-2P-100AT': {'material': 2884.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
     
-    # RCBO
-    'RCBO-1P-10AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'RCBO-1P-16AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'RCBO-1P-20AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
-    'RCBO-1P-32AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider'},
+    # RCBO - Sold individually
+    'RCBO-1P-10AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'RCBO-1P-16AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'RCBO-1P-20AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'RCBO-1P-32AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
     
-    # Accessories
-    'ACCESSORY': {'material': 1000.00, 'labor': 1000.00, 'unit': 'เหมา', 'brand': 'Local'},
+    # Accessories - Lump sum
+    'ACCESSORY': {'material': 1000.00, 'labor': 1000.00, 'unit': 'เหมา', 'brand': 'Local', 'pack_unit': 'เหมา', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': []},
 }
+
+
+def calculate_order_qty(quantity: float, pack_size: float, wastage: float) -> float:
+    """Calculate order quantity with wastage, rounded up to pack size"""
+    if pack_size <= 0:
+        return quantity
+    qty_with_wastage = quantity * (1 + wastage)
+    return math.ceil(qty_with_wastage / pack_size) * pack_size
 
 
 def get_price(key: str) -> Dict[str, Any]:
