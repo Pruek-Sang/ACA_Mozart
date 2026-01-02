@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { X, Download, Printer, Loader2 } from 'lucide-react';
 import type { DesignResult } from '../types';
-// @ts-ignore
 import html2pdf from 'html2pdf.js';
 
 interface PDFPreviewModalProps {
