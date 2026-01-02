@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import type { ChatMessage } from '../types';
-import Markdown from 'react-markdown';
 import { cn } from '../lib/utils';
+import { ChatBubble } from './ChatBubble';
 
 interface ChatPanelProps {
     messages: ChatMessage[];
@@ -18,6 +18,12 @@ interface ChatPanelProps {
  */
 export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isLoading }) => {
     const [input, setInput] = useState('');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,50 +52,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, i
                 )}
 
                 {messages.map((msg, idx) => (
-                    <div key={idx} className={cn(
-                        "flex",
-                        msg.role === 'user' ? 'justify-end' : 'justify-start'
-                    )}>
-                        <div className={cn(
-                            "max-w-[85%] rounded-lg p-3 text-sm border",
-                            // User Message
-                            msg.role === 'user' && "bg-sky-600 text-white border-transparent",
-                            // System/Assistant Normal
-                            msg.role !== 'user' && !msg.error_type && "bg-slate-900 text-slate-300 border-slate-800",
-                            // Error Messages
-                            msg.error_type === 'backend_error' && "bg-red-500/10 text-red-400 border-red-500/30 font-mono",
-                            msg.error_type === 'frontend_error' && "bg-orange-500/10 text-orange-400 border-orange-500/30 font-mono",
-                            msg.error_type === 'network_error' && "bg-yellow-500/10 text-yellow-400 border-yellow-500/30 font-mono"
-                        )}>
-                            {/* Error Type Badge */}
-                            {msg.error_type && (
-                                <div className="text-[10px] uppercase tracking-wider mb-1 opacity-70">
-                                    {msg.error_type.replace('_', ' ')}
-                                </div>
-                            )}
-                            <div className="markdown-content">
-                                <Markdown
-                                    components={{
-                                        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                                        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                                        li: ({ children }) => <li className="mb-0.5">{children}</li>,
-                                        strong: ({ children }) => <strong className={cn(
-                                            "font-bold",
-                                            msg.role === 'user' ? "text-white" : "text-sky-200"
-                                        )}>{children}</strong>,
-                                        code: ({ children }) => <code className={cn(
-                                            "px-1 py-0.5 rounded font-mono text-xs",
-                                            msg.role === 'user' ? "bg-white/20" : "bg-black/30"
-                                        )}>{children}</code>,
-                                        pre: ({ children }) => <pre className="bg-black/50 p-2 rounded-md overflow-x-auto text-xs my-2">{children}</pre>
-                                    }}
-                                >
-                                    {msg.content}
-                                </Markdown>
-                            </div>
-                        </div>
-                    </div>
+                    <ChatBubble key={`msg-${msg.timestamp?.getTime() || idx}`} message={msg} />
                 ))}
 
                 {/* Loading Indicator */}
@@ -101,6 +64,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, i
                         </div>
                     </div>
                 )}
+
+                {/* Auto-scroll anchor */}
+                <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}

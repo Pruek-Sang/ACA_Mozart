@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { Table, FileImage, ClipboardCheck, Box, Download, Receipt, Printer } from 'lucide-react';
+import { Table, FileImage, ClipboardCheck, Box, Receipt } from 'lucide-react';
 import type { DesignResult, LoadResult, SLDData } from '../types';
 import { cn } from '../lib/utils';
 import { SLDViewer } from './SLDViewer';
 import { PDFPreviewModal } from './PDFPreviewModal';
+import { DownloadDropdown } from './DownloadDropdown';
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'table' | 'audit' | 'sld' | 'boq';
@@ -127,6 +128,17 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
         }
     }, [data]);
 
+    /**
+     * 🆕 Task 1: Download PDF Function
+     * Opens PDF preview and triggers download
+     */
+    const handleDownloadPDF = useCallback(() => {
+        // Open PDF preview modal - it has download button inside
+        setPDFPreviewOpen(true);
+        // Note: The actual PDF download happens in PDFPreviewModal
+        console.log('[DOWNLOAD] 📄 Opening PDF Preview for download');
+    }, []);
+
     // === EARLY RETURNS AFTER ALL HOOKS ===
 
     // Loading State
@@ -178,26 +190,17 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
                     {data.data?.total_power_kw && (
                         <span className="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-1 rounded">
                             Total: {data.data.total_power_kw.toFixed(2)} kW
                         </span>
                     )}
-                    <button
-                        onClick={handleDownloadExcel}
-                        title="Download Excel"
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-                    >
-                        <Download size={16} />
-                    </button>
-                    <button
-                        onClick={() => setPDFPreviewOpen(true)}
-                        title="Print Preview / Download PDF"
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-                    >
-                        <Printer size={16} />
-                    </button>
+                    <DownloadDropdown
+                        onDownloadExcel={handleDownloadExcel}
+                        onDownloadPDF={handleDownloadPDF}
+                        onPreview={() => setPDFPreviewOpen(true)}
+                    />
                 </div>
             </div>
 
