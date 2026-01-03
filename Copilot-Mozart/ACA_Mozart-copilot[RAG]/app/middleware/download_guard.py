@@ -1,4 +1,16 @@
 """
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  WARNING: THIS MODULE IS NOT FULLY IMPLEMENTED  ⚠️                      ║
+║                                                                              ║
+║  STATUS: SKELETON ONLY - All methods raise NotImplementedError              ║
+║  REASON: Download quota/tracking system deferred to future sprint           ║
+║  IMPACT: None - Core download works, just no tracking/limiting              ║
+║                                                                              ║
+║  TO IMPLEMENT: See methods below, connect to Supabase download_logs table   ║
+║  ESTIMATED EFFORT: 1-2 hours                                                 ║
+║  PRIORITY: LOW                                                               ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
 Download Protection Module
 ==========================
 Protect premium Excel downloads from unauthorized access.
