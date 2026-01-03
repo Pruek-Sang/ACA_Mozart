@@ -161,3 +161,85 @@ export async function healthCheck(): Promise<boolean> {
         return false;
     }
 }
+
+// =============================================================================
+// 🆕 Project Management API
+// =============================================================================
+
+export interface ProjectSummary {
+    session_id: string;
+    project_name: string;
+    stage?: string;
+    updated_at?: string;
+    loads_count?: number;
+}
+
+/**
+ * List all projects for the current user (max 10)
+ */
+export async function listProjects(): Promise<{ projects: ProjectSummary[]; storage: string }> {
+    const token = await getAccessToken();
+
+    const response = await fetch(buildApiUrl('/api/v1/session/list'), {
+        method: 'GET',
+        headers: {
+            ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to list projects');
+    }
+
+    return response.json();
+}
+
+/**
+ * Delete a project (requires typing CONFIRM)
+ */
+export async function deleteProject(sessionId: string, confirm: string): Promise<{ status: string; message: string }> {
+    if (confirm !== 'CONFIRM') {
+        throw new Error('Deletion requires typing CONFIRM');
+    }
+
+    const token = await getAccessToken();
+
+    const response = await fetch(buildApiUrl(`/api/v1/session/${sessionId}?confirm=${confirm}`), {
+        method: 'DELETE',
+        headers: {
+            ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail?.message || 'Failed to delete project');
+    }
+
+    return response.json();
+}
+
+/**
+ * Start a new session with optional project name
+ */
+export async function startSessionWithName(projectName?: string): Promise<{ session_id: string; project_name: string }> {
+    const token = await getAccessToken();
+
+    const url = projectName
+        ? buildApiUrl(`/api/v1/session/start?project_name=${encodeURIComponent(projectName)}`)
+        : buildApiUrl('/api/v1/session/start');
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to start session');
+    }
+
+    return response.json();
+}
