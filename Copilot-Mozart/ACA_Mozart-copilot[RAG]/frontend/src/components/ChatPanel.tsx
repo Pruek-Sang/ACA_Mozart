@@ -1,13 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, History, X } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { cn } from '../lib/utils';
 import { ChatBubble } from './ChatBubble';
+import { HistoryPanel } from './HistoryPanel';
+
+// Mock history data for demonstration
+const MOCK_HISTORY = [
+    {
+        fromVersion: 1,
+        toVersion: 2,
+        timestamp: new Date().toISOString(),
+        summary: "เพิ่มแอร์ 18000 BTU ห้องนอน 1",
+        changes: [
+            { field: "ac_bedroom1", label: "แอร์ห้องนอน 1", before: "12000 BTU", after: "18000 BTU", changeType: "modified" as const }
+        ],
+        changeCount: 1
+    }
+];
 
 interface ChatPanelProps {
     messages: ChatMessage[];
     onSendMessage: (text: string) => void;
     isLoading: boolean;
+    revisionHistory?: typeof MOCK_HISTORY;
 }
 
 /**
@@ -15,9 +31,16 @@ interface ChatPanelProps {
  * 
  * ตำแหน่ง: ซ้ายบน
  * หน้าที่: รับคำสั่งจาก User และแสดง Response/Error
+ * 🆕 Added: History panel toggle
  */
-export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, isLoading }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+    messages,
+    onSendMessage,
+    isLoading,
+    revisionHistory = []
+}) => {
     const [input, setInput] = useState('');
+    const [showHistory, setShowHistory] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to bottom when new messages arrive
@@ -33,14 +56,51 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ messages, onSendMessage, i
     };
 
     return (
-        <div className="flex flex-col h-full bg-slate-950 border-r border-slate-800">
-            {/* Chat Header */}
-            <div className="p-4 border-b border-slate-800 bg-slate-900">
+        <div className="flex flex-col h-full bg-slate-950 border-r border-slate-800 relative">
+            {/* Chat Header with History Toggle */}
+            <div className="p-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
                 <h2 className="text-slate-400 font-mono text-xs uppercase tracking-widest flex items-center gap-2">
                     <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                     Command Interface
                 </h2>
+
+                {/* History Toggle Button */}
+                <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className={cn(
+                        "flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors",
+                        showHistory
+                            ? "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                            : "text-slate-500 hover:text-sky-400 hover:bg-slate-800"
+                    )}
+                    data-testid="history-toggle-button"
+                >
+                    <History size={12} />
+                    ประวัติ
+                </button>
             </div>
+
+            {/* History Panel Sidebar */}
+            {showHistory && (
+                <div className="absolute right-0 top-12 bottom-0 w-80 bg-slate-900 border-l border-slate-700 z-10 flex flex-col">
+                    <div className="flex items-center justify-between p-3 border-b border-slate-800">
+                        <span className="text-sm text-slate-300 font-medium">ประวัติการแก้ไข</span>
+                        <button
+                            onClick={() => setShowHistory(false)}
+                            className="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300"
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto">
+                        <HistoryPanel
+                            history={revisionHistory.length > 0 ? revisionHistory : MOCK_HISTORY}
+                            currentVersion={revisionHistory.length + 1}
+                            className="border-0"
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">

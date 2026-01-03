@@ -5,6 +5,7 @@ import { ContextPanel } from './components/ContextPanel';
 import { ResultViewer } from './components/ResultViewer';
 import { LoginPage } from './components/LoginPage';
 import { FeedbackModal } from './components/FeedbackModal';
+import { ProjectSelector } from './components/ProjectSelector';
 import type {
   ChatMessage,
   SiteContext,
@@ -264,7 +265,7 @@ function App() {
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-200 font-sans flex flex-col overflow-hidden">
 
-      {/* TOP BAR: User Info + Project Name */}
+      {/* TOP BAR: User Info + Project Selector */}
       <div className="h-12 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm">
@@ -272,13 +273,32 @@ function App() {
             <span className="font-mono">{user?.email}</span>
           </div>
 
-          {/* 🆕 Project Indicator */}
-          <div className="flex items-center gap-2 text-slate-300 text-sm border-l border-slate-700 pl-4">
-            <FolderOpen size={16} className="text-violet-400" />
+          {/* 🆕 Project Selector (New/Load/Delete) */}
+          <div className="border-l border-slate-700 pl-4">
             {isSessionLoading ? (
-              <span className="text-slate-500 italic">กำลังโหลด...</span>
+              <div className="flex items-center gap-2 text-slate-500 text-sm">
+                <FolderOpen size={16} className="animate-pulse" />
+                <span className="italic">กำลังโหลด...</span>
+              </div>
             ) : (
-              <span className="font-semibold">{projectName}</span>
+              <ProjectSelector
+                currentSessionId={sessionId}
+                currentProjectName={projectName}
+                onSessionChange={(newSessionId, newProjectName) => {
+                  setSessionId(newSessionId);
+                  setProjectName(newProjectName);
+                }}
+                onNewProject={() => {
+                  // Clear chat and results for new project
+                  setMessages([{
+                    role: 'system',
+                    content: '🆕 เริ่มโปรเจกต์ใหม่! พิมพ์คำสั่งออกแบบได้เลย',
+                    timestamp: new Date()
+                  }]);
+                  setResultData(null);
+                  setSldData(null);
+                }}
+              />
             )}
           </div>
         </div>
