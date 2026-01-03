@@ -532,14 +532,20 @@ Query: "{query}"
             # Get floor from room
             floor = room.floor if hasattr(room, 'floor') else 1
             
+            # 🔧 FIX: VD Branch Distance Pipeline Leak #3d
+            # Auto-fill lighting ต้องมี branch_distance_m ด้วย
+            default_distance_by_floor = {1: 15.0, 2: 25.0, 3: 35.0}
+            light_distance = default_distance_by_floor.get(floor, 15.0 + (floor - 1) * 10.0)
+            
             lighting_loads.append(LoadInput(
                 room_name=room_name,
                 device=device,
                 quantity=num_fixtures,
-                floor=floor
+                floor=floor,
+                branch_distance_m=light_distance  # 🔧 FIX: Floor-based default
             ))
             
-            logger.info(f"💡 Auto-fill lighting: {room_name} (floor={floor}, {area}m²) → {num_fixtures}x {device}")
+            logger.info(f"💡 Auto-fill lighting: {room_name} (floor={floor}, {area}m²) → {num_fixtures}x {device} (distance={light_distance}m)")
         
         return lighting_loads
     
@@ -574,14 +580,20 @@ Query: "{query}"
             
             count = OUTLET_COUNT.get(room_type, 2)
             
+            # 🔧 FIX: VD Branch Distance Pipeline Leak #3e
+            # Auto-fill outlets ต้องมี branch_distance_m ด้วย
+            default_distance_by_floor = {1: 15.0, 2: 25.0, 3: 35.0}
+            outlet_distance = default_distance_by_floor.get(floor, 15.0 + (floor - 1) * 10.0)
+            
             outlet_loads.append(LoadInput(
                 room_name=room_name,
                 device="SOCKET-16A",  # Use correct device code from DEVICE_CODES.md
                 quantity=count,
-                floor=floor
+                floor=floor,
+                branch_distance_m=outlet_distance  # 🔧 FIX: Floor-based default
             ))
             
-            logger.info(f"🔌 Auto-fill outlets: {room_name} (floor={floor}) → {count}x SOCKET-16A")
+            logger.info(f"🔌 Auto-fill outlets: {room_name} (floor={floor}) → {count}x SOCKET-16A (distance={outlet_distance}m)")
         
         return outlet_loads
     
@@ -1711,11 +1723,28 @@ Query: "{query}"
             # Get floor from room
             floor = room_floor_map.get(room_name, 1)
             
+            # =====================================================================
+            # 🔧 FIX: VD Branch Distance Pipeline Leak #1
+            # Problem: branch_distance_m จาก LLM extraction ไม่ถูกส่งต่อมาที่ LoadInput
+            # ทำให้ MCP ใช้ค่า Default 15m แทน แม้ผู้ใช้จะระบุระยะมาแล้ว
+            # Solution: ส่งต่อค่า branch_distance_m จาก extracted dict
+            # Fallback: ถ้าไม่มีค่า ให้ใช้ floor-based default (15m=ชั้น1, 25m=ชั้น2)
+            # Date: 2026-01-04 | Issue: VD หายเกลี้ยง (FATAL)
+            # =====================================================================
+            user_distance = l.get("branch_distance_m")
+            if user_distance is None:
+                # Fallback: Use floor-based default distance (ตามมาตรฐานบ้านไทย)
+                # ชั้น 1: ~15m, ชั้น 2: ~25m, ชั้น 3+: ~35m
+                default_distance_by_floor = {1: 15.0, 2: 25.0, 3: 35.0}
+                user_distance = default_distance_by_floor.get(floor, 15.0 + (floor - 1) * 10.0)
+                logger.debug(f"📏 Auto-fallback distance for {room_name} (floor {floor}): {user_distance}m")
+            
             loads.append(LoadInput(
                 room_name=room_name,
                 device=l.get("device", "OUTLET_16A"),
                 quantity=l.get("quantity") or 1,  # Handle None from LLM
-                floor=floor
+                floor=floor,
+                branch_distance_m=user_distance  # 🔧 FIX: Pass distance through!
             ))
         
         # ============================================
@@ -1755,17 +1784,21 @@ Query: "{query}"
             for l in extracted.get("loads", [])
         )
         if not has_pump:
+            # 🔧 FIX: VD Branch Distance Pipeline Leak #3a
+            # Auto-fill loads ต้องมี branch_distance_m ด้วย
+            # Pump มักอยู่ชั้น 1 ใช้ default 15m
             loads.append(LoadInput(
                 room_name="พื้นที่ส่วนกลาง",
                 device="PUMP-750W",  # Use correct device code from DEVICE_CODES.md
                 quantity=1,
-                floor=1
+                floor=1,
+                branch_distance_m=15.0  # 🔧 FIX: Floor 1 default
             ))
             # เพิ่มห้องถ้ายังไม่มี
             if "พื้นที่ส่วนกลาง" not in room_names:
                 rooms.append(RoomInput(name="พื้นที่ส่วนกลาง", type="exterior"))
                 room_names.add("พื้นที่ส่วนกลาง")
-            logger.info("🔧 Auto-added: ปั๊มน้ำ 750W")
+            logger.info("🔧 Auto-added: ปั๊มน้ำ 750W (branch_distance_m=15m)")
         
         # 4. Auto-fill Water Heater (ถ้าบอกว่ามีน้ำอุ่นแต่ LLM ไม่ได้ extract ครบ)
         # ตรวจสอบว่ามี heater ในห้องน้ำหรือยัง
@@ -1779,13 +1812,20 @@ Query: "{query}"
             original_query = extracted.get("original_query", "").lower()
             if any(kw in original_query for kw in ["น้ำอุ่น", "น้ำร้อน", "heater", "ฮีทเตอร์"]):
                 for br in bathroom_rooms:
+                    # 🔧 FIX: VD Branch Distance Pipeline Leak #3b
+                    # Auto-fill Heater ต้องมี branch_distance_m ด้วย
+                    br_floor = br.floor if hasattr(br, 'floor') else 1
+                    default_distance_by_floor = {1: 15.0, 2: 25.0, 3: 35.0}
+                    heater_distance = default_distance_by_floor.get(br_floor, 15.0 + (br_floor - 1) * 10.0)
+                    
                     loads.append(LoadInput(
                         room_name=br.name,
                         device="HEATER-4500W",
                         quantity=1,
-                        floor=br.floor if hasattr(br, 'floor') else 1
+                        floor=br_floor,
+                        branch_distance_m=heater_distance  # 🔧 FIX: Floor-based default
                     ))
-                    logger.info(f"🔧 Auto-added: น้ำอุ่น 4500W ใน {br.name}")
+                    logger.info(f"🔧 Auto-added: น้ำอุ่น 4500W ใน {br.name} (branch_distance_m={heater_distance}m)")
         
         # 5. Auto-fill Exterior Lighting (ถ้าบอกว่ามีโคมไฟหน้าบ้าน)
         exterior_rooms = [r for r in rooms if r.type == "exterior"]
@@ -1795,13 +1835,20 @@ Query: "{query}"
         )
         if not has_exterior_light and len(exterior_rooms) > 0:
             for er in exterior_rooms:
+                # 🔧 FIX: VD Branch Distance Pipeline Leak #3c
+                # Auto-fill lights ต้องมี branch_distance_m ด้วย
+                er_floor = er.floor if hasattr(er, 'floor') else 1
+                default_distance_by_floor = {1: 15.0, 2: 25.0, 3: 35.0}
+                light_distance = default_distance_by_floor.get(er_floor, 15.0 + (er_floor - 1) * 10.0)
+                
                 loads.append(LoadInput(
                     room_name=er.name,
                     device="LIGHT-LED-10W",
                     quantity=2,  # 2 ดวงสำหรับหน้าบ้าน
-                    floor=1
+                    floor=er_floor,
+                    branch_distance_m=light_distance  # 🔧 FIX: Floor-based default
                 ))
-                logger.info(f"🔧 Auto-added: ไฟ LED หน้าบ้าน 10W x 2 ใน {er.name}")
+                logger.info(f"🔧 Auto-added: ไฟ LED หน้าบ้าน 10W x 2 ใน {er.name} (branch_distance_m={light_distance}m)")
         
         # [CP4] Checkpoint: Conversion Output
         logger.info(f"[CP4-OUT] Result: {len(rooms)} rooms, {len(loads)} loads ready for MCP")
@@ -1862,12 +1909,29 @@ Query: "{query}"
             # Note: device codes are already normalized by this point
             # No transformation needed for LIGHT-LED*, SOCKET-16A, PUMP-750W
             
+            # =====================================================================
+            # 🔧 FIX: VD Branch Distance Pipeline Leak #2
+            # Problem: branch_distance_m จาก LoadInput ไม่ถูกส่งต่อไปยัง LoadSpec
+            # ทำให้ MCP ใช้ค่า Default 15m แทน แม้ค่าจะมีอยู่ใน LoadInput แล้ว
+            # Solution: ส่งต่อค่า branch_distance_m จาก LoadInput ไปยัง LoadSpec
+            # Fallback: ถ้าไม่มีค่า ใช้ floor-based default
+            # Date: 2026-01-04 | Issue: VD หายเกลี้ยง (FATAL)
+            # =====================================================================
+            branch_dist = getattr(load, 'branch_distance_m', None)
+            if branch_dist is None:
+                # Fallback: Use floor-based default (same as Leak #1)
+                floor_num = load.floor if load.floor else 1
+                default_distance_by_floor = {1: 15.0, 2: 25.0, 3: 35.0}
+                branch_dist = default_distance_by_floor.get(floor_num, 15.0 + (floor_num - 1) * 10.0)
+                logger.debug(f"📏 LoadSpec fallback distance for {load.room_name} (floor {floor_num}): {branch_dist}m")
+            
             load_specs.append(LoadSpec(
                 load_id=load_id,
                 room_id=room_id,
                 device_code=device_code,
                 qty=load.quantity,
-                floor=load.floor
+                floor=load.floor,
+                branch_distance_m=branch_dist  # 🔧 FIX: Pass distance through!
             ))
         
         # Build ProjectInputSpec

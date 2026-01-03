@@ -112,9 +112,35 @@ Render `message.content` เป็น Plain Text ดิบๆ ไม่ผ่า
 
 ## 🛠️ สรุปแผนแก้ไข (Action Items)
 
-1.  **Backend (Urgent):** จูน `service.py` เพิ่ม Regex จับ "ระยะสาย" ด่วนที่สุด ไม่งั้น VD ผิดตลอดกาล
-2.  **Frontend (PDF):** รื้อ `PDFPreviewModal` ให้ใช้ data จาก `circuits` และรับ prop เพื่อเปลี่ยนโหมดแสดงผล
-3.  **Frontend (SLD):** เขียน Algorithm จัดวาง Node ใหม่ (Dynamic Layout)
-4.  **Frontend (Styles):** ไล่แก้ Font Size และเพิ่ม Toast Error ให้ `ProjectSelector`
+### ✅ FIXED: Issue 7 - VD หายเกลี้ยง (2026-01-04)
 
-พร้อมรับคำสั่งเพื่อเริ่มปฏิบัติการแก้ไขทีละจุดแล้วเจ้าค่ะ! 🫡
+**Root Cause ที่แท้จริง:** มี **3 จุดรั่วไหลข้อมูล** ใน Service Pipeline
+
+| # | ตำแหน่ง | Bug | สถานะ |
+|:-:|---------|-----|:-----:|
+| 1 | `_convert_to_project_requirements()` L1718 | ❌ ไม่ส่งต่อ `branch_distance_m` | ✅ FIXED |
+| 2 | `_convert_req_to_spec()` L1871 | ❌ ไม่ส่งต่อ `branch_distance_m` | ✅ FIXED |
+| 3a | Auto-fill Pump | ❌ ไม่มี distance | ✅ FIXED |
+| 3b | Auto-fill Water Heater | ❌ ไม่มี distance | ✅ FIXED |
+| 3c | Auto-fill Exterior Lighting | ❌ ไม่มี distance | ✅ FIXED |
+| 3d | `_auto_fill_lighting()` | ❌ ไม่มี distance | ✅ FIXED |
+| 3e | `_auto_fill_outlets()` | ❌ ไม่มี distance | ✅ FIXED |
+
+**การแก้ไข:**
+- เพิ่ม `branch_distance_m` ในทุกจุดที่สร้าง `LoadInput` และ `LoadSpec`
+- ใช้ Floor-based Default: ชั้น 1 = 15m, ชั้น 2 = 25m, ชั้น 3+ = 35m+
+- เพิ่ม Comments อธิบายเหตุผลของการแก้ไขทุกจุด
+- เพิ่ม Debug Log เมื่อใช้ Fallback Distance
+
+---
+
+### 🔲 TODO: Remaining Issues
+
+1.  **Frontend (PDF):** รื้อ `PDFPreviewModal` ให้ใช้ data จาก `circuits` และรับ prop เพื่อเปลี่ยนโหมดแสดงผล
+2.  **Frontend (SLD):** เขียน Algorithm จัดวาง Node ใหม่ (Dynamic Layout)
+3.  **Frontend (Styles):** ไล่แก้ Font Size และเพิ่ม Toast Error ให้ `ProjectSelector`
+
+---
+
+**อัพเดทล่าสุด:** 2026-01-04 02:30 | **แก้ไขโดย:** Ampere 🔧
+
