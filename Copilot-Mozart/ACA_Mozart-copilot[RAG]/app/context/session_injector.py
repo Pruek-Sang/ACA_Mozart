@@ -20,18 +20,39 @@ Usage:
 """
 
 import logging
+import uuid
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field, asdict
 
 from .supabase_client import get_supabase_client
 
 logger = logging.getLogger("Aura.SessionInjector")
 
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+
+# TODO: Adjust session TTL based on production usage patterns
+# Current: 24 hours. May need to increase for longer projects.
+SESSION_TTL_HOURS = 24
+
+# Max projects per user. Oldest will be auto-deleted when exceeded.
+# TODO: In future, implement archiving to separate storage instead of deletion.
+MAX_PROJECTS_PER_USER = 10
+
+# Default project name when user doesn't provide one
+DEFAULT_PROJECT_NAME = "\u0e1a\u0e49\u0e32\u0e19\u0e19\u0e32\u0e22\u0e2a\u0e21\u0e2b\u0e0d\u0e34\u0e07"
+
 
 def _utcnow() -> datetime:
     """UTC now with timezone info."""
     return datetime.now(timezone.utc)
+
+
+def _generate_guest_id() -> str:
+    """Generate a guest user ID for anonymous users."""
+    return f"guest_{uuid.uuid4().hex[:12]}"
 
 
 @dataclass
@@ -43,12 +64,13 @@ class SessionData:
     """
     id: Optional[str] = None
     user_id: Optional[str] = None
+    project_name: str = DEFAULT_PROJECT_NAME  # 🆕 User-defined name
     stage: str = "gathering"
     
     # Design data
     rooms: List[Dict] = field(default_factory=list)
     loads: List[Dict] = field(default_factory=list)
-    site_context: Dict[str, Any] = field(default_factory=dict)
+    site_context: Dict[str, Any] = field(default_factory=dict)  # 🆕 Stored with session
     
     # Conversation state
     messages: List[Dict] = field(default_factory=list)
@@ -127,12 +149,21 @@ class SessionInjector:
     # CREATE
     # =========================================================================
     
-    async def create(self, user_id: str, initial_data: Optional[Dict] = None) -> Optional[SessionData]:
+    async def create(
+        self, 
+        user_id: Optional[str] = None, 
+        project_name: Optional[str] = None,
+        initial_data: Optional[Dict] = None
+    ) -> Optional[SessionData]:
         """
         Create a new session in database.
         
+        Supports both authenticated users and anonymous guests.
+        Enforces max 10 projects per user - oldest deleted when exceeded.
+        
         Args:
-            user_id: Supabase auth user ID
+            user_id: Supabase auth user ID (None for guest)
+            project_name: User-defined name (defaults to บ้านนายสมหญิง)
             initial_data: Optional initial session data
             
         Returns:
@@ -143,8 +174,23 @@ class SessionInjector:
             return None
         
         try:
+            # 🆕 Support anonymous guests
+            actual_user_id = user_id or _generate_guest_id()
+            
+            # 🆕 Enforce max projects limit
+            if user_id:  # Only for authenticated users
+                existing = await self.load_by_user(user_id, limit=MAX_PROJECTS_PER_USER + 1)
+                if len(existing) >= MAX_PROJECTS_PER_USER:
+                    oldest = existing[-1]  # Oldest is last (sorted by updated_at desc)
+                    logger.warning(f"Max projects ({MAX_PROJECTS_PER_USER}) reached, deleting oldest: {oldest.id}")
+                    await self.delete(oldest.id)
+            
+            # 🆕 Calculate expiry time
+            expires_at = (_utcnow() + timedelta(hours=SESSION_TTL_HOURS)).isoformat()
+            
             data = {
-                "user_id": user_id,
+                "user_id": actual_user_id,
+                "project_name": project_name or DEFAULT_PROJECT_NAME,
                 "stage": "gathering",
                 "rooms": [],
                 "loads": [],
@@ -152,6 +198,7 @@ class SessionInjector:
                 "messages": [],
                 "partial_requirements": {},
                 "status": "active",
+                "expires_at": expires_at,
             }
             
             if initial_data:
@@ -166,7 +213,7 @@ class SessionInjector:
             
             if result.data and len(result.data) > 0:
                 session = SessionData.from_dict(result.data[0])
-                logger.info(f"Created session: {session.id}")
+                logger.info(f"Created session: {session.id} ({session.project_name})")
                 return session
             
             return None

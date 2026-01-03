@@ -381,20 +381,25 @@ async def delete_doc(req: DeleteRequest):
 # =============================================================================
 
 @app.post("/api/v1/session/start")
-async def start_session():
+async def start_session(request: Request, project_name: str = None):
     """
-    Start a new conversation session
+    Start a new conversation session.
+    
+    Args:
+        project_name: Optional name for the project (default: บ้านนายสมหญิง)
     
     Returns session_id for subsequent calls.
     Session remembers user's answers across turns.
     """
-    session = session_store.create_session()
+    user_id = getattr(request.state, "user_id", None)
+    session = session_store.create_session(user_id=user_id, project_name=project_name)
     
     # Return questionnaire immediately
     questionnaire = build_site_context_questionnaire(session.session_id)
     
     return {
         "session_id": session.session_id,
+        "project_name": project_name or "บ้านนายสมหญิง",
         "message": "Session created. Please answer site context questions.",
         "site_context": questionnaire.model_dump()
     }
@@ -568,17 +573,91 @@ async def design_with_session(session_id: str, req: ProjectRequirements):
         }
 
 
+@app.get("/api/v1/session/list")
+async def list_projects(request: Request):
+    """
+    List all projects for the current user (max 10).
+    
+    Returns list of session summaries for project selector UI.
+    """
+    user_id = getattr(request.state, "user_id", None) or (request.client.host if request.client else None)
+    
+    if not SUPABASE_AVAILABLE or not session_injector:
+        # Fallback to in-memory
+        active = session_store.list_active_sessions()
+        return {
+            "projects": [
+                {"session_id": sid, "project_name": "In-Memory Session"}
+                for sid in active[:10]
+            ],
+            "storage": "memory"
+        }
+    
+    try:
+        sessions = await session_injector.load_by_user(user_id, limit=10)
+        return {
+            "projects": [
+                {
+                    "session_id": s.id,
+                    "project_name": s.project_name,
+                    "stage": s.stage,
+                    "updated_at": s.updated_at,
+                    "loads_count": len(s.loads) if s.loads else 0
+                }
+                for s in sessions
+            ],
+            "storage": "supabase"
+        }
+    except Exception as e:
+        logger.error(f"Failed to list projects: {e}")
+        return {"projects": [], "error": str(e)}
+
+
 @app.delete("/api/v1/session/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(session_id: str, confirm: str = None):
     """
-    Delete a session and forget all remembered values
+    Delete a session and forget all remembered values.
+    
+    ⚠️ REQUIRES confirmation: pass ?confirm=CONFIRM to actually delete.
+    
+    Example: DELETE /api/v1/session/xxx-xxx?confirm=CONFIRM
     """
+    # Check CONFIRM requirement
+    if confirm != "CONFIRM":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Deletion requires confirmation",
+                "message": "กรุณาพิมพ์ 'CONFIRM' เพื่อยืนยันการลบโปรเจกต์",
+                "required": "?confirm=CONFIRM"
+            }
+        )
+    
+    # Try Supabase first
+    if SUPABASE_AVAILABLE and session_injector:
+        try:
+            success = await session_injector.delete(session_id)
+            if success:
+                logger.info(f"Deleted session via Supabase: {session_id}")
+                return {
+                    "status": "deleted",
+                    "session_id": session_id,
+                    "message": "โปรเจกต์ถูกลบแล้ว"
+                }
+        except Exception as e:
+            logger.error(f"Failed to delete session via Supabase: {e}")
+    
+    # Fallback to in-memory
     session = session_store.get_session(session_id)
     if not session:
         raise HTTPException(404, f"Session not found: {session_id}")
     
     session_store.delete_session(session_id)
-    return {"status": "deleted", "session_id": session_id}
+    return {
+        "status": "deleted",
+        "session_id": session_id,
+        "message": "โปรเจกต์ถูกลบแล้ว (in-memory)"
+    }
 
 
 # =============================================================================

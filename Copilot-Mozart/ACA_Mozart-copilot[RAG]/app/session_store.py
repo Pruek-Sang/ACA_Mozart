@@ -97,21 +97,81 @@ class ConversationSession:
 
 class SessionStore:
     """
-    In-memory session storage
+    Facade for session management.
     
-    Note: For production with multiple instances, use RedisSessionStore
+    Strategy:
+    1. Try session_injector (Supabase) first → Persistent
+    2. Fallback to in-memory → Lost on restart
+    
+    This allows the system to work even when Supabase is unavailable.
     """
     
     def __init__(self, ttl_minutes: int = 60):
         self._sessions: Dict[str, ConversationSession] = {}
         self.ttl = ttl_minutes
-        logger.info(f"SessionStore initialized with TTL={ttl_minutes} minutes")
+        self._use_injector = False
+        
+        # Try to import session_injector
+        try:
+            from app.context.session_injector import session_injector
+            self._injector = session_injector
+            self._use_injector = session_injector.is_available()
+            if self._use_injector:
+                logger.info("SessionStore: Using Supabase (session_injector)")
+            else:
+                logger.warning("SessionStore: Supabase unavailable, using in-memory fallback")
+        except ImportError:
+            self._injector = None
+            logger.warning("SessionStore: session_injector not available, using in-memory")
+        
+        logger.info(f"SessionStore initialized (TTL={ttl_minutes}min, Supabase={self._use_injector})")
     
-    def create_session(self) -> ConversationSession:
-        """Create a new conversation session"""
+    def create_session(self, user_id: str = None, project_name: str = None) -> ConversationSession:
+        """
+        Create a new conversation session.
+        
+        Args:
+            user_id: Optional user ID for authenticated users
+            project_name: Optional project name (default: บ้านนายสมหญิง)
+        """
+        # Try Supabase first
+        if self._use_injector and self._injector:
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context, create a task
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        session_data = pool.submit(
+                            asyncio.run, 
+                            self._injector.create(user_id=user_id, project_name=project_name)
+                        ).result()
+                else:
+                    session_data = loop.run_until_complete(
+                        self._injector.create(user_id=user_id, project_name=project_name)
+                    )
+                
+                if session_data:
+                    # Convert to ConversationSession for backward compatibility
+                    session = ConversationSession(
+                        session_id=session_data.id,
+                        partial_requirements=session_data.partial_requirements,
+                        messages=session_data.messages,
+                        current_spec=session_data.current_spec,
+                        stage=session_data.stage,
+                        mcp_response=session_data.mcp_response
+                    )
+                    logger.info(f"Created session via Supabase: {session.session_id}")
+                    return session
+            except Exception as e:
+                logger.error(f"Failed to create session via Supabase: {e}")
+                # Fall through to in-memory
+        
+        # Fallback: In-memory
         session = ConversationSession(session_id=str(uuid.uuid4()))
         self._sessions[session.session_id] = session
-        logger.info(f"Created session: {session.session_id}")
+        logger.info(f"Created session (in-memory fallback): {session.session_id}")
         return session
     
     def get_session(self, session_id: str) -> Optional[ConversationSession]:

@@ -13,8 +13,8 @@ import type {
 } from './types';
 import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
-import { askDesign } from './lib/api';
-import { LogOut, User as UserIcon, MessageSquareHeart } from 'lucide-react';
+import { askDesign, startSession } from './lib/api';
+import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen } from 'lucide-react';
 
 /**
  * App - Main Application Controller
@@ -54,6 +54,11 @@ function App() {
   const [sldData, setSldData] = useState<SLDData | null>(null);  // 🆕 SLD data
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);  // 🆕 Feedback modal
 
+  // === 🆕 SESSION STATE ===
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState('บ้านนายสมหญิง');
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
+
   // === AUTH EFFECT ===
   useEffect(() => {
     // ดึง Session ปัจจุบัน
@@ -78,6 +83,34 @@ function App() {
   useEffect(() => {
     setIsDirty(true);
   }, [context]);
+
+  // === 🆕 AUTO-START SESSION ===
+  useEffect(() => {
+    if (!session) return; // Wait for auth
+
+    const initSession = async () => {
+      try {
+        console.log('🚀 Starting new session...');
+        const result = await startSession();
+        setSessionId(result.session_id);
+        // Use project_name from response if available
+        setProjectName((result as { session_id: string; project_name?: string }).project_name || 'บ้านนายสมหญิง');
+        console.log('✅ Session started:', result.session_id);
+      } catch (error) {
+        console.error('❌ Failed to start session:', error);
+        // Fallback: generate local session ID
+        const localId = `local-${Date.now()}`;
+        setSessionId(localId);
+        console.log('⚠️ Using local session:', localId);
+      } finally {
+        setIsSessionLoading(false);
+      }
+    };
+
+    if (!sessionId) {
+      initSession();
+    }
+  }, [session, sessionId]);
 
   // === LOGOUT HANDLER ===
   const handleLogout = async () => {
@@ -123,12 +156,12 @@ function App() {
     setIsDirty(false);
 
     try {
-      // 2. Call API via centralized api.ts module
+      // 2. Call API via centralized api.ts module (with session_id)
       const data = await askDesign({
         query: userPrompt,
         language: 'th',
         site_context: context
-      });
+      }, sessionId || undefined);
 
       // 3. Add Success Message
       const sysMsg: ChatMessage = {
@@ -231,12 +264,25 @@ function App() {
   return (
     <div className="h-screen w-screen bg-slate-950 text-slate-200 font-sans flex flex-col overflow-hidden">
 
-      {/* TOP BAR: User Info */}
+      {/* TOP BAR: User Info + Project Name */}
       <div className="h-12 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-2 text-slate-400 text-sm">
-          <UserIcon size={16} />
-          <span className="font-mono">{user?.email}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-slate-400 text-sm">
+            <UserIcon size={16} />
+            <span className="font-mono">{user?.email}</span>
+          </div>
+
+          {/* 🆕 Project Indicator */}
+          <div className="flex items-center gap-2 text-slate-300 text-sm border-l border-slate-700 pl-4">
+            <FolderOpen size={16} className="text-violet-400" />
+            {isSessionLoading ? (
+              <span className="text-slate-500 italic">กำลังโหลด...</span>
+            ) : (
+              <span className="font-semibold">{projectName}</span>
+            )}
+          </div>
         </div>
+
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 text-slate-400 hover:text-red-400 text-sm transition-colors"

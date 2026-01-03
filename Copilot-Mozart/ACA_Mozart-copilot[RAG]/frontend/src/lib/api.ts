@@ -60,17 +60,26 @@ export interface ApiError {
  * Ask the design system a question or request a design
  * 
  * @param payload - Query with optional site context
+ * @param sessionId - Optional session ID for stateful editing
  * @returns Response with answer and optional design result
  * @throws ApiError on failure
  */
-export async function askDesign(payload: AskRequest): Promise<AskResponse> {
+export async function askDesign(
+    payload: AskRequest,
+    sessionId?: string
+): Promise<AskResponse> {
     const token = await getAccessToken();
 
-    console.log('🚀 API: Sending request to /api/v1/ask');
-    console.log('📍 URL:', buildApiUrl('/api/v1/ask'));
-    console.log('🔐 Auth:', token ? 'Token attached' : 'No token');
+    // 🆕 Include session_id in URL if provided
+    const url = sessionId
+        ? buildApiUrl(`/api/v1/ask?session_id=${sessionId}`)
+        : buildApiUrl('/api/v1/ask');
 
-    const response = await fetch(buildApiUrl('/api/v1/ask'), {
+    console.log('🚀 API: Sending request to', url);
+    console.log('🔐 Auth:', token ? 'Token attached' : 'No token');
+    console.log('📋 Session:', sessionId || 'none');
+
+    const response = await fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
