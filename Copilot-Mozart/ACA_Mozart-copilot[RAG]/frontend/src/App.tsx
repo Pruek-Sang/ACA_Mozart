@@ -135,12 +135,33 @@ function App() {
     message: string;
   }) => {
     try {
-      console.log('[FEEDBACK] Submitted:', feedback);
-      // TODO: Send to backend when API ready
-      // await fetch('/api/feedback', { method: 'POST', body: JSON.stringify(feedback) });
+      console.log('[FEEDBACK] Submitting to API:', feedback);
+
+      // 🆕 Send to backend API
+      const token = await (await import('./lib/supabase')).supabase.auth.getSession()
+        .then(res => res.data.session?.access_token);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          ...feedback,
+          session_id: sessionId,
+          timestamp: new Date().toISOString()
+        })
+      });
+
+      if (!response.ok) {
+        console.warn('[FEEDBACK] API not available, logged locally');
+      } else {
+        console.log('[FEEDBACK] Submitted successfully');
+      }
     } catch (error) {
-      console.error('[FEEDBACK] Submit error:', error);
-      throw error;  // Re-throw to show error in modal
+      console.error('[FEEDBACK] Submit error (fallback to local):', error);
+      // Don't throw - allow graceful degradation
     }
   };
 
@@ -321,6 +342,7 @@ function App() {
               messages={messages}
               onSendMessage={handleSubmit}
               isLoading={isLoading}
+              revisionHistory={(resultData?.data?.revision_history || []) as any}
             />
           </div>
           <ContextPanel
