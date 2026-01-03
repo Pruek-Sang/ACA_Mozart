@@ -1,6 +1,6 @@
 import React from 'react';
 import type { SLDData, SLDNode, SLDEdge } from '../types';
-import { SldSymbolMeter, SldSymbolCB, SldSymbolMCB } from './sld-symbols';
+import { SldSymbolMeter, SldSymbolMainCB, SldSymbolMCB } from './sld-symbols';
 
 interface SLDViewerProps {
     data: SLDData | null;
@@ -133,7 +133,7 @@ const NodeBox: React.FC<{ node: SLDNode }> = ({ node }) => {
                 {isMeter ? (
                     <SldSymbolMeter size={symbolSize} color={colors.border} />
                 ) : isMain ? (
-                    <SldSymbolCB size={symbolSize} color={colors.border} />
+                    <SldSymbolMainCB size={symbolSize} color={colors.border} />
                 ) : (
                     <SldSymbolMCB size={symbolSize} color={colors.border} />
                 )}
