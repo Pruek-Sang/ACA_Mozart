@@ -329,6 +329,22 @@ export interface DesignResult {
         meter_size?: string;
         main_cb_rating?: number;  // Alias for main_breaker if used
         calculations?: any;       // Allow any calculation data
+
+        // 🆕 Revision History (for HistoryPanel)
+        revision_history?: Array<{
+            fromVersion: number;
+            toVersion: number;
+            timestamp: string;
+            summary: string;
+            changes: Array<{
+                field: string;
+                label: string;
+                before?: any;
+                after?: any;
+                changeType: 'added' | 'removed' | 'modified';
+            }>;
+            changeCount: number;
+        }>;
     };
 }
 
