@@ -79,9 +79,10 @@ describe('ResultViewer', () => {
             expect(screen.getByText('BOQ')).toBeInTheDocument()
         })
 
-        it('renders download button', () => {
+        it('renders download dropdown button', () => {
             render(<ResultViewer data={mockData as any} isLoading={false} />)
-            expect(screen.getByTitle('Download Excel')).toBeInTheDocument()
+            // New DownloadDropdown component uses text "Download" instead of title
+            expect(screen.getByText('Download')).toBeInTheDocument()
         })
 
         it('renders circuit data in table', () => {
