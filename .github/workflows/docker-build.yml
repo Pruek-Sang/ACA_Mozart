@@ -98,7 +98,7 @@ jobs:
           pip install --quiet pydantic pytest
           export PYTHONPATH="${PYTHONPATH}:$(pwd)"
           echo "🧪 Running parser logic and merge tests..."
-          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py -v --tb=short
+          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py -v --tb=short
           echo "✅ RAG Backend tests PASSED"
 
       - name: 📊 Backend Test Summary
