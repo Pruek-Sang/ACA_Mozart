@@ -120,7 +120,12 @@ function App() {
         // 🔧 FIX 2026-01-05: Also load saved design data from backend
         try {
           const API_URL = import.meta.env.VITE_API_URL || '';
-          const res = await fetch(`${API_URL}/api/v1/session/${savedSessionId}/data`);
+          const token = session?.access_token;
+          const res = await fetch(`${API_URL}/api/v1/session/${savedSessionId}/data`, {
+            headers: {
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            }
+          });
 
           if (res.ok) {
             const data = await res.json();
