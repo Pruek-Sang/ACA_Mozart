@@ -2021,7 +2021,7 @@ Query: "{query}"
         
         return spec
 
-    async def _build_design_response(self, req: ProjectRequirements, language: str = "th") -> StandardResponse:
+    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None) -> StandardResponse:
         """
         Build design response by chaining to MCP Core.
         
@@ -2180,6 +2180,15 @@ Query: "{query}"
             if mcp_response.success:
                 # Format using new Card-style Markdown formatter
                 result = mcp_response.to_dict()
+                
+                # 🆕 [VD-FIX] Inject floor_distances from RAG extraction (Chat UI Path)
+                # This connects the missing link between Chat UI -> RAG -> Compute
+                # This fixes the "Default 35" error where defaults were used despite extraction success
+                if extracted_data and extracted_data.get("floor_distances"):
+                    result["floor_distances"] = extracted_data["floor_distances"]
+                    logger.info(f"[CP-VD] Injected floor_distances (Chat UI): {result['floor_distances']}")
+                elif extracted_data:
+                    logger.warning(f"[CP-VD] extracted_data present but no floor_distances found. Data keys: {list(extracted_data.keys())}")
                 
                 # Use new formatter (Card-style, Legend at top, critical warnings)
                 formatted_text = format_design_report(result)
@@ -2549,7 +2558,8 @@ Query: "{query}"
                     logger.info(f"[DEBUG-SC-3] About to call _build_design_response with site_context: {project_req.site_context}")
                     
                     # Chain to MCP Core for calculations
-                    result = await self._build_design_response(project_req, req.language)
+                    # 🆕 [VD-FIX] Pass extracted loads (with floor_distances) to design builder
+                    result = await self._build_design_response(project_req, req.language, extracted_data=loads)
                     
                     logger.info("✅ Design response built successfully via NLP→MCP chain")
                     return result
