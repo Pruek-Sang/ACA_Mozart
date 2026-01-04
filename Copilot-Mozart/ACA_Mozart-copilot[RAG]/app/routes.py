@@ -405,6 +405,52 @@ async def start_session(request: Request, project_name: str = None):
     }
 
 
+# =============================================================================
+# 🔧 FIX: Route Order - Static routes MUST come before dynamic routes!
+# FastAPI matches routes in order, so /session/list must be before /session/{id}
+# Otherwise "list" gets matched as a session_id and returns 404
+# =============================================================================
+
+@app.get("/api/v1/session/list")
+async def list_projects(request: Request):
+    """
+    List all projects for the current user (max 10).
+    
+    Returns list of session summaries for project selector UI.
+    """
+    user_id = getattr(request.state, "user_id", None) or (request.client.host if request.client else None)
+    
+    if not SUPABASE_AVAILABLE or not session_injector:
+        # Fallback to in-memory
+        active = session_store.list_active_sessions()
+        return {
+            "projects": [
+                {"session_id": sid, "project_name": "In-Memory Session"}
+                for sid in active[:10]
+            ],
+            "storage": "memory"
+        }
+    
+    try:
+        sessions = await session_injector.load_by_user(user_id, limit=10)
+        return {
+            "projects": [
+                {
+                    "session_id": s.id,
+                    "project_name": s.project_name,
+                    "stage": s.stage,
+                    "updated_at": s.updated_at,
+                    "loads_count": len(s.loads) if s.loads else 0
+                }
+                for s in sessions
+            ],
+            "storage": "supabase"
+        }
+    except Exception as e:
+        logger.error(f"Failed to list projects: {e}")
+        return {"projects": [], "error": str(e)}
+
+
 @app.get("/api/v1/session/{session_id}/site", response_model=SiteContextQuestionnaire)
 async def get_site_context_questions(session_id: str):
     """
@@ -573,44 +619,7 @@ async def design_with_session(session_id: str, req: ProjectRequirements):
         }
 
 
-@app.get("/api/v1/session/list")
-async def list_projects(request: Request):
-    """
-    List all projects for the current user (max 10).
-    
-    Returns list of session summaries for project selector UI.
-    """
-    user_id = getattr(request.state, "user_id", None) or (request.client.host if request.client else None)
-    
-    if not SUPABASE_AVAILABLE or not session_injector:
-        # Fallback to in-memory
-        active = session_store.list_active_sessions()
-        return {
-            "projects": [
-                {"session_id": sid, "project_name": "In-Memory Session"}
-                for sid in active[:10]
-            ],
-            "storage": "memory"
-        }
-    
-    try:
-        sessions = await session_injector.load_by_user(user_id, limit=10)
-        return {
-            "projects": [
-                {
-                    "session_id": s.id,
-                    "project_name": s.project_name,
-                    "stage": s.stage,
-                    "updated_at": s.updated_at,
-                    "loads_count": len(s.loads) if s.loads else 0
-                }
-                for s in sessions
-            ],
-            "storage": "supabase"
-        }
-    except Exception as e:
-        logger.error(f"Failed to list projects: {e}")
-        return {"projects": [], "error": str(e)}
+# 🔧 NOTE: /session/list route moved to Line ~410 to fix route matching order
 
 
 @app.delete("/api/v1/session/{session_id}")
