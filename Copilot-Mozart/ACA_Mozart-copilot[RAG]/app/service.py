@@ -650,37 +650,73 @@ Query: "{query}"
     def _extract_floor_distances(self, text: str) -> Dict[int, float]:
         """
         Extract average branch distances per floor from text using regex.
-        Supports:
+        
+        [🔧 FIX 2026-01-05 Issue#7-VD] Enhanced regex patterns to capture:
         - "Floor 1 15m"
         - "ชั้น 1 สาย 20 เมตร"
         - "ชั้นล่าง 15 เมตร" (Floor 1)
         - "ชั้นบน 25 เมตร" (Floor 2)
+        - "ระยะเฉลี่ยจากตู้ MDB ไปห้องชั้น 1 = 15 เมตร" (NEW!)
+        - "ระยะ...ชั้น 1...15 เมตร" patterns (NEW!)
         """
         import re
         distances = {}
         
-        # Pattern for explicit floor numbers: "ชั้น X ... Y เมตร"
+        # ================================================================
+        # Pattern 1: "ระยะ...ชั้น X = Y เมตร" or "ไปห้องชั้น X = Y เมตร"
+        # Matches: "ระยะเฉลี่ยจากตู้ MDB ไปห้องชั้น 1 = 15 เมตร"
+        # This is the PRIORITY pattern for explicit user specifications
+        # ================================================================
+        pattern_mdb = re.finditer(
+            r'(?:ระยะ|ไป|ถึง).*?ชั้น\s*(\d+)\s*[=:]\s*(\d+)\s*(?:เมตร|m|เมตร/วงจร)',
+            text, re.IGNORECASE
+        )
+        for m in pattern_mdb:
+            try:
+                floor = int(m.group(1))
+                dist = float(m.group(2))
+                distances[floor] = dist
+                logger.debug(f"[VD-EXTRACT] Pattern MDB: Floor {floor} = {dist}m")
+            except (ValueError, IndexError):
+                pass
+        
+        # ================================================================
+        # Pattern 2: Explicit floor numbers: "ชั้น X ... Y เมตร"
         # Matches: "ชั้น 1 ยาว 15เมตร", "ชั้น 2 สาย 20 m"
+        # Only apply if Pattern 1 didn't find anything for this floor
+        # ================================================================
         floor_matches = re.finditer(r'ชั้น\s*(\d+).*?(\d+)\s*(?:เมตร|m)', text)
         for m in floor_matches:
             try:
                 floor = int(m.group(1))
                 dist = float(m.group(2))
-                distances[floor] = dist
+                # Only set if not already set by Pattern 1
+                if floor not in distances:
+                    distances[floor] = dist
+                    logger.debug(f"[VD-EXTRACT] Pattern Floor: Floor {floor} = {dist}m")
             except (ValueError, IndexError):
                 pass
                 
-        # Pattern for generic keywords
+        # ================================================================
+        # Pattern 3: Generic keywords (fallback)
+        # ================================================================
         if 'ชั้นล่าง' in text or 'ground' in text.lower():
             m = re.search(r'(?:ชั้นล่าง|ground).*?(\d+)\s*(?:เมตร|m)', text, re.IGNORECASE)
-            if m:
+            if m and 1 not in distances:
                 distances[1] = float(m.group(1))
+                logger.debug(f"[VD-EXTRACT] Pattern Ground: Floor 1 = {distances[1]}m")
                 
         if 'ชั้นบน' in text or 'upper' in text.lower():
             m = re.search(r'(?:ชั้นบน|upper).*?(\d+)\s*(?:เมตร|m)', text, re.IGNORECASE)
-            if m:
-                # Assuming 2-story house, "upper" is floor 2
+            if m and 2 not in distances:
                 distances[2] = float(m.group(1))
+                logger.debug(f"[VD-EXTRACT] Pattern Upper: Floor 2 = {distances[2]}m")
+        
+        # Log summary
+        if distances:
+            logger.info(f"[VD-EXTRACT] Extracted floor distances: {distances}")
+        else:
+            logger.warning("[VD-EXTRACT] No floor distances found in text, will use defaults")
                 
         return distances
 
