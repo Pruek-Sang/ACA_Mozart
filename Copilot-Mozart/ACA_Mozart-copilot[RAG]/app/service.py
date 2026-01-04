@@ -817,6 +817,7 @@ Query: "{query}"
   "voltage_system": "TH_1PH_230V",
   "num_floors": จำนวนชั้น (ถ้าไม่ระบุให้ใส่ 1),
   "service_distance_m": ระยะสายเมนเป็นเมตร (ถ้ามี เช่น "หม้อแปลง 50 เมตร" -> 50, ถ้าไม่มีให้ใส่ null),
+  "floor_distances": {{"1": ระยะเมตรชั้น1, "2": ระยะเมตรชั้น2, ...}} (🔴 สำคัญมาก! ถ้าระบุระยะสายต่อชั้น เช่น "ชั้น 1 = 15m, ชั้น 2 = 25m" ให้ใส่ที่นี่),
   "extraction_confidence": 0.0-1.0 (ความมั่นใจในการสกัดข้อมูลโดยรวม),
   "rooms": [
     {{"name": "ชื่อห้อง", "type": "ประเภท (living/bedroom/kitchen/bathroom/storage/exterior)", "floor": ชั้นที่อยู่, "area_sqm": พื้นที่ตร.ม. (ถ้าไม่ระบุใส่ null), "confidence": 0.0-1.0}}
@@ -851,9 +852,13 @@ Query: "{query}"
    - สวน/garden → name="สวน", type="exterior"
    - ระยะสายเมน/เสาไฟ/หม้อแปลง → ใส่ใน service_distance_m (เช่น "ห่างเสาไฟ 30 เมตร")
 
-4. 📏 ระยะทาง (Distance):
+4. 📏 ระยะทาง (Distance - สำคัญมาก!):
    - ถ้าบอก "หม้อแปลงห่าง 50 เมตร" → service_distance_m: 50
+   - ถ้าบอก "ระยะชั้น 1 = 15m ชั้น 2 = 25m" → floor_distances: {{"1": 15, "2": 25}}
+   - ถ้าบอก "ระยะเฉลี่ยจากตู้ MDB ไปห้องชั้น 1 = 15 เมตร" → floor_distances: {{"1": 15}}
+   - ถ้าบอก "สายวงจรย่อยชั้นล่าง 15m ชั้นบน 25m" → floor_distances: {{"1": 15, "2": 25}}
    - ถ้าบอก "แอร์เดินสาย 20 เมตร" → loads[...].branch_distance_m: 20
+   - 🔴 floor_distances ใช้สำหรับระยะเฉลี่ยต่อชั้น, branch_distance_m ใช้สำหรับอุปกรณ์เฉพาะตัว
 
 🔌 กฎนับเต้ารับ (สำคัญมาก! ตาม วสท. 2564):
 8. "คู่" และ "เดี่ยว" หมายถึง **ประเภท** ของเต้ารับ ไม่ใช่ตัวคูณ!
@@ -912,26 +917,45 @@ Query: "{query}"
                 # เก็บ original query ไว้สำหรับ auto-fill checks
                 extracted["original_query"] = normalized_query
                 
-                # 🆕 [RAG-FIX] Backfill floor distances if not specified on individual loads
-                floor_distances = self._extract_floor_distances(normalized_query)
+                # 🆕 [RAG-FIX v2] Use floor_distances from LLM first, fallback to regex
+                # Priority: LLM floor_distances > Regex extraction > Floor defaults
+                llm_floor_distances = extracted.get("floor_distances", {})
+                if llm_floor_distances:
+                    # Convert string keys to int if needed
+                    floor_distances = {int(k): float(v) for k, v in llm_floor_distances.items() if v}
+                    logger.info(f"📏 [LLM] floor_distances from LLM: {floor_distances}")
+                else:
+                    # Fallback to regex extraction
+                    floor_distances = self._extract_floor_distances(normalized_query)
+                    if floor_distances:
+                        logger.info(f"📏 [REGEX] floor_distances from regex: {floor_distances}")
+                
+                # Store floor_distances for downstream (e.g., compute.py)
+                extracted["floor_distances"] = floor_distances
+                
+                # Apply floor distances to loads that don't have specific distances
                 if floor_distances:
-                    logger.info(f"📏 Extracted floor distances: {floor_distances}")
                     for load in extracted.get("loads", []):
-                        # Only apply if load doesn't have specific distance AND no user-specified override
+                        # Only apply if load doesn't have specific distance
                         if not load.get("branch_distance_m"):
                             # Get load's floor via room
                             room_name = load.get("room_name")
-                            room_floor = 1 # Default
+                            room_floor = 1  # Default
                             
                             # Find room in extracted['rooms']
                             for r in extracted.get("rooms", []):
-                                if r["name"] == room_name:
-                                    room_floor = r.get("floor", 1)
+                                if r.get("name") == room_name:
+                                    room_floor = r.get("floor", 1) or 1
                                     break
                             
                             if room_floor in floor_distances:
                                 load["branch_distance_m"] = floor_distances[room_floor]
-                                logger.info(f"  └─ Applied {floor_distances[room_floor]}m to {load['device']} in {room_name}")
+                                logger.info(f"  └─ Applied {floor_distances[room_floor]}m to {load.get('device')} in {room_name} (floor {room_floor})")
+                            else:
+                                # Floor not specified, use floor-based default
+                                default_dist = {1: 15.0, 2: 25.0, 3: 35.0}.get(room_floor, 15.0 + (room_floor - 1) * 10.0)
+                                load["branch_distance_m"] = default_dist
+                                logger.warning(f"  └─ [DEFAULT] Applied {default_dist}m to {load.get('device')} (floor {room_floor} not in user input)")
 
                 # 🆕 Validation: Check if extraction actually succeeded
                 rooms_count = len(extracted.get('rooms', []))
