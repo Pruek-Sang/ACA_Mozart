@@ -156,10 +156,18 @@ def create_explainable_warning(
     
     # Format action description
     action_desc = template.get("action_template", "")
-    if before_value and "{before}" in action_desc:
+    
+    if before_value:
         action_desc = action_desc.replace("{before}", before_value)
-    if after_value and "{after}" in action_desc:
+    else:
+        # Fallback: remove placeholder or use generic term
+        action_desc = action_desc.replace("{before}", "ขนาดเดิม")
+
+    if after_value:
         action_desc = action_desc.replace("{after}", after_value)
+    else:
+        # Fallback
+        action_desc = action_desc.replace("{after}", "ขนาดที่เหมาะสม")
     
     return {
         "code": warning_code,
