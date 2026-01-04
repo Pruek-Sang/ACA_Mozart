@@ -21,16 +21,15 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
 
         const element = contentRef.current;
         const opt = {
-            margin: 10,
-            filename: `Electrical-Design-${new Date().toISOString().split('T')[0]}.pdf`,
+            margin: 5,
+            filename: `Panel-Schedule-${data.data?.project_name || 'Project'}.pdf`,
             image: { type: 'jpeg' as const, quality: 0.98 },
             html2canvas: { scale: 2 },
-            jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+            jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'landscape' as const } // Landscape for wide table
         };
 
         try {
             await html2pdf().set(opt).from(element).save();
-            // Don't auto-close, let user decide
         } catch (error) {
             console.error("PDF Generation failed", error);
         } finally {
@@ -39,18 +38,32 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
     };
 
     const loads = data.data?.loads || [];
-    const totalLoad = loads.reduce((sum: number, item: any) => sum + (item.load_va_l1 || item.power_kw * 1000 || 0), 0);
+    const mainBreaker = data.data?.main_breaker || 50;
+    const mainCbType = data.data?.main_cb_type || "MCB";
+    const mainWire = data.data?.main_feeder_size || "16";
+    const mainWireType = data.data?.main_feeder_type || "IEC01";
+    const mainConduit = data.data?.main_raceway_size || "1\"";
+    const mainConduitType = data.data?.main_raceway_type || "EMT";
 
-    // Generate Rows for empty space filling (optional) or just list
+    // Categorize Loads for Footer
+    const lightingLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('light') || l.device_name?.includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+    const receptacleLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('socket') || l.device_name?.includes('เต้ารับ')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+    const heaterLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('water') || l.device_name?.includes('น้ำอุ่น')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+    const acLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('air') || l.device_name?.includes('แอร์')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+    const spareLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('spare')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+
+    const totalConnectedLoad = loads.reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+    const demandFactor = 0.8;
+    const demandLoad = totalConnectedLoad * demandFactor;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-slate-900 w-full max-w-4xl h-[90vh] rounded-xl border border-slate-700 flex flex-col shadow-2xl overflow-hidden">
+            <div className="bg-slate-900 w-full max-w-6xl h-[90vh] rounded-xl border border-slate-700 flex flex-col shadow-2xl overflow-hidden">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
                     <h3 className="text-white font-semibold flex items-center gap-2">
                         <Printer size={20} className="text-sky-400" />
-                        Print Preview (BOQ)
+                        Print Preview (Panel Schedule)
                     </h3>
                     <div className="flex items-center gap-2">
                         <button
@@ -72,89 +85,170 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
 
                 {/* Preview Area (Scrollable) */}
                 <div className="flex-1 overflow-y-auto p-8 bg-slate-800 flex justify-center">
-                    {/* A4 Paper Container - Scaled visual wrapper */}
+                    {/* A4 Landscape Container */}
                     <div
                         ref={contentRef}
-                        className="bg-white text-black w-[210mm] min-h-[297mm] h-fit p-[15mm] shadow-lg relative"
-                        style={{ fontSize: '10pt', fontFamily: 'Sarabun, sans-serif' }}
+                        className="bg-white text-black w-[297mm] min-h-[210mm] h-fit p-[10mm] shadow-lg relative"
+                        style={{ fontFamily: 'Sarabun, sans-serif' }}
                     >
-                        {/* Header */}
-                        <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-start">
-                            <div className="flex items-center gap-3">
-                                {/* Logo Placeholder */}
-                                <div className="w-12 h-12 bg-black text-white flex items-center justify-center font-bold rounded">AM</div>
-                                <div>
-                                    <h1 className="text-xl font-bold uppercase leading-none">ACA Mozart</h1>
-                                    <p className="text-xs text-gray-500">AI Electrical Design System</p>
-                                </div>
+                        {/* Title */}
+                        <div className="text-center font-bold mb-4 uppercase text-lg underline">
+                            240 VAC. PANEL BOARD SCHEDULE FOR
+                        </div>
+
+                        {/* Panel Info Box */}
+                        <div className="border-2 border-black mb-1 text-xs font-bold uppercase">
+                            <div className="grid grid-cols-[150px_1fr_150px_1fr_150px_1fr] gap-x-2 p-1 border-b border-black">
+                                <div>PANEL NO.</div>
+                                <div>: LP-1</div>
+                                <div>CAPACITY</div>
+                                <div>: {loads.length} CKT.</div>
+                                <div>PROJECT</div>
+                                <div className="truncate">: {data.data?.project_name || 'RESIDENTIAL'}</div>
                             </div>
-                            <div className="text-right">
-                                <h2 className="text-lg font-bold uppercase text-gray-800">Load Schedule</h2>
-                                <p className="text-sm text-gray-600">Ref: {data.data?.project_name || 'Project-001'}</p>
-                                <p className="text-xs text-gray-500">{new Date().toLocaleDateString()}</p>
+                            <div className="grid grid-cols-[150px_1fr_150px_1fr_150px_1fr] gap-x-2 p-1 border-b border-black">
+                                <div>UP STREAM PANEL</div>
+                                <div>: MDB</div>
+                                <div>MAIN BUSBAR</div>
+                                <div>: 100 A</div>
+                                <div>LOCATION</div>
+                                <div>: INDOOR</div>
+                            </div>
+                            <div className="grid grid-cols-[150px_1fr_150px_1fr_150px_1fr] gap-x-2 p-1">
+                                <div>MAIN CIRCUIT BREAKER</div>
+                                <div>: {mainCbType} 2P {mainBreaker} AT</div>
+                                <div>IC {'>='}</div>
+                                <div>: 10 kA At 240 VAC</div>
+                                <div>MOUNTING</div>
+                                <div>: WALL MOUNTED</div>
                             </div>
                         </div>
 
-                        {/* Project Info Grid */}
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-6 text-sm border-b border-gray-300 pb-6">
-                            <div className="grid grid-cols-[100px_1fr]">
-                                <span className="font-bold text-gray-600">Project:</span>
-                                <span>{data.data?.project_name || 'Residential House'}</span>
-                                <span className="font-bold text-gray-600">Building:</span>
-                                <span>{data.data?.building_type || 'Residential'}</span>
-                                <span className="font-bold text-gray-600">Standard:</span>
-                                <span>EIT 2001-56 / NEC 2023</span>
-                            </div>
-                            <div className="grid grid-cols-[100px_1fr]">
-                                <span className="font-bold text-gray-600">Meter:</span>
-                                <span>{data.data?.meter_size || '15(45)A'}</span>
-                                <span className="font-bold text-gray-600">Main CB:</span>
-                                <span>{data.data?.main_cb_rating}A ({data.data?.main_cb_type || 'MCB'})</span>
-                                <span className="font-bold text-gray-600">Main Feeder:</span>
-                                <span>{data.data?.main_feeder_size || '-'} mm² ({data.data?.main_feeder_type})</span>
-                            </div>
-                        </div>
-
-                        {/* Load Table */}
-                        <div className="mb-6">
-                            <h3 className="font-bold mb-2 uppercase text-sm border-l-4 border-black pl-2">Branch Circuits</h3>
+                        {/* Main Table */}
+                        <div className="border-2 border-black border-t-0">
                             <table className="w-full text-xs border-collapse">
                                 <thead>
-                                    <tr className="bg-gray-100 border-b-2 border-black">
-                                        <th className="py-2 px-1 text-center font-bold w-12">Ckt</th>
-                                        <th className="py-2 px-2 text-left font-bold">Description</th>
-                                        <th className="py-2 px-1 text-center font-bold w-16">Load (VA)</th>
-                                        <th className="py-2 px-1 text-center font-bold w-16">Breaker</th>
-                                        <th className="py-2 px-1 text-center font-bold w-20">Wire</th>
-                                        <th className="py-2 px-1 text-center font-bold w-16">Conduit</th>
+                                    {/* Header Row 1 */}
+                                    <tr className="border-b border-black text-center font-bold">
+                                        <td className="border-r border-black w-8" rowSpan={2}>CKT.<br />NO.</td>
+                                        <td className="border-r border-black" rowSpan={2}>DESCRIPTION</td>
+
+                                        {/* CB Group */}
+                                        <td className="border-r border-black w-[25%]" colSpan={4}>CB</td>
+
+                                        {/* Wire Group */}
+                                        <td className="border-r border-black w-[15%]" colSpan={2}>WIRE</td>
+
+                                        {/* Conduit Group */}
+                                        <td className="border-r border-black w-[15%]" colSpan={2}>CONDUIT</td>
+
+                                        <td className="w-24" rowSpan={2}>CONNECTED<br />LOAD IN VA.</td>
+                                    </tr>
+                                    {/* Header Row 2 */}
+                                    <tr className="border-b-2 border-black text-center font-bold h-8">
+                                        <td className="border-r border-black w-10">NO POLE</td>
+                                        <td className="border-r border-black w-8">AT</td>
+                                        <td className="border-r border-black w-10">TYPE</td>
+                                        <td className="border-r border-black w-8">IC {'>='}</td>
+
+                                        <td className="border-r border-black w-16">SIZE</td>
+                                        <td className="border-r border-black w-10">TYPE</td>
+
+                                        <td className="border-r border-black w-10">SIZE</td>
+                                        <td className="border-r border-black w-10">TYPE</td>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {loads.map((load: any, i: number) => (
-                                        <tr key={i} className="border-b border-gray-200">
-                                            <td className="py-2 px-1 text-center font-mono text-gray-500">{i + 1}</td>
-                                            <td className="py-2 px-2 font-medium">{load.device_name}</td>
-                                            <td className="py-2 px-1 text-center">{Math.round(load.load_va_l1 || 0)}</td>
-                                            <td className="py-2 px-1 text-center">{load.breaker_size}A</td>
-                                            <td className="py-2 px-1 text-center">{load.wire_size?.replace(' mm²', '')}</td>
-                                            <td className="py-2 px-1 text-center">{load.conduit_size}</td>
-                                        </tr>
-                                    ))}
-                                    {/* Footer */}
-                                    <tr className="font-bold bg-gray-100 border-t-2 border-black">
-                                        <td colSpan={2} className="py-2 px-2 text-right">TOTAL LOAD</td>
-                                        <td className="py-2 px-1 text-center">{Math.round(totalLoad)} VA</td>
-                                        <td colSpan={3} className="py-2 px-1"></td>
-                                    </tr>
+                                    {loads.map((load: any, i: number) => {
+                                        // Wire format: "2x2.5/2.5G"
+                                        const wireL = load.wire_size_l || load.wire_size?.replace(' mm²', '') || '2.5';
+                                        const wireG = load.wire_size_grd || load.ground_size || '2.5';
+                                        const wireStr = `2x${wireL}/${wireG}G`;
+
+                                        return (
+                                            <tr key={i} className="border-b border-black h-7 text-center hover:bg-gray-50">
+                                                <td className="border-r border-black font-bold">{i + 1}</td>
+                                                <td className="border-r border-black text-left px-2 font-medium">{load.device_name}</td>
+
+                                                {/* CB */}
+                                                <td className="border-r border-black">{load.breaker_poles || 1}</td>
+                                                <td className="border-r border-black font-bold">{load.breaker_at || load.breaker_size}</td>
+                                                <td className="border-r border-black text-[10px]">{load.breaker_type || 'CB'}</td>
+                                                <td className="border-r border-black">{load.breaker_ic_ka || 6}</td>
+
+                                                {/* Wire */}
+                                                <td className="border-r border-black">{wireStr}</td>
+                                                <td className="border-r border-black">{load.wire_type || 'IEC01'}</td>
+
+                                                {/* Conduit */}
+                                                <td className="border-r border-black">{load.conduit_size || '1/2"'}</td>
+                                                <td className="border-r border-black">{load.conduit_type || 'EMT'}</td>
+
+                                                {/* Load */}
+                                                <td className="font-bold text-right px-2">{(load.total_va || load.load_va_l1 || 0).toLocaleString()}</td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {/* Fill Empty Rows to keep form height consistent (Optional - skipped for now) */}
                                 </tbody>
                             </table>
                         </div>
 
-                        {/* Footer Note */}
-                        <div className="absolute bottom-[15mm] left-[15mm] right-[15mm] text-[10px] text-gray-400 border-t border-gray-200 pt-2 flex justify-between">
-                            <span>Generated by ACA Mozart AI</span>
-                            <span>Page 1/1</span>
+                        {/* Footer Section */}
+                        <div className="border-2 border-black border-t-0 flex text-xs font-bold uppercase">
+                            {/* Feeder Info */}
+                            <div className="w-[45%] border-r-2 border-black p-2 flex flex-col justify-center space-y-2">
+                                <div className="flex">
+                                    <span className="w-28">FEEDER CABLE :</span>
+                                    <span>{mainWire} Sq.mm ({mainWireType})</span>
+                                </div>
+                                <div className="flex ml-28">
+                                    <span>in {mainConduitType} Dia {mainConduit}</span>
+                                </div>
+                            </div>
+
+                            {/* Load Breakdown */}
+                            <div className="w-[30%] border-r-2 border-black text-xs">
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
+                                    <span>LIGHTING</span><span>=</span><span className="text-right">{lightingLoad}</span><span className="pl-1">VA</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
+                                    <span>RECEPTACLE</span><span>=</span><span className="text-right">{receptacleLoad}</span><span className="pl-1">VA</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
+                                    <span>WATER HEATER</span><span>=</span><span className="text-right">{heaterLoad}</span><span className="pl-1">VA</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
+                                    <span>A/C</span><span>=</span><span className="text-right">{acLoad}</span><span className="pl-1">VA</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] py-1 px-2">
+                                    <span>SPARE</span><span>=</span><span className="text-right">{spareLoad}</span><span className="pl-1">VA</span>
+                                </div>
+                            </div>
+
+                            {/* Totals */}
+                            <div className="w-[25%] flex flex-col">
+                                <div className="flex-1"></div>
+                                <div className="border-t-2 border-black grid grid-cols-[1fr_60px_30px] py-2 px-2 items-center bg-gray-100">
+                                    <span>CONNECTED LOAD :</span>
+                                    <span className="text-right font-extrabold text-sm">{totalConnectedLoad.toLocaleString()}</span>
+                                    <span className="pl-1">VA</span>
+                                </div>
+                                <div className="border-t-2 border-black grid grid-cols-[1fr_60px_30px] py-2 px-2 items-center bg-gray-100">
+                                    <span>DEMAND LOAD (80 %) :</span>
+                                    <span className="text-right font-extrabold text-sm">{demandLoad.toLocaleString()}</span>
+                                    <span className="pl-1">VA</span>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Note */}
+                        <div className="border-2 border-black border-t-0 p-2 text-xs font-bold uppercase flex justify-between">
+                            <div>NOTE : ELCB = EARTH LEAKAGE CIRCUIT BREAKER 30 mA</div>
+                            <div>GENERATED BY ACA MOZART AI</div>
+                        </div>
+
                     </div>
                 </div>
             </div>
