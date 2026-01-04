@@ -56,8 +56,15 @@ function App() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);  // 🆕 Feedback modal
 
   // === 🆕 SESSION STATE ===
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState('บ้านนายสมหญิง');
+  // 🔧 FIX: Initialize from localStorage to persist across refresh
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    const saved = localStorage.getItem('mozart_session_id');
+    return saved || null;
+  });
+  const [projectName, setProjectName] = useState(() => {
+    const saved = localStorage.getItem('mozart_project_name');
+    return saved || 'บ้านนายสมหญิง';
+  });
   const [isSessionLoading, setIsSessionLoading] = useState(true);
 
   // === AUTH EFFECT ===
@@ -85,16 +92,39 @@ function App() {
     setIsDirty(true);
   }, [context]);
 
-  // === 🆕 AUTO-START SESSION ===
+  // === 🆕 PERSIST SESSION TO LOCALSTORAGE ===
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem('mozart_session_id', sessionId);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (projectName) {
+      localStorage.setItem('mozart_project_name', projectName);
+    }
+  }, [projectName]);
+
+  // === 🆕 AUTO-START SESSION (only if no saved session) ===
   useEffect(() => {
     if (!session) return; // Wait for auth
 
     const initSession = async () => {
+      // 🔧 FIX: Check if we have a saved session that's still valid
+      const savedSessionId = localStorage.getItem('mozart_session_id');
+
+      if (savedSessionId) {
+        console.log('✅ Restored session from localStorage:', savedSessionId);
+        setSessionId(savedSessionId);
+        setIsSessionLoading(false);
+        return;
+      }
+
+      // No saved session, create new one
       try {
         console.log('🚀 Starting new session...');
         const result = await startSession();
         setSessionId(result.session_id);
-        // Use project_name from response if available
         setProjectName((result as { session_id: string; project_name?: string }).project_name || 'บ้านนายสมหญิง');
         console.log('✅ Session started:', result.session_id);
       } catch (error) {
@@ -110,6 +140,8 @@ function App() {
 
     if (!sessionId) {
       initSession();
+    } else {
+      setIsSessionLoading(false);
     }
   }, [session, sessionId]);
 
