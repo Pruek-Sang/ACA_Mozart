@@ -116,6 +116,70 @@ function App() {
       if (savedSessionId) {
         console.log('✅ Restored session from localStorage:', savedSessionId);
         setSessionId(savedSessionId);
+
+        // 🔧 FIX 2026-01-05: Also load saved design data from backend
+        try {
+          const API_URL = import.meta.env.VITE_API_URL || '';
+          const res = await fetch(`${API_URL}/api/v1/session/${savedSessionId}/data`);
+
+          if (res.ok) {
+            const data = await res.json();
+            console.log('📂 Restored session data:', data.project_name);
+
+            // Restore project name
+            if (data.project_name) {
+              setProjectName(data.project_name);
+            }
+
+            // Restore design result if available
+            if (data.mcp_response?.display_data) {
+              const displayData = data.mcp_response.display_data;
+              setResultData({
+                success: true,
+                message: 'Design restored from session',
+                data: {
+                  loads: (displayData.circuits || []).map((ckt: {
+                    room?: string;
+                    floor?: string;
+                    circuit_name: string;
+                    total_kw: number;
+                    total_current: number;
+                    breaker_rating: number;
+                    wire_size: string;
+                    conduit_size?: string;
+                    vd_percent?: number;
+                  }) => ({
+                    room_name: ckt.room || ckt.floor || '',
+                    device_name: ckt.circuit_name,
+                    power_kw: ckt.total_kw,
+                    current_a: ckt.total_current,
+                    breaker_size: ckt.breaker_rating,
+                    wire_size: `${ckt.wire_size} mm²`,
+                    conduit_size: ckt.conduit_size,
+                    voltage_drop_percent: ckt.vd_percent,
+                  })),
+                  warnings: displayData.warnings || [],
+                  explainable_warnings: displayData.explainable_warnings,
+                  assumptions: displayData.assumptions,
+                  total_power_kw: displayData.total_kw,
+                  main_breaker: Number.parseInt(displayData.main_breaker) || 0,
+                  audit_table: data.mcp_response?.audit_results || undefined,
+                }
+              });
+              console.log('✅ Design restored with', displayData.circuits?.length || 0, 'circuits');
+            }
+
+            // Restore SLD data if available
+            if (data.mcp_response?.sld_data) {
+              setSldData(data.mcp_response.sld_data);
+            }
+          } else if (res.status !== 404) {
+            console.warn('⚠️ Could not load session data:', res.status);
+          }
+        } catch (e) {
+          console.warn('⚠️ Session data load failed (non-blocking):', e);
+        }
+
         setIsSessionLoading(false);
         return;
       }

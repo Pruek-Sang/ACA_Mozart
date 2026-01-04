@@ -188,7 +188,25 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
         logger.debug(f"⏱️ Rate check passed for {user_id} on /ask")
     
     # 🆕 Pass session_id to enable Stateful Intelligence
-    return await rag_service.process_ask(req, session_id=session_id)
+    response = await rag_service.process_ask(req, session_id=session_id)
+    
+    # =========================================================================
+    # 🔧 AUTO-SAVE: Persist design result to Supabase
+    # [FIX 2026-01-05] Session data was lost on refresh because we never saved!
+    # =========================================================================
+    if SUPABASE_AVAILABLE and session_injector and session_id:
+        try:
+            # Check if this is a design response (has display_data)
+            metadata = response.get("metadata", {}) if isinstance(response, dict) else {}
+            if metadata.get("display_data") or metadata.get("mcp_response"):
+                # Save the entire metadata (display_data, audit_results, sld_data, etc.)
+                await session_injector.set_mcp_response(session_id, metadata)
+                logger.info(f"✅ Auto-saved design to session {session_id[:8]}...")
+        except Exception as e:
+            # Don't fail the request if save fails - just log warning
+            logger.warning(f"⚠️ Auto-save failed (non-blocking): {e}")
+    
+    return response
 
 
 
@@ -450,6 +468,52 @@ async def list_projects(request: Request):
         logger.error(f"Failed to list projects: {e}")
         return {"projects": [], "error": str(e)}
 
+
+# =============================================================================
+# 🆕 GET SESSION DATA - Load saved design for restoration after refresh
+# [FIX 2026-01-05] Frontend needs to restore saved design on page refresh
+# =============================================================================
+@app.get("/api/v1/session/{session_id}/data")
+async def get_session_data(session_id: str, request: Request):
+    """
+    Load saved design data for a session.
+    
+    Used by Frontend to restore session state after page refresh.
+    Returns rooms, loads, site_context, messages, and MCP response.
+    
+    Errors:
+    - 404: Session not found or storage unavailable
+    """
+    if not SUPABASE_AVAILABLE or not session_injector:
+        raise HTTPException(
+            status_code=503,
+            detail="Session storage not available"
+        )
+    
+    try:
+        session = await session_injector.load(session_id)
+        
+        if not session:
+            raise HTTPException(404, f"Session not found: {session_id[:8]}...")
+        
+        logger.info(f"📂 Loaded session data for {session_id[:8]}... ({len(session.loads or [])} loads)")
+        
+        return {
+            "session_id": session_id,
+            "project_name": session.project_name,
+            "stage": session.stage,
+            "rooms": session.rooms or [],
+            "loads": session.loads or [],
+            "site_context": session.site_context or {},
+            "mcp_response": session.mcp_response,
+            "messages": session.messages or [],
+            "updated_at": session.updated_at,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to load session data: {e}")
+        raise HTTPException(500, f"Failed to load session: {str(e)}")
 
 @app.get("/api/v1/session/{session_id}/site", response_model=SiteContextQuestionnaire)
 async def get_site_context_questions(session_id: str):
