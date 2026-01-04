@@ -205,6 +205,13 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         warnings = mcp_result.get('warnings') or []
         errors = mcp_result.get('errors') or []
         
+        # 🆕 [VD-FIX] Extract floor_distances from metadata for accurate VD calculation
+        floor_distances = mcp_result.get('floor_distances') or {}
+        if floor_distances:
+            logger.info(f"[CP-VD] Using floor_distances from RAG: {floor_distances}")
+        else:
+            logger.warning("[CP-VD] No floor_distances in mcp_result, will use defaults")
+        
         # Calculate totals (logic from markdown_formatter.py lines 92-98)
         total_watts = summary.get('total_watts') or summary.get('total_load_va', 0)
         total_watts = round_up(total_watts)
@@ -220,8 +227,8 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         # Get main equipment sizing
         meter_size, main_wire, main_breaker = _get_meter_sizing(demand_current)
         
-        # Process circuits
-        circuits = _process_circuits(grouped_circuits, wire_sizing, conduit_sizing)
+        # Process circuits (pass floor_distances for VD calculation)
+        circuits = _process_circuits(grouped_circuits, wire_sizing, conduit_sizing, floor_distances)
         
         # === NEW: Calculate summary fields ===
         # Total load by phase (1-phase: all in L1)
@@ -292,12 +299,21 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
 def _process_circuits(
     grouped_circuits: List[Dict],
     wire_sizing: Dict[str, Any],
-    conduit_sizing: Dict[str, Any]
+    conduit_sizing: Dict[str, Any],
+    floor_distances: Dict[str, float] = None
 ) -> List[CircuitData]:
     """Process grouped_circuits into CircuitData list.
     
     Updated: Now includes professional load table fields.
+    
+    Args:
+        grouped_circuits: List of circuit dicts from MCP Core
+        wire_sizing: Wire sizing results from MCP Core
+        conduit_sizing: Conduit sizing results from MCP Core
+        floor_distances: Dict mapping floor number to distance in meters (from RAG extraction)
     """
+    if floor_distances is None:
+        floor_distances = {}
     circuits: List[CircuitData] = []
     
     for idx, circuit in enumerate(grouped_circuits, start=1):
@@ -335,12 +351,21 @@ def _process_circuits(
             if branch_distance_m is None:
                 branch_distance_m = circuit.get('branch_distance_m') or circuit.get('distance_m')
             
-            # Source 3: Floor-based defaults (last resort)
+            # Source 3: Use floor_distances from RAG extraction (prioritize over hardcoded defaults)
             if branch_distance_m is None:
                 floor_int = int(floor_str) if floor_str.isdigit() else 1
-                floor_defaults = {1: 15.0, 2: 25.0, 3: 35.0}
-                branch_distance_m = floor_defaults.get(floor_int, 15.0 + (floor_int - 1) * 10.0)
-                logger.warning(f"[VD-FIX] Using floor default for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
+                # Try RAG-extracted floor_distances first (string keys like "1", "2")
+                if str(floor_int) in floor_distances:
+                    branch_distance_m = floor_distances[str(floor_int)]
+                    logger.info(f"[CP-VD] Using RAG floor_distances for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
+                elif floor_int in floor_distances:
+                    branch_distance_m = floor_distances[floor_int]
+                    logger.info(f"[CP-VD] Using RAG floor_distances for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
+                else:
+                    # Fallback to hardcoded defaults
+                    floor_defaults = {1: 15.0, 2: 25.0, 3: 35.0}
+                    branch_distance_m = floor_defaults.get(floor_int, 15.0 + (floor_int - 1) * 10.0)
+                    logger.warning(f"[VD-FIX] Using floor default for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
             
             # Get conduit from conduit_sizing
             conduit_data = conduit_sizing.get(circuit_id, {})
