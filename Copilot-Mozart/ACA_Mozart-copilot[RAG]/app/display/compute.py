@@ -103,6 +103,7 @@ class DisplayData(TypedDict):
     
     # Circuits
     circuits: List[CircuitData]
+    default_distance_circuits: List[str]  # 🆕 List of circuit names using default distance
     circuit_count: int
     
     # Warnings & Errors

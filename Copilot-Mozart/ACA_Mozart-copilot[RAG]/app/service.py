@@ -2190,33 +2190,39 @@ Query: "{query}"
                 elif extracted_data:
                     logger.warning(f"[CP-VD] extracted_data present but no floor_distances found. Data keys: {list(extracted_data.keys())}")
                 
+                # 🆕 [CP-DISPLAY] Compute display data FIRST (Source of Truth)
+                try:
+                    display_data_dict = compute_display_data(result)
+                except Exception as compute_err:
+                    logger.error(f"[CP-DISPLAY] Early compute failed: {compute_err}")
+                    display_data_dict = None
+
                 # Use new formatter (Card-style, Legend at top, critical warnings)
                 formatted_text = format_design_report(result)
                 
                 # [CP-AUDIT-FLOW] Audit Mode Integration
-                # 1. Get grouped_circuits from MCP result
-                # 2. Validate user-specified values against auto values
-                # 3. Format audit report and append to response
                 audit_report_text = ""
-                audit_results = None  # 🆕 Initialize to prevent UnboundLocalError
+                audit_results = None
                 try:
                     from app.audit_validator import validate_user_specs
                     from app.formatters.audit_formatter import format_audit_report as format_audit
                     
-                    grouped_circuits = result.get('grouped_circuits', [])
-                    extracted_loads = getattr(req, '_extracted_loads', [])  # Will be set if user specified breaker/wire
+                    # Use Computed Circuits if available (enriched data), else raw
+                    grouped_circuits = display_data_dict.get('circuits', []) if display_data_dict else result.get('grouped_circuits', [])
+                    extracted_loads = getattr(req, '_extracted_loads', [])
+                    defaults = display_data_dict.get('default_distance_circuits', []) if display_data_dict else []
                     
                     logger.info(f"[CP-AUDIT-FLOW] Checking audit: {len(grouped_circuits)} circuits, {len(extracted_loads)} extracted loads")
                     
-                    # Check if any loads have user-specified values
-                    has_user_specs = any(
+                    # Check if any loads have user-specified values OR system warnings exist (defaults/voltage drop)
+                    has_user_specs = (any(
                         load.get('user_breaker') or load.get('user_wire_size')
                         for load in extracted_loads
-                    ) if extracted_loads else False
+                    ) if extracted_loads else False) or (len(defaults) > 0)
                     
                     if has_user_specs:
-                        logger.info("[CP-AUDIT-FLOW] User specs found, running audit validation")
-                        audit_results = validate_user_specs(grouped_circuits, extracted_loads)
+                        logger.info("[CP-AUDIT-FLOW] Running audit validation (User specs or System warnings)")
+                        audit_results = validate_user_specs(grouped_circuits, extracted_loads, default_distance_circuits=defaults)
                         if audit_results:
                             audit_report_text = format_audit(audit_results)
                             logger.info(f"[CP-AUDIT-FLOW] Audit report generated: {len(audit_results)} items")
@@ -2236,10 +2242,9 @@ Query: "{query}"
                 if audit_report_text:
                     final_text = formatted_text + audit_report_text
                 
-                # 🆕 [CP-DISPLAY] Compute display data for Frontend
+                # 🆕 [CP-DISPLAY] Enrich display data for Frontend
                 try:
-                    display_data_dict = compute_display_data(result)
-                    
+                    # reuse display_data_dict computed earlier
                     if display_data_dict:
                         # 1. Collect Assumptions
                         site_ctx_dict = req.site_context.dict() if hasattr(req.site_context, 'dict') else (req.site_context.__dict__ if hasattr(req.site_context, '__dict__') else req.site_context)

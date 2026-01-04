@@ -15,14 +15,17 @@ logger = logging.getLogger("Aura.Audit")
 
 def validate_user_specs(
     grouped_circuits: List[Dict[str, Any]],
-    extracted_loads: List[Dict[str, Any]]
+    extracted_loads: List[Dict[str, Any]],
+    default_distance_circuits: List[str] = None  # 🆕 Accepted default distance list
 ) -> List[Dict[str, Any]]:
     """
     [CP-AUDIT] Compare user-specified values with auto-calculated values.
+    Also validates system warnings like default distances.
     
     Args:
         grouped_circuits: Auto-calculated circuits from MCP Core
         extracted_loads: Loads with user_breaker/user_wire_size from LLM extraction
+        default_distance_circuits: List of circuit names using default distance
     
     Returns:
         List of audit results with PASS/FAIL status for each check
@@ -32,6 +35,30 @@ def validate_user_specs(
     
     audit_results = []
     
+    # 🆕 1. Check Default Distances (System Audit)
+    # Checks consistency with Chat Markdown Report
+    if default_distance_circuits:
+        logger.info(f"[CP-AUDIT] Found {len(default_distance_circuits)} circuits with default distance")
+        for ckt_name in default_distance_circuits:
+            audit_results.append({
+                'check': f"ระยะสาย ({ckt_name})",
+                'user_value': "ไม่ระบุ (Default)",
+                'recommended_value': "วัดหน้างาน",
+                'auto_value': "Default",
+                'status': 'WARN',
+                'circuit_name': ckt_name,
+                'device': 'Walking Distance',
+                'room': '-',
+                'checks': [{
+                    'item': 'Distance',
+                    'user_value': 'Default',
+                    'auto_value': 'Risk',
+                    'status': 'WARN',
+                    'reason': 'ใช้ระยะ Default (ค่าประมาณการ) อาจมีผลต่อ Voltage Drop'
+                }],
+                'overall_status': 'WARN'
+            })
+
     # Build a map of device -> user specs for quick lookup
     user_specs_map = {}
     for load in extracted_loads:
@@ -47,8 +74,8 @@ def validate_user_specs(
             }
     
     if not user_specs_map:
-        logger.info("[CP-AUDIT] No user-specified values found, skipping audit")
-        return []
+        logger.info("[CP-AUDIT] No user-specified values found, only system audits")
+        return audit_results
     
     logger.info(f"[CP-AUDIT] Found {len(user_specs_map)} loads with user specs")
     
