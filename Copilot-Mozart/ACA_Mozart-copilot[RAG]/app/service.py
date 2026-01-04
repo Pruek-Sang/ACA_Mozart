@@ -1068,6 +1068,12 @@ Query: "{query}"
             except Exception as e:
                 logger.error(f"Validator error: {e}")
 
+            # 🆕 [VD-FIX] Pass floor_distances from RAG extraction to compute.py
+            # This ensures compute.py can use user-specified distances instead of defaults
+            if extracted.get("floor_distances"):
+                design_dict["floor_distances"] = extracted["floor_distances"]
+                logger.info(f"[VD-INJECT] Passing floor_distances to display layer: {extracted['floor_distances']}")
+
             return {
                 "status": "complete",
                 "design_result": design_dict,
