@@ -2190,6 +2190,12 @@ Query: "{query}"
                 elif extracted_data:
                     logger.warning(f"[CP-VD] extracted_data present but no floor_distances found. Data keys: {list(extracted_data.keys())}")
                 
+                # 🆕 [VD-FIX] Inject floor_distances from extracted_data (RAG) into mcp_result (Core)
+                # This bridges the gap between RAG extraction and Compute layer
+                if extracted_data and extracted_data.get('floor_distances'):
+                    result['floor_distances'] = extracted_data['floor_distances']
+                    logger.info(f"[CP-VD-BRIDGE] Injected floor_distances into mcp_result: {result['floor_distances']}")
+
                 # 🆕 [CP-DISPLAY] Compute display data FIRST (Source of Truth)
                 try:
                     display_data_dict = compute_display_data(result)

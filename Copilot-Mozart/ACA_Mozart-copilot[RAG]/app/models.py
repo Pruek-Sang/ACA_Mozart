@@ -299,6 +299,7 @@ class McpSpecResponse(BaseModel):
     project_input: ProjectInputSpec = Field(..., description="The core spec for MCP")
     standards_profile: StandardsProfile = Field(..., description="Standards used")
     llm_metadata: LlmMetadata = Field(..., description="LLM generation audit trail")
+    floor_distances: Optional[Dict[str, float]] = Field(None, description="Extracted floor average distances (for VD calc)")
 
 
 class InsufficientDataError(BaseModel):
