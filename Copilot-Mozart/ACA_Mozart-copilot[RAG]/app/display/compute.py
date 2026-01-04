@@ -48,6 +48,7 @@ class CircuitData(TypedDict):
     ground_size: str
     conduit_size: str
     vd_percent: float
+    branch_distance_m: Optional[float]   # 🆕 Branch distance from MDB to load
     requires_rcbo: bool
     num_loads: int
     notes: List[str]
@@ -317,10 +318,12 @@ def _process_circuits(
             if not room:
                 room = f"ชั้น {floor_str}"
             
-            # Get VD% from wire_sizing
+            # Get VD% and distance from wire_sizing
             vd_data = wire_sizing.get(circuit_id, {})
             vd_percent = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
             ground_size = vd_data.get('ground_size', '2.5') if isinstance(vd_data, dict) else '2.5'
+            # 🆕 Extract branch_distance_m from MCP Core wire_result
+            branch_distance_m = vd_data.get('distance_m') if isinstance(vd_data, dict) else None
             
             # Get conduit from conduit_sizing
             conduit_data = conduit_sizing.get(circuit_id, {})
@@ -351,6 +354,7 @@ def _process_circuits(
                 'ground_size': ground_size,
                 'conduit_size': conduit_size,
                 'vd_percent': round_up(vd_percent, 1),
+                'branch_distance_m': branch_distance_m,  # 🆕 From MCP Core wire_result
                 'requires_rcbo': requires_rcbo,
                 'num_loads': num_loads,
                 'notes': notes,
