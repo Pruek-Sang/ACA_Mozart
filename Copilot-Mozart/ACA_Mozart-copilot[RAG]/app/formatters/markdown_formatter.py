@@ -78,7 +78,21 @@ class MarkdownFormatter(BaseFormatter):
             lines.extend(self._create_load_schedule(loads, wire_sizing, breaker_selections))
             lines.extend(self._create_breaker_summary(breaker_selections))
         
-        lines.extend(self._create_notes_section(warnings, errors))
+        # 🆕 Collect circuits using default distance for Summary
+        default_circuits = []
+        for cid, w in wire_sizing.items():
+            if w.get('used_default_distance', False):
+                # Try to map ID to name if possible, or use ID
+                # (Simple lookup from grouped_circuits would be better but expensive here)
+                # We'll use the ID or try to find name in grouped_circuits
+                c_name = cid
+                for c in grouped_circuits:
+                    if c.get('circuit_id') == cid or c.get('id') == cid:
+                        c_name = c.get('circuit_name', cid)
+                        break
+                default_circuits.append(c_name)
+        
+        lines.extend(self._create_notes_section(warnings, errors, default_circuits))
         lines.extend(self._create_footer())
         
         return "\n".join(lines)
@@ -304,7 +318,7 @@ class MarkdownFormatter(BaseFormatter):
         lines.append("")
         return lines
     
-    def _create_notes_section(self, warnings: List[str], errors: List[str]) -> List[str]:
+    def _create_notes_section(self, warnings: List[str], errors: List[str], default_circuits: List[str] = None) -> List[str]:
         """Create notes and warnings section."""
         lines = [
             "---",
@@ -323,9 +337,11 @@ class MarkdownFormatter(BaseFormatter):
         ]
         
         # Add warnings if any
-        if warnings or errors:
+        if warnings or errors or default_circuits:
             lines.append("### คำเตือนจากระบบ")
             lines.append("")
+            
+            # Show Errors first
             for err in errors[:3]:
                 lines.append(f"- ❌ {err}")
             
@@ -338,14 +354,21 @@ class MarkdownFormatter(BaseFormatter):
             for warn in critical_warns:
                 lines.append(f"- ⚠️ {warn}")
             
-            # 🆕 Consolidate VD warnings (count instead of showing each)
+            # Filter other warnings
             vd_warns = [w for w in other_warns if "VD" in w or "Voltage Drop" in w or "ระยะ Default" in w]
             afci_warns = [w for w in other_warns if "AFCI" in w]
             remaining_warns = [w for w in other_warns if w not in vd_warns and w not in afci_warns]
             
-            # Show consolidated VD warning
-            if vd_warns:
-                lines.append(f"- ℹ️ Voltage Drop: มี {len(vd_warns)} วงจร ใช้ระยะ Default (ควรระบุระยะจริง)")
+            # 🆕 Show consolidated VD warning with specific circuit names from wire_sizing check
+            if default_circuits:
+                # Limit to 5 names to avoid spam
+                examples = ", ".join(default_circuits[:5])
+                more_count = len(default_circuits) - 5
+                more_text = f" และอีก {more_count} วงจร" if more_count > 0 else ""
+                lines.append(f"- ℹ️ **Voltage Drop:** มี {len(default_circuits)} วงจร ใช้ระยะ Default (เช่น {examples}{more_text}) → **ควรตรวจสอบระยะจริงหน้างาน**")
+            elif vd_warns:
+                # Fallback if default_circuits not passed but warnings exist
+                lines.append(f"- ℹ️ Voltage Drop: พบวงจรที่ใช้ระยะ Default หรือมีแรงดันตกเกิน (ควรระบุระยะจริง)")
             
             # Show consolidated AFCI warning
             if afci_warns:
