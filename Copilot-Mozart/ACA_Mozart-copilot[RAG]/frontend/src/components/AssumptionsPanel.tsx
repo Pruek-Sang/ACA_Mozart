@@ -85,7 +85,7 @@ export const AssumptionsPanel: React.FC<AssumptionsPanelProps> = ({
                         <Settings size={16} className="text-violet-400" />
                     </div>
                     <div>
-                        <h3 className="text-sm font-medium text-white">
+                        <h3 className="text-lg font-medium text-white">
                             สมมติฐานที่ใช้ในการออกแบบ
                         </h3>
                         <p className="text-xs text-slate-400 mt-0.5">
@@ -125,7 +125,7 @@ export const AssumptionsPanel: React.FC<AssumptionsPanelProps> = ({
                                     <ChevronRight size={14} className="text-slate-500" />
                                 )}
                                 {CATEGORY_ICONS[category] || <Info size={14} className="text-slate-400" />}
-                                <span className="text-sm text-slate-300">
+                                <span className="text-lg text-slate-300">
                                     {CATEGORY_LABELS[category] || category}
                                 </span>
                                 <span className="text-xs text-slate-500">({items.length})</span>
@@ -134,7 +134,7 @@ export const AssumptionsPanel: React.FC<AssumptionsPanelProps> = ({
                             {/* Category Items */}
                             {expandedCategories.has(category) && (
                                 <div className="bg-slate-950/50 px-4 py-2">
-                                    <table className="w-full text-xs">
+                                    <table className="w-full text-base">
                                         <thead>
                                             <tr className="text-slate-500 border-b border-slate-800">
                                                 <th className="py-2 text-left font-medium">รายการ</th>
@@ -149,7 +149,7 @@ export const AssumptionsPanel: React.FC<AssumptionsPanelProps> = ({
                                                     <td className="py-2 font-mono text-white">{item.value}</td>
                                                     <td className="py-2">
                                                         <span className={cn(
-                                                            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]",
+                                                            "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs",
                                                             item.source === 'default' && "bg-slate-700 text-slate-300",
                                                             item.source === 'user' && "bg-emerald-500/20 text-emerald-400",
                                                             item.source === 'calculated' && "bg-sky-500/20 text-sky-400",
