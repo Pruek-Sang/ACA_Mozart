@@ -668,8 +668,8 @@ Query: "{query}"
         # This is the PRIORITY pattern for explicit user specifications
         # ================================================================
         pattern_mdb = re.finditer(
-            r'(?:ระยะ|ไป|ถึง).*?ชั้น\s*(\d+)\s*[=:]\s*(\d+)\s*(?:เมตร|m|เมตร/วงจร)',
-            text, re.IGNORECASE
+            r'(?:ระยะ|ไป|ถึง).*?ชั้น\s*(\d+).*?[=:]?\s*(\d+)\s*(?:เมตร|m|เมตร/วงจร)',
+            text, re.IGNORECASE | re.DOTALL  # Enabled DOTALL to match across lines if needed
         )
         for m in pattern_mdb:
             try:
