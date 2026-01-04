@@ -227,32 +227,13 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         # Get main equipment sizing
         meter_size, main_wire, main_breaker = _get_meter_sizing(demand_current)
         
-        # Process circuits (pass floor_distances for VD calculation)
-        circuits = _process_circuits(grouped_circuits, wire_sizing, conduit_sizing, floor_distances)
+        # Process circuits
+        circuits, default_distance_circuits = _process_circuits(
+            grouped_circuits, wire_sizing, conduit_sizing, floor_distances
+        )
         
-        # === NEW: Calculate summary fields ===
-        # Total load by phase (1-phase: all in L1)
-        total_load_va = sum(c.get('total_va', 0) for c in circuits)
-        total_load_va_l1 = sum(c.get('load_va_l1', 0) for c in circuits)
-        total_load_va_l2 = 0  # 0 for 1-phase
-        total_load_va_l3 = 0  # 0 for 1-phase
-        
-        # Demand calculation
-        demand_factor = 0.78  # Standard for residential
-        demand_load_va = round_up(total_load_va * demand_factor)
-        
-        # Count breaker types
-        rcbo_count = sum(1 for c in circuits if c.get('requires_rcbo', False))
-        mcb_count = len(circuits) - rcbo_count
-        
-        # Main equipment details
-        main_cb_type = f"MCCB 2P {main_breaker}"
-        main_cb_ic_ka = 10  # 10kA at 230V
-        main_feeder_size = main_wire.replace(' mm²', '')
-        main_feeder_type = 'IEC01 (THW)'
-        main_feeder_grd = f"G-{main_feeder_size} Sq.mm"
-        main_raceway_type = 'PVC'
-        main_raceway_size = '1"' if demand_current <= 45 else '2"'
+        # Calculate summary fields
+        summary_fields = _get_summary_fields(circuits, demand_current, main_breaker, main_wire)
         
         display_data: DisplayData = {
             # === EXISTING FIELDS ===
@@ -265,28 +246,18 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
             'main_wire': main_wire,
             'main_breaker': main_breaker,
             'circuits': circuits,
+            'default_distance_circuits': default_distance_circuits,
             'circuit_count': len(circuits),
             'warnings': warnings,
             'errors': errors,
             'phase_balance': None,
             
             # === NEW FIELDS (Summary Section) ===
-            'total_load_va': total_load_va,
-            'total_load_va_l1': total_load_va_l1,
-            'total_load_va_l2': total_load_va_l2,
-            'total_load_va_l3': total_load_va_l3,
-            'demand_factor': demand_factor,
-            'demand_load_va': demand_load_va,
-            'main_cb_type': main_cb_type,
-            'main_cb_ic_ka': main_cb_ic_ka,
-            'main_feeder_size': main_feeder_size,
-            'main_feeder_type': main_feeder_type,
-            'main_feeder_grd': main_feeder_grd,
-            'main_raceway_type': main_raceway_type,
-            'main_raceway_size': main_raceway_size,
-            'rcbo_count': rcbo_count,
-            'mcb_count': mcb_count,
+            **summary_fields
         }
+        
+        rcbo_count = summary_fields.get('rcbo_count', 0)
+        mcb_count = summary_fields.get('mcb_count', 0)
         
         logger.info(f"[CP-COMPUTE] Computed: {total_kw}kW, {demand_current}A, {len(circuits)} circuits ({rcbo_count} RCBO, {mcb_count} MCB)")
         return display_data
@@ -296,25 +267,126 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         return _empty_display_data()
 
 
+def _get_summary_fields(
+    circuits: List[CircuitData], 
+    demand_current: float, 
+    main_breaker: str, 
+    main_wire: str
+) -> Dict[str, Any]:
+    """Calculate summary fields for professional load table."""
+    # Total load by phase (1-phase: all in L1)
+    total_load_va = sum(c.get('total_va', 0) for c in circuits)
+    total_load_va_l1 = sum(c.get('load_va_l1', 0) for c in circuits)
+    total_load_va_l2 = 0  # 0 for 1-phase
+    total_load_va_l3 = 0  # 0 for 1-phase
+    
+    # Demand calculation
+    demand_factor = 0.78  # Standard for residential
+    demand_load_va = round_up(total_load_va * demand_factor)
+    
+    # Count breaker types
+    rcbo_count = sum(1 for c in circuits if c.get('requires_rcbo', False))
+    mcb_count = len(circuits) - rcbo_count
+    
+    # Main equipment details
+    main_cb_type = f"MCCB 2P {main_breaker}"
+    main_cb_ic_ka = 10  # 10kA at 230V
+    main_feeder_size = main_wire.replace(' mm²', '')
+    main_feeder_type = 'IEC01 (THW)'
+    main_feeder_grd = f"G-{main_feeder_size} Sq.mm"
+    main_raceway_type = 'PVC'
+    main_raceway_size = '1"' if demand_current <= 45 else '2"'
+    
+    return {
+        'total_load_va': total_load_va,
+        'total_load_va_l1': total_load_va_l1,
+        'total_load_va_l2': total_load_va_l2,
+        'total_load_va_l3': total_load_va_l3,
+        'demand_factor': demand_factor,
+        'demand_load_va': demand_load_va,
+        'main_cb_type': main_cb_type,
+        'main_cb_ic_ka': main_cb_ic_ka,
+        'main_feeder_size': main_feeder_size,
+        'main_feeder_type': main_feeder_type,
+        'main_feeder_grd': main_feeder_grd,
+        'main_raceway_type': main_raceway_type,
+        'main_raceway_size': main_raceway_size,
+        'rcbo_count': rcbo_count,
+        'mcb_count': mcb_count,
+    }
+
+
+def _get_branch_distance(
+    circuit: Dict,
+    vd_data: Dict,
+    floor_distances: Dict[str, float],
+    floor_int: int,
+    ckt_name: str,
+    room: str
+) -> tuple[float, bool]:
+    """
+    Determine the branch distance for a circuit.
+    
+    Priority:
+    1. Wire sizing distance (from MCP Core calculation)
+    2. Grouped circuit distance (from RAG extraction)
+    3. Floor-based distance (from RAG floor map)
+    4. Hardcoded defaults (15m, 25m, 35m)
+    
+    Returns:
+        (distance_m, is_default)
+    """
+    # 1. Source: wire_sizing (from MCP Core)
+    if isinstance(vd_data, dict) and vd_data.get('distance_m'):
+        return float(vd_data['distance_m']), False
+    
+    # 2. Source: grouped_circuits (from RAG service)
+    dist = circuit.get('branch_distance_m') or circuit.get('distance_m')
+    if dist is not None:
+        return float(dist), False
+    
+    # 3. Source: floor_distances from RAG extraction
+    # Handle known rooms that should map to Floor 1 distance defaults
+    room_lower = room.lower()
+    if any(k in room_lower for k in ['outdoor', 'garage', 'common', 'garden', 'ภายนอก', 'โรงรถ', 'ส่วนกลาง', 'สวน']):
+        # If no explicit floor distance, use Floor 1 default logic
+        # We don't return here, we let it fall through to RAG check or default
+        pass
+
+    # Try string key "1", "2" then int key 1, 2
+    if str(floor_int) in floor_distances:
+        d = floor_distances[str(floor_int)]
+        logger.info(f"[CP-VD] Using RAG floor_distances for '{ckt_name}': {d}m (floor {floor_int})")
+        return float(d), False
+    elif floor_int in floor_distances:
+        d = floor_distances[floor_int]
+        logger.info(f"[CP-VD] Using RAG floor_distances for '{ckt_name}': {d}m (floor {floor_int})")
+        return float(d), False
+
+    # 4. Fallback: Hardcoded defaults
+    floor_defaults = {1: 15.0, 2: 25.0, 3: 35.0}
+    # For floors > 3, add 10m per floor
+    default_dist = floor_defaults.get(floor_int, 15.0 + (floor_int - 1) * 10.0)
+    
+    logger.warning(f"[VD-FIX] Using floor default for '{ckt_name}': {default_dist}m (floor {floor_int})")
+    return float(default_dist), True
+
+
 def _process_circuits(
     grouped_circuits: List[Dict],
     wire_sizing: Dict[str, Any],
     conduit_sizing: Dict[str, Any],
     floor_distances: Dict[str, float] = None
-) -> List[CircuitData]:
+) -> tuple[List[CircuitData], List[str]]:
     """Process grouped_circuits into CircuitData list.
     
-    Updated: Now includes professional load table fields.
-    
-    Args:
-        grouped_circuits: List of circuit dicts from MCP Core
-        wire_sizing: Wire sizing results from MCP Core
-        conduit_sizing: Conduit sizing results from MCP Core
-        floor_distances: Dict mapping floor number to distance in meters (from RAG extraction)
+    Returns:
+        (circuits_list, default_distance_warnings_list)
     """
     if floor_distances is None:
         floor_distances = {}
     circuits: List[CircuitData] = []
+    default_circuits: List[str] = []
     
     for idx, circuit in enumerate(grouped_circuits, start=1):
         try:
@@ -330,53 +402,33 @@ def _process_circuits(
             floor_str = str(circuit.get('floor', '1'))
             room = circuit.get('room', '')
             
-            # Room fallback: if empty, use floor + circuit type
+            # Room fallback
             if not room:
                 room = f"ชั้น {floor_str}"
             
-            # Get VD% and distance from wire_sizing
+            # Additional data
             vd_data = wire_sizing.get(circuit_id, {})
-            vd_percent = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
             ground_size = vd_data.get('ground_size', '2.5') if isinstance(vd_data, dict) else '2.5'
+            vd_percent = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
             
-            # 🔧 FIX VD PIPELINE: Read branch_distance_m from multiple sources
-            # Priority: wire_sizing.distance_m > circuit.branch_distance_m > floor defaults
-            branch_distance_m = None
-            
-            # Source 1: wire_sizing (from MCP Core)
-            if isinstance(vd_data, dict) and vd_data.get('distance_m'):
-                branch_distance_m = vd_data.get('distance_m')
-            
-            # Source 2: grouped_circuits (from RAG service via extracted loads)
-            if branch_distance_m is None:
-                branch_distance_m = circuit.get('branch_distance_m') or circuit.get('distance_m')
-            
-            # Source 3: Use floor_distances from RAG extraction (prioritize over hardcoded defaults)
-            if branch_distance_m is None:
-                floor_int = int(floor_str) if floor_str.isdigit() else 1
-                # Try RAG-extracted floor_distances first (string keys like "1", "2")
-                if str(floor_int) in floor_distances:
-                    branch_distance_m = floor_distances[str(floor_int)]
-                    logger.info(f"[CP-VD] Using RAG floor_distances for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
-                elif floor_int in floor_distances:
-                    branch_distance_m = floor_distances[floor_int]
-                    logger.info(f"[CP-VD] Using RAG floor_distances for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
-                else:
-                    # Fallback to hardcoded defaults
-                    floor_defaults = {1: 15.0, 2: 25.0, 3: 35.0}
-                    branch_distance_m = floor_defaults.get(floor_int, 15.0 + (floor_int - 1) * 10.0)
-                    logger.warning(f"[VD-FIX] Using floor default for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
-            
-            # Get conduit from conduit_sizing
             conduit_data = conduit_sizing.get(circuit_id, {})
             conduit_size = conduit_data.get('trade_size', '1/2"') if isinstance(conduit_data, dict) else '1/2"'
             
-            # Handle loads count
+            # Calculate Distance
+            floor_int = int(floor_str) if floor_str.isdigit() else 1
+            branch_distance_m, used_default = _get_branch_distance(
+                circuit, vd_data, floor_distances, floor_int, ckt_name, room
+            )
+            
+            if used_default:
+                default_circuits.append(ckt_name)
+
+            # Loads count
             num_loads = circuit.get('loads', 0)
             if isinstance(num_loads, list):
                 num_loads = len(num_loads)
             
-            # Notes handling
+            # Notes
             notes = circuit.get('notes', [])
             remark = '; '.join(notes) if notes else ''
             
@@ -433,9 +485,8 @@ def _process_circuits(
         except Exception as e:
             logger.warning(f"[CP-COMPUTE] Error processing circuit: {e}")
             continue
-    
-    return circuits
-
+            
+    return circuits, default_circuits
 
 def _empty_display_data() -> DisplayData:
     """Return empty DisplayData for fallback.
