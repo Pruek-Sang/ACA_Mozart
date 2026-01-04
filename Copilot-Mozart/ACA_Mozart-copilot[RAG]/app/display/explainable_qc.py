@@ -191,37 +191,58 @@ def convert_legacy_warnings(legacy_warnings: List[str]) -> List[ExplainableWarni
     Convert legacy string warnings to explainable format.
     
     Maps old warning strings to new format with actions.
+    Now actively attempts to extract circuit names from warning text.
     """
     explainable: List[ExplainableWarning] = []
+    import re
     
     for warning in legacy_warnings:
         warning_lower = warning.lower()
+        
+        # Try to exact circuit name if present (e.g. "Circuit L1: ...")
+        # Pattern 1: "Circuit X:" or "Circuit X uses"
+        circuit_match = re.search(r'circuit\s+([a-zA-Z0-9_-]+)', warning, re.IGNORECASE)
+        # Pattern 2: "for 'X'" or "for X"
+        if not circuit_match:
+            circuit_match = re.search(r"for\s+'?([a-zA-Z0-9_\s-]+)'?", warning, re.IGNORECASE)
+            
+        circuit_name = circuit_match.group(1) if circuit_match else None
         
         # Detect warning type
         if "voltage drop" in warning_lower or "vd" in warning_lower:
             explainable.append(create_explainable_warning(
                 "VD_EXCEED",
-                custom_message=warning
+                custom_message=warning,
+                circuit_name=circuit_name
             ))
         elif "rcbo" in warning_lower or "ไฟรั่ว" in warning_lower:
             explainable.append(create_explainable_warning(
                 "NO_RCBO_WET",
-                custom_message=warning
+                custom_message=warning,
+                circuit_name=circuit_name
             ))
         elif "overload" in warning_lower or "เกินพิกัด" in warning_lower:
             explainable.append(create_explainable_warning(
                 "CIRCUIT_OVERLOAD",
-                custom_message=warning
+                custom_message=warning,
+                circuit_name=circuit_name
             ))
         elif "ampacity" in warning_lower:
             explainable.append(create_explainable_warning(
                 "AMPACITY_LOW",
-                custom_message=warning
+                custom_message=warning,
+                circuit_name=circuit_name
             ))
         elif "distance" in warning_lower or "ระยะ" in warning_lower:
+            # 🆕 For default distance, make message clearer if we have name
+            msg = warning
+            if circuit_name and "default" in warning_lower:
+                msg = f"วงจร {circuit_name} ใช้ระยะสาย Default (ควรตรวจสอบ)"
+                
             explainable.append(create_explainable_warning(
                 "DISTANCE_ASSUMED",
-                custom_message=warning
+                custom_message=msg,
+                circuit_name=circuit_name
             ))
         else:
             # Generic warning
@@ -231,7 +252,7 @@ def convert_legacy_warnings(legacy_warnings: List[str]) -> List[ExplainableWarni
                 "reason": "ตรวจสอบรายละเอียด",
                 "severity": Severity.INFO.value,
                 "standard_ref": "-",
-                "circuit_name": None,
+                "circuit_name": circuit_name,
                 "suggested_action": {
                     "action_type": ActionType.VERIFY_MANUAL.value,
                     "description": "ตรวจสอบด้วยตนเอง",
