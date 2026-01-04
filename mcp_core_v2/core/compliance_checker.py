@@ -214,7 +214,6 @@ class ComplianceChecker:
         
         # Collect stats for consolidated warning
         default_distance_count = 0
-        default_distance_value = None
         
         # Check for metadata warning (default distance used)
         metadata = wire_sizing.get('_metadata', {})
@@ -258,14 +257,13 @@ class ComplianceChecker:
             # Count default distance usage (don't spam per-load warnings)
             if used_default:
                 default_distance_count += 1
-                default_distance_value = distance_m
         
         # Add ONE consolidated warning for default distances
         if default_distance_count > 0:
             self.warnings.append({
                 'code': 'VD_DEFAULT_SUMMARY',
                 'severity': 'info',
-                'message': f'ℹ️ VD คำนวณจากระยะ Default {default_distance_value:.0f}m สำหรับ {default_distance_count} วงจร (ระบุระยะจริงเพื่อความแม่นยำ)'
+                'message': 'ℹ️ มีการใช้ค่าระยะทาง Default ในการคำนวณบางจุด (ควรระบุระยะจริงเพื่อให้แม่นยำ)'
             })
 
     def _has_afci_protection(self, load: ElectricalLoad) -> bool:
