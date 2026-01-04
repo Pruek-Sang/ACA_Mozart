@@ -723,6 +723,89 @@ async def proxy_ask(request: Request):
         )
 
 
+# =============================================================================
+# 🆕 Session Proxy Routes (Frontend needs these!)
+# =============================================================================
+
+@app.post("/api/v1/session/start")
+async def proxy_session_start(request: Request):
+    """Proxy /api/v1/session/start to RAG Service"""
+    try:
+        # Get query params (project_name)
+        project_name = request.query_params.get("project_name", "")
+        url = f"{MOZART_ENDPOINT}/api/v1/session/start"
+        if project_name:
+            url += f"?project_name={project_name}"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url)
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy /api/v1/session/start failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+@app.get("/api/v1/session/list")
+async def proxy_session_list(request: Request):
+    """Proxy /api/v1/session/list to RAG Service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Forward Authorization header if present
+            headers = {}
+            if auth := request.headers.get("Authorization"):
+                headers["Authorization"] = auth
+            
+            response = await client.get(
+                f"{MOZART_ENDPOINT}/api/v1/session/list",
+                headers=headers
+            )
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy /api/v1/session/list failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+@app.get("/api/v1/session/{session_id}")
+async def proxy_session_get(session_id: str, request: Request):
+    """Proxy /api/v1/session/{id} to RAG Service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}")
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy /api/v1/session/{session_id} failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+@app.get("/api/v1/session/{session_id}/data")
+async def proxy_session_data(session_id: str, request: Request):
+    """Proxy /api/v1/session/{id}/data to RAG Service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/data")
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy /api/v1/session/{session_id}/data failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+@app.delete("/api/v1/session/{session_id}")
+async def proxy_session_delete(session_id: str, request: Request):
+    """Proxy DELETE /api/v1/session/{id} to RAG Service"""
+    try:
+        confirm = request.query_params.get("confirm", "")
+        url = f"{MOZART_ENDPOINT}/api/v1/session/{session_id}"
+        if confirm:
+            url += f"?confirm={confirm}"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.delete(url)
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy DELETE /api/v1/session/{session_id} failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
 @app.post("/orchestrate", response_model=GatewayResponse)
 async def orchestrate(
     request: GatewayRequest,
