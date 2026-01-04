@@ -322,8 +322,25 @@ def _process_circuits(
             vd_data = wire_sizing.get(circuit_id, {})
             vd_percent = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
             ground_size = vd_data.get('ground_size', '2.5') if isinstance(vd_data, dict) else '2.5'
-            # 🆕 Extract branch_distance_m from MCP Core wire_result
-            branch_distance_m = vd_data.get('distance_m') if isinstance(vd_data, dict) else None
+            
+            # 🔧 FIX VD PIPELINE: Read branch_distance_m from multiple sources
+            # Priority: wire_sizing.distance_m > circuit.branch_distance_m > floor defaults
+            branch_distance_m = None
+            
+            # Source 1: wire_sizing (from MCP Core)
+            if isinstance(vd_data, dict) and vd_data.get('distance_m'):
+                branch_distance_m = vd_data.get('distance_m')
+            
+            # Source 2: grouped_circuits (from RAG service via extracted loads)
+            if branch_distance_m is None:
+                branch_distance_m = circuit.get('branch_distance_m') or circuit.get('distance_m')
+            
+            # Source 3: Floor-based defaults (last resort)
+            if branch_distance_m is None:
+                floor_int = int(floor_str) if floor_str.isdigit() else 1
+                floor_defaults = {1: 15.0, 2: 25.0, 3: 35.0}
+                branch_distance_m = floor_defaults.get(floor_int, 15.0 + (floor_int - 1) * 10.0)
+                logger.warning(f"[VD-FIX] Using floor default for '{ckt_name}': {branch_distance_m}m (floor {floor_int})")
             
             # Get conduit from conduit_sizing
             conduit_data = conduit_sizing.get(circuit_id, {})

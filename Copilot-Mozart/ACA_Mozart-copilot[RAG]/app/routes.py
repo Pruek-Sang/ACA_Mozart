@@ -193,12 +193,16 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
     # =========================================================================
     # 🔧 AUTO-SAVE: Persist design result to Supabase
     # [FIX 2026-01-05] Session data was lost on refresh because we never saved!
+    # [FIX 2026-01-04] StandardResponse is Pydantic model, NOT dict! Must convert first.
     # =========================================================================
     if SUPABASE_AVAILABLE and session_injector and session_id:
         try:
-            # Check if this is a design response (has display_data)
-            metadata = response.get("metadata", {}) if isinstance(response, dict) else {}
-            if metadata.get("display_data") or metadata.get("mcp_response"):
+            # FIX: Convert Pydantic model to dict before using .get()
+            response_dict = response.model_dump() if hasattr(response, 'model_dump') else (response.dict() if hasattr(response, 'dict') else response)
+            metadata = response_dict.get("metadata", {}) if isinstance(response_dict, dict) else {}
+            
+            # Check if this is a design response (has display_data or mcp_response)
+            if metadata and (metadata.get("display_data") or metadata.get("mcp_response")):
                 # Save the entire metadata (display_data, audit_results, sld_data, etc.)
                 await session_injector.set_mcp_response(session_id, metadata)
                 logger.info(f"✅ Auto-saved design to session {session_id[:8]}...")
@@ -450,6 +454,14 @@ async def list_projects(request: Request):
         }
     
     try:
+        # FIX: Validate user_id is UUID before querying Supabase
+        # IP addresses like "169.254.169.126" are not valid UUIDs
+        import re
+        is_valid_uuid = user_id and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(user_id), re.I)
+        if not is_valid_uuid:
+            logger.warning(f"⚠️ Invalid user_id '{user_id}' (not UUID), returning empty project list")
+            return {"projects": [], "storage": "supabase", "note": "no_valid_user_id"}
+        
         sessions = await session_injector.load_by_user(user_id, limit=10)
         return {
             "projects": [
