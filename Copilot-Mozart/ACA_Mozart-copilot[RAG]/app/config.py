@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     """
     Central configuration for Mozart RAG
     
+    # === Environment ===
+    APP_ENV: str = "development"  # development | production | staging
+
+    
     Philosophy:
     - All paths absolute and explicit (using BASE_DIR)
     - Environment variables override defaults

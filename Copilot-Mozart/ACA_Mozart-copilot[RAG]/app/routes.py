@@ -32,6 +32,8 @@ from app.mcp_client import McpClient, McpDesignResponse
 from app.session_store import session_store
 from core.ingest import IngestionEngine
 from core.vector_adapter import get_vector_db
+from app.logging_config import setup_logging
+from pydantic import BaseModel
 
 # 🆕 Stateful Intelligence imports
 try:
@@ -58,7 +60,13 @@ except ImportError:
     ADMIN_AUTH_AVAILABLE = False
     verify_admin_access = lambda: None
 
+    verify_admin_access = lambda: None
+
+# Initialize Logging Infrastructure (Cloud or Local)
+setup_logging()
+
 logger = logging.getLogger("Aura.Routes")
+
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -80,6 +88,30 @@ async def add_request_id(request: Request, call_next):
     
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log request start and completion with structured data"""
+    import time
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    process_time = time.time() - start_time
+    
+    # Log access details (structured logging will capture extra fields)
+    logger.info(
+        f"{request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s",
+        extra={
+            "request_id": getattr(request.state, "request_id", ""),
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration": process_time
+        }
+    )
     return response
 
 
@@ -149,19 +181,45 @@ async def root():
                 supabase_status = "connected"
                 logger.debug("🔌 Supabase keepalive: ping success")
             except Exception as e:
-                supabase_status = f"error: {str(e)[:50]}"
-                logger.warning(f"⚠️ Supabase keepalive failed: {e}")
-        else:
-            supabase_status = "client_not_initialized"
+                supabase_status = "error"
+                logger.warning(f"🔌 Supabase keepalive failed: {e}")
     
     return {
-        "service": "Mozart RAG Spec Engine",
+        "status": "online", 
         "version": settings.API_VERSION,
-        "status": "alive",
         "supabase": supabase_status,
-        "rate_limiter": "enabled" if RATE_LIMITER_AVAILABLE else "disabled",
-        "goddess": "Aura"
+        "env": settings.APP_ENV
     }
+
+
+class ClientLogEntry(BaseModel):
+    level: str
+    message: str
+    context: dict = {}
+
+
+@app.post("/api/v1/logs", tags=["System"])
+async def log_client_event(entry: ClientLogEntry):
+    """
+    Ingest logs from frontend clients.
+    These logs are forwarded to Cloud Logging with 'Aura.Client' logger.
+    """
+    client_logger = logging.getLogger("Aura.Client")
+    log_msg = f"[CLIENT] {entry.message}"
+    extra = {"json_fields": entry.context}  # 'json_fields' is standard for google-cloud-logging
+    
+    lvl = entry.level.upper()
+    if lvl == "ERROR":
+        client_logger.error(log_msg, extra=extra)
+    elif lvl == "WARNING":
+        client_logger.warning(log_msg, extra=extra)
+    elif lvl == "DEBUG":
+        client_logger.debug(log_msg, extra=extra)
+    else:
+        client_logger.info(log_msg, extra=extra)
+        
+    return {"status": "ok"}
+
 
 
 @app.post("/api/v1/ask", response_model=StandardResponse)

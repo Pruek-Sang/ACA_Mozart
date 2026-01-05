@@ -15,6 +15,7 @@
 
 import { buildApiUrl } from './utils';
 import { getAccessToken } from './supabase';
+import { logger } from './logger';
 import type { SiteContext, DisplayData, AuditRow, PDFData, SLDData } from '../types';
 
 // ============================================================================
@@ -92,6 +93,13 @@ export async function askDesign(
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        logger.error(`API Error /ask: ${response.status}`, {
+            status: response.status,
+            url,
+            error: errorData
+        });
+
         const apiError = new Error(`API Error: ${response.status}`) as any;
         apiError.response = {
             status: response.status,
@@ -122,6 +130,8 @@ export async function startSession(): Promise<{ session_id: string }> {
     });
 
     if (!response.ok) {
+        const err = await response.text();
+        logger.error(`Failed to start session: ${response.status}`, { error: err });
         throw new Error('Failed to start session');
     }
 
@@ -142,6 +152,7 @@ export async function getSessionStatus(sessionId: string): Promise<any> {
     });
 
     if (!response.ok) {
+        logger.warn(`Session not found: ${sessionId}`, { status: response.status });
         throw new Error('Session not found');
     }
 
@@ -157,7 +168,9 @@ export async function healthCheck(): Promise<boolean> {
             method: 'GET'
         });
         return response.ok;
-    } catch {
+    } catch (e) {
+        // Don't log health check failures to backend (it's likely down)
+        console.warn('Health check failed', e);
         return false;
     }
 }
