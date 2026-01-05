@@ -17,16 +17,15 @@ class Settings(BaseSettings):
     """
     Central configuration for Mozart RAG
     
-    # === Environment ===
-    APP_ENV: str = "development"  # development | production | staging
-
-    
     Philosophy:
     - All paths absolute and explicit (using BASE_DIR)
     - Environment variables override defaults
     - No magic values scattered across codebase
     - Folder-based knowledge architecture
     """
+    
+    # === Environment ===
+    APP_ENV: str = "development"  # development | production | staging
     
     # === Google Cloud / Vertex AI ===
     PROJECT_ID: str = "your-project-id"
