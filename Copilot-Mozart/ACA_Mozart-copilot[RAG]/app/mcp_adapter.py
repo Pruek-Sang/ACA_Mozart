@@ -260,13 +260,19 @@ class McpAdapter:
     def __init__(self):
         self.unknown_devices: List[str] = []  # Track unknown devices for logging
     
-    def convert(self, spec: ProjectInputSpec, site_context: Optional[SiteContext] = None) -> McpDesignRequest:
+    def convert(
+        self, 
+        spec: ProjectInputSpec, 
+        site_context: Optional[SiteContext] = None,
+        floor_distances: Optional[Dict[str, float]] = None
+    ) -> McpDesignRequest:
         """
         Main conversion: RAG spec -> MCP request
         
         Args:
             spec: ProjectInputSpec from RAG service
             site_context: Optional site context for safety calculations
+            floor_distances: Optional default distances per floor (for VD calc)
             
         Returns:
             McpDesignRequest ready for MCP Core
@@ -279,8 +285,8 @@ class McpAdapter:
         # 2. Build room lookup (room_id -> RoomSpec)
         room_lookup = {room.room_id: room for room in spec.rooms}
         
-        # 3. Convert loads
-        mcp_loads = self._convert_loads(spec.loads, room_lookup, service_voltage)
+        # 3. Convert loads (with floor defaults!)
+        mcp_loads = self._convert_loads(spec.loads, room_lookup, service_voltage, floor_distances)
         
         # 4. Create default panel (MCP requires at least one)
         panel = self._create_default_panel(
@@ -324,10 +330,12 @@ class McpAdapter:
         self, 
         loads: List[LoadSpec], 
         room_lookup: Dict[str, RoomSpec],
-        service_voltage: VoltageType
+        service_voltage: VoltageType,
+        floor_distances: Optional[Dict[str, float]] = None
     ) -> List[McpElectricalLoad]:
         """Convert RAG LoadSpecs to MCP ElectricalLoads"""
         mcp_loads = []
+        floor_map = floor_distances or {}
         
         # Power Factor by load type (IEC 60364 / วสท. 2564)
         PF_BY_LOAD_TYPE = {
@@ -358,6 +366,15 @@ class McpAdapter:
             # Get floor from LoadSpec (new: floor support)
             floor = str(getattr(load, 'floor', 1)) if hasattr(load, 'floor') else "1"
             
+            # Resolve Branch Distance: Specific > Floor Default > None
+            dist = getattr(load, 'branch_distance_m', None)
+            if dist is None or dist == 0:
+                # Try to find default for this floor
+                # Handle string/int key differences (JSON keys are strings)
+                default_dist = floor_map.get(str(floor)) or floor_map.get(int(floor) if floor.isdigit() else floor)
+                if default_dist:
+                    dist = float(default_dist)
+            
             # Create MCP load
             mcp_load = McpElectricalLoad(
                 id=load.load_id,
@@ -369,7 +386,7 @@ class McpAdapter:
                 location=McpLocation(room=room_name, floor=floor),
                 is_continuous=is_continuous,
                 notes=load.notes,
-                branch_distance_m=getattr(load, 'branch_distance_m', None),
+                branch_distance_m=dist,
                 power_factor=power_factor  # 🆕 Correct PF by load type
             )
             mcp_loads.append(mcp_load)
