@@ -32,6 +32,7 @@ vertexai>=1.60.0
 google-api-core>=2.15.0
 google-auth>=2.27.0
 google-cloud-core>=2.4.1
+google-cloud-logging>=3.0.0
 google-cloud-storage>=2.14.0
 googleapis-common-protos>=1.62.0
 grpcio>=1.60.0

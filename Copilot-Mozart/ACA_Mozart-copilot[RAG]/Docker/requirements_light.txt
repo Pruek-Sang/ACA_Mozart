@@ -21,6 +21,9 @@ google-generativeai>=0.8.0
 
 # Utilities
 python-dotenv>=1.0.0
+google-cloud-logging>=3.0.0
+google-cloud-core>=2.4.1
+
 
 # Supabase - Stateful Intelligence (v2+ = HTTP REST only, no websocket)
 supabase>=2.0.0

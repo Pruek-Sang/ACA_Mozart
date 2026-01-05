@@ -15,6 +15,7 @@ import type {
 import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
 import { askDesign, startSession } from './lib/api';
+import { logger } from './lib/logger';
 import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen } from 'lucide-react';
 
 /**
@@ -74,6 +75,10 @@ function App() {
       setSession(session);
       setUser(session?.user ?? null);
       setIsAuthLoading(false);
+
+      if (session) {
+        logger.info('App initialized: Auth session found', { user: session.user.email });
+      }
     });
 
     // Listen for auth changes
@@ -349,6 +354,7 @@ function App() {
 
     } catch (error: any) {
       console.error('❌ ERROR OCCURRED:', error);
+      logger.error('Design submission error', { error: error.toString() });
 
       const errorDetails = classifyError(error);
 
