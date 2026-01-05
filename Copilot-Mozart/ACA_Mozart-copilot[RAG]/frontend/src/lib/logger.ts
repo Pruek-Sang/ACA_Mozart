@@ -66,7 +66,7 @@ class RemoteLogger {
                 // Fallback if backend logging fails (don't create infinite loop)
                 console.warn('Failed to send log to backend:', err);
             });
-        } catch (e) {
+        } catch {
             // Ignore network errors for logging
         }
     }
