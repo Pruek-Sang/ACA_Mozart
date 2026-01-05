@@ -246,6 +246,7 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
         logger.debug(f"⏱️ Rate check passed for {user_id} on /ask")
     
     # 🆕 Pass session_id to enable Stateful Intelligence
+    logger.info(f"🚀 [ASK] Received request from session_id: {session_id}")
     response = await rag_service.process_ask(req, session_id=session_id)
     
     # =========================================================================
@@ -253,20 +254,25 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
     # [FIX 2026-01-05] Session data was lost on refresh because we never saved!
     # [FIX 2026-01-04] StandardResponse is Pydantic model, NOT dict! Must convert first.
     # =========================================================================
-    if SUPABASE_AVAILABLE and session_injector and session_id:
-        try:
-            # FIX: Convert Pydantic model to dict before using .get()
-            response_dict = response.model_dump() if hasattr(response, 'model_dump') else (response.dict() if hasattr(response, 'dict') else response)
-            metadata = response_dict.get("metadata", {}) if isinstance(response_dict, dict) else {}
-            
-            # Check if this is a design response (has display_data or mcp_response)
-            if metadata and (metadata.get("display_data") or metadata.get("mcp_response")):
-                # Save the entire metadata (display_data, audit_results, sld_data, etc.)
-                await session_injector.set_mcp_response(session_id, metadata)
-                logger.info(f"✅ Auto-saved design to session {session_id[:8]}...")
-        except Exception as e:
-            # Don't fail the request if save fails - just log warning
-            logger.warning(f"⚠️ Auto-save failed (non-blocking): {e}")
+    if SUPABASE_AVAILABLE and session_injector:
+        if session_id:
+            try:
+                # FIX: Convert Pydantic model to dict before using .get()
+                response_dict = response.model_dump() if hasattr(response, 'model_dump') else (response.dict() if hasattr(response, 'dict') else response)
+                metadata = response_dict.get("metadata", {}) if isinstance(response_dict, dict) else {}
+                
+                # Check if this is a design response (has display_data or mcp_response)
+                if metadata and (metadata.get("display_data") or metadata.get("mcp_response")):
+                    # Save the entire metadata (display_data, audit_results, sld_data, etc.)
+                    await session_injector.set_mcp_response(session_id, metadata)
+                    logger.info(f"✅ [AUTO-SAVE] Saved design to session {session_id[:8]}...")
+                else:
+                    logger.debug(f"ℹ️ [AUTO-SAVE] Skipped - No display_data/mcp_response in metadata. Keys: {list(metadata.keys()) if metadata else 'None'}")
+            except Exception as e:
+                # Don't fail the request if save fails - just log warning
+                logger.warning(f"⚠️ [AUTO-SAVE] Failed (non-blocking): {e}")
+    else:
+        logger.warning(f"⚠️ [AUTO-SAVE] Skipped: Supabase={SUPABASE_AVAILABLE}, Injector={bool(session_injector)}, SessionID={session_id}")
     
     return response
 
@@ -476,6 +482,14 @@ async def start_session(request: Request, project_name: str = None):
     Session remembers user's answers across turns.
     """
     user_id = getattr(request.state, "user_id", None)
+    logger.info(f"🆕 [SESSION-START] Creating session for user={user_id}, project={project_name}")
+    
+    # Check if we are really using Supabase or falling back
+    if session_store._use_injector:
+         logger.info("✅ [SESSION-START] Using Supabase storage")
+    else:
+         logger.warning("⚠️ [SESSION-START] Using In-Memory storage (Data will be lost on restart!)")
+         
     session = session_store.create_session(user_id=user_id, project_name=project_name)
     
     # Return questionnaire immediately

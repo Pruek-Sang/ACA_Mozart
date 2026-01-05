@@ -112,15 +112,20 @@ function App() {
 
   // === 🆕 AUTO-START SESSION (only if no saved session) ===
   useEffect(() => {
-    if (!session) return; // Wait for auth
+    if (!session) {
+      console.log('[SESSION-DEBUG] Waiting for auth session...');
+      return; // Wait for auth
+    }
 
     const initSession = async () => {
+      console.log('[SESSION-DEBUG] initSession started, current sessionId state:', sessionId);
       // 🔧 FIX: Check if we have a saved session that's still valid
       const savedSessionId = localStorage.getItem('mozart_session_id');
 
       if (savedSessionId) {
-        console.log('✅ Restored session from localStorage:', savedSessionId);
+        console.log('[SESSION-DEBUG] ✅ Found in localStorage:', savedSessionId);
         setSessionId(savedSessionId);
+        console.log('[SESSION-DEBUG] setSessionId called with:', savedSessionId);
 
         // 🔧 FIX 2026-01-05: Also load saved design data from backend
         try {
@@ -284,12 +289,18 @@ function App() {
     setIsDirty(false);
 
     try {
+      // 🔧 DEBUG: Log session state before API call
+      console.log('[SESSION-DEBUG] handleSubmit - sessionId state:', sessionId);
+      console.log('[SESSION-DEBUG] handleSubmit - localStorage:', localStorage.getItem('mozart_session_id'));
+
       // 2. Call API via centralized api.ts module (with session_id)
       const data = await askDesign({
         query: userPrompt,
         language: 'th',
         site_context: context
       }, sessionId || undefined);
+
+      console.log('[SESSION-DEBUG] askDesign returned, checking metadata.display_data:', !!data.metadata?.display_data);
 
       // 3. Add Success Message
       const sysMsg: ChatMessage = {
