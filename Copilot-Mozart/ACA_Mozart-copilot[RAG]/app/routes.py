@@ -185,7 +185,7 @@ async def root():
                 logger.warning(f"🔌 Supabase keepalive failed: {e}")
     
     return {
-        "status": "online", 
+        "status": "alive", 
         "version": settings.API_VERSION,
         "supabase": supabase_status,
         "env": settings.APP_ENV
