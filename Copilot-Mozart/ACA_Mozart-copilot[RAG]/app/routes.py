@@ -345,7 +345,11 @@ async def design_electrical_system(req: ProjectRequirements, request: Request):
     
     # Step 2: Convert to MCP format (with site_context!)
     adapter = McpAdapter()
-    mcp_request = adapter.convert(spec_response.project_input, req.site_context)
+    mcp_request = adapter.convert(
+        spec_response.project_input, 
+        req.site_context,
+        spec_response.floor_distances  # 🆕 Pass extracted floor distances
+    )
     
     # Log any unknown devices
     if adapter.unknown_devices:

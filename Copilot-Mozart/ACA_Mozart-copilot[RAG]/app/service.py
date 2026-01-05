@@ -3193,6 +3193,9 @@ CRITICAL RULES:
 13. **MAP DISTANCES (NEW)**:
     - Map `req.service_distance_m` -> `project_input.project_info.service_distance_m`
     - Map `req.loads[...].branch_distance_m` -> `project_input.loads[...].branch_distance_m`
+14. **EXTRACT FLOOR DISTANCES**:
+    - If user specifies "Average distance for Floor X = Y m", map to `floor_distances: {"X": Y}`
+    - Example: "Floor 1 average 15m" -> ` "floor_distances": {"1": 15.0} `
 
 {examples}
 
@@ -3214,6 +3217,8 @@ OUTPUT JSON (McpSpecResponse):
     ],
     "constraints": {{"rule_profile_id": "TH_RESIDENTIAL_LV", "user_constraints": [...]}}
   }},
+  "floor_distances": {{ "1": 15.0, "2": 25.0 }},
+  "standards_profile": {{"rule_profile_id": "TH_RESIDENTIAL_LV", "notes": "..."}},
   "standards_profile": {{"rule_profile_id": "TH_RESIDENTIAL_LV", "notes": "..."}},
   "llm_metadata": {{"model": "{settings.MODEL_NAME_ANSWER}", "retrieved_docs": [...], "temperature": {settings.GENERATION_TEMPERATURE}, "timestamp": "..."}}
 }}
