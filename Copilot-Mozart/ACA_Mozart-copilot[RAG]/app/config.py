@@ -76,10 +76,15 @@ class Settings(BaseSettings):
     # === MCP Core Integration ===
     MCP_CORE_URL: str = "http://localhost:5001"
     MCP_TIMEOUT: float = 60.0
+
+    # === Supabase (Added for validation success) ===
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
     
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_file_encoding="utf-8"
+        env_file_encoding="utf-8",
+        extra="ignore"  # Allow extra fields in .env without crashing
     )
     
     def model_post_init(self, __context) -> None:
