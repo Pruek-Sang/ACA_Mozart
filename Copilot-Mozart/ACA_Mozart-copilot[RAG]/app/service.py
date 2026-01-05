@@ -287,7 +287,7 @@ class RagService:
             logger.info(f"✨ Auto-ingest complete! Total: {total_docs} documents")
             
         except Exception as e:
-            logger.error(f"❌ Auto-ingest failed: {e}")
+            logger.error(f"❌ Auto-ingest failed: {e}", exc_info=True)
             raise RuntimeError(f"Failed to auto-ingest knowledge base: {e}")
     
     def _get_generation_config(
@@ -444,7 +444,7 @@ Query: "{query}"
             return is_design
             
         except Exception as e:
-            logger.warning(f"[INTENT] LLM fallback failed: {e}, defaulting to Q&A")
+            logger.warning(f"[INTENT] LLM fallback failed: {e}, defaulting to Q&A", exc_info=True)
             return False  # Safe default: Q&A mode
     
     # =========================================================================
@@ -978,7 +978,7 @@ Query: "{query}"
             logger.error(f"JSON parse error: {e}")
             return {"error": "รูปแบบข้อมูลไม่ถูกต้อง", "missing_info": ["รายละเอียดอุปกรณ์"]}
         except Exception as e:
-            logger.error(f"Extraction failed: {e}")
+            logger.error(f"Extraction failed: {e}", exc_info=True)
             return {"error": str(e), "missing_info": ["ข้อมูลทั้งหมด"]}
     
     async def _call_mcp_with_extracted_loads(self, extracted: Dict[str, Any]) -> Dict[str, Any]:
@@ -1023,7 +1023,7 @@ Query: "{query}"
         try:
             spec_response = await self.generate_mcp_spec(req)
         except Exception as e:
-            logger.error(f"MCP spec generation failed: {e}")
+            logger.error(f"MCP spec generation failed: {e}", exc_info=True)
             return {"error": f"ไม่สามารถสร้าง spec ได้: {e}"}
         
         # Convert to MCP format and call MCP Core
@@ -1070,7 +1070,7 @@ Query: "{query}"
                     design_dict["data"]["warnings"].extend(input_warnings + output_warnings)
 
             except Exception as e:
-                logger.error(f"Validator error: {e}")
+                logger.error(f"Validator error: {e}", exc_info=True)
 
             # 🆕 [VD-FIX] Pass floor_distances from RAG extraction to compute.py
             # This ensures compute.py can use user-specified distances instead of defaults
@@ -2205,7 +2205,7 @@ Query: "{query}"
                 try:
                     display_data_dict = compute_display_data(result)
                 except Exception as compute_err:
-                    logger.error(f"[CP-DISPLAY] Early compute failed: {compute_err}")
+                    logger.error(f"[CP-DISPLAY] Early compute failed: {compute_err}", exc_info=True)
                     display_data_dict = None
 
                 # Use new formatter (Card-style, Legend at top, critical warnings)
@@ -2245,7 +2245,7 @@ Query: "{query}"
                         audit_report_text = format_auto_audit_summary(len(grouped_circuits))
                         logger.info(f"[CP-AUDIT-FLOW] Auto-audit summary for {len(grouped_circuits)} circuits")
                 except Exception as e:
-                    logger.error(f"[CP-AUDIT-FLOW] Audit failed: {e}")
+                    logger.error(f"[CP-AUDIT-FLOW] Audit failed: {e}", exc_info=True)
                     # Don't fail the whole response, just skip audit
                 
                 # Combine main report with audit report
@@ -2268,7 +2268,7 @@ Query: "{query}"
                         display_data_dict['explainable_warnings'] = explainable
                         
                 except Exception as compute_err:
-                    logger.error(f"[CP-DISPLAY] Compute failed, fallback: {compute_err}")
+                    logger.error(f"[CP-DISPLAY] Compute failed, fallback: {compute_err}", exc_info=True)
                     display_data_dict = None
                 
                 # 🆕 [CP-AUDIT-JSON] Format audit results for Frontend
@@ -2277,14 +2277,14 @@ Query: "{query}"
                     if audit_results:
                         audit_results_formatted = format_audit_for_frontend(audit_results)
                 except Exception as audit_fmt_err:
-                    logger.warning(f"[CP-AUDIT-JSON] Failed to format audit: {audit_fmt_err}")
+                    logger.warning(f"[CP-AUDIT-JSON] Failed to format audit: {audit_fmt_err}", exc_info=True)
                 
                 # 🆕 [CP-BOQ] Format PDF/BOQ data for Frontend
                 pdf_data_dict = None
                 try:
                     pdf_data_dict = format_pdf_table(result)
                 except Exception as pdf_err:
-                    logger.warning(f"[CP-BOQ] Failed to format PDF: {pdf_err}")
+                    logger.warning(f"[CP-BOQ] Failed to format PDF: {pdf_err}", exc_info=True)
                 
                 # 🆕 [CP-SLD] Generate SLD data for Frontend
                 sld_data_dict = None
@@ -2292,7 +2292,7 @@ Query: "{query}"
                     if display_data_dict:
                         sld_data_dict = render_sld(display_data_dict)
                 except Exception as sld_err:
-                    logger.warning(f"[CP-SLD] Failed to generate SLD: {sld_err}")
+                    logger.warning(f"[CP-SLD] Failed to generate SLD: {sld_err}", exc_info=True)
                 
                 return StandardResponse(
                     answer=final_text,
@@ -2332,7 +2332,7 @@ Query: "{query}"
                 )
                 
         except Exception as e:
-            logger.error(f"Design response build failed: {e}")
+            logger.error(f"Design response build failed: {e}", exc_info=True)
             return StandardResponse(
                 answer=f"❌ ไม่สามารถคำนวณได้: {str(e)}",
                 sources=[],
@@ -2439,7 +2439,7 @@ Query: "{query}"
                 try:
                     await log_conversation(session_id, "user", req.query)
                 except Exception as e:
-                    logger.warning(f"[AUDIT] Failed to log user message: {e}")
+                    logger.warning(f"[AUDIT] Failed to log user message: {e}", exc_info=True)
         elif is_edit_mode and not session_id:
             logger.warning(f"⚠️ EDIT intent detected but no session_id provided - falling back to CREATE mode")
         
@@ -2613,7 +2613,7 @@ Query: "{query}"
                     )
                     
             except Exception as e:
-                logger.error(f"❌ Design chain failed: {e}")
+                logger.error(f"❌ Design chain failed: {e}", exc_info=True)
                 # 🆕 FIX: Return error message instead of silent fallback
                 return StandardResponse(
                     answer=f"""❌ เกิดข้อผิดพลาดในการประมวลผล: {str(e)}
@@ -2734,7 +2734,7 @@ Rules:
             config = self._get_generation_config(temperature=settings.GENERATION_TEMPERATURE)
             answer = self._generate_content(prompt, config)
         except Exception as e:
-            logger.error(f"LLM generation failed: {e}")
+            logger.error(f"LLM generation failed: {e}", exc_info=True)
             raise HTTPException(504, "LLM provider timeout")
         
         # 5. Grounding Check
@@ -2896,7 +2896,7 @@ Rules:
             return result.get('questions', [])
             
         except Exception as e:
-            logger.warning(f"Failed to generate questions: {e}")
+            logger.warning(f"Failed to generate questions: {e}", exc_info=True)
             # Fallback to generic questions
             return [
                 "มีห้องอะไรบ้างในโครงการ?",
@@ -3118,7 +3118,7 @@ Rules:
                     logger.error(f"[{request_id}] All retry attempts exhausted")
                     
             except Exception as e:
-                logger.error(f"[{request_id}] LLM generation error: {e}")
+                logger.error(f"[{request_id}] LLM generation error: {e}", exc_info=True)
                 if "timeout" in str(e).lower():
                     raise HTTPException(504, "LLM provider timeout")
                 raise HTTPException(502, "LLM provider error")
@@ -3311,7 +3311,7 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
             return self._generate_content(prompt, config)
             
         except Exception as e:
-            logger.error(f"Plan generation failed: {e}")
+            logger.error(f"Plan generation failed: {e}", exc_info=True)
             return f"[Plan generation failed: {e}]"
     
     # === Validation Functions (Phase 2: NO DB ACCESS) ===
@@ -3545,5 +3545,5 @@ Please generate CORRECTED JSON addressing all errors above. Follow the McpSpecRe
             return result.get('issues', [])
             
         except Exception as e:
-            logger.warning(f"LLM semantic check failed: {e}")
+            logger.warning(f"LLM semantic check failed: {e}", exc_info=True)
             return []  # Don't fail QC if judge fails
