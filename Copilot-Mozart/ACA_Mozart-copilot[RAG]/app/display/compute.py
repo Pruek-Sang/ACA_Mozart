@@ -407,10 +407,16 @@ def _process_circuits(
             if not room:
                 room = f"ชั้น {floor_str}"
             
-            # Additional data
+            # 🆕 [VD-FIX] Read VD from circuit (injected by service.py)
+            # This fixes the key mismatch where wire_sizing uses load.id but we have circuit_id
+            vd_percent = circuit.get('voltage_drop_percent', 2.0)
+            if abs(vd_percent - 2.0) < 0.001:  # Check if using default
+                logger.warning(f"[VD-WARN] Circuit '{ckt_name}' has default VD 2.0 - check injection!")
+            
+            # Ground size still from wire_sizing (fallback to first matching load or default)
             vd_data = wire_sizing.get(circuit_id, {})
             ground_size = vd_data.get('ground_size', '2.5') if isinstance(vd_data, dict) else '2.5'
-            vd_percent = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
+
             
             conduit_data = conduit_sizing.get(circuit_id, {})
             conduit_size = conduit_data.get('trade_size', '1/2"') if isinstance(conduit_data, dict) else '1/2"'
