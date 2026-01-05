@@ -919,14 +919,18 @@ Query: "{query}"
                 
                 # 🆕 [RAG-FIX v2] Use floor_distances from LLM first, fallback to regex
                 # Priority: LLM floor_distances > Regex extraction > Floor defaults
+                # 🔧 [ENIGMA-FIX] Fixed critical typo: was "li_floor_distances" (wrong) → "llm_floor_distances" (correct)
+                # This typo caused NameError on line 923, silently caught by try-except, making all VD use defaults!
                 llm_floor_distances = extracted.get("floor_distances", {})
                 if llm_floor_distances:
                     # Convert string keys to int if needed
                     floor_distances = {int(k): float(v) for k, v in llm_floor_distances.items() if v}
-                    logger.info(f"📏 [LLM] floor_distances from LLM: {floor_distances}")
+                    logger.info(f"[TRACE-VD-1] LLM floor_distances raw: {llm_floor_distances}")
+                    logger.info(f"[TRACE-VD-2] Converted floor_distances: {floor_distances}")
                 else:
                     # Fallback to regex extraction
                     floor_distances = self._extract_floor_distances(normalized_query)
+                    logger.info(f"[TRACE-VD-1b] Regex extracted floor_distances: {floor_distances}")
                     if floor_distances:
                         logger.info(f"📏 [REGEX] floor_distances from regex: {floor_distances}")
                 
@@ -950,7 +954,7 @@ Query: "{query}"
                             
                             if room_floor in floor_distances:
                                 load["branch_distance_m"] = floor_distances[room_floor]
-                                logger.info(f"  └─ Applied {floor_distances[room_floor]}m to {load.get('device')} in {room_name} (floor {room_floor})")
+                                logger.info(f"[TRACE-VD-3] Applied {floor_distances[room_floor]}m to {load.get('device')} in {room_name} (floor {room_floor})")
                             else:
                                 # Floor not specified, use floor-based default
                                 default_dist = {1: 15.0, 2: 25.0, 3: 35.0}.get(room_floor, 15.0 + (room_floor - 1) * 10.0)
@@ -1812,6 +1816,7 @@ Query: "{query}"
                 floor=floor,
                 branch_distance_m=user_distance  # 🔧 FIX: Pass distance through!
             ))
+            logger.info(f"[TRACE-VD-4] LoadInput created: {l.get('device')} distance={user_distance}")
         
         # ============================================
         # AUTO-FILL: Lighting, Outlets, Pump
