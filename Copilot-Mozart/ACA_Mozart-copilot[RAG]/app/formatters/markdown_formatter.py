@@ -442,10 +442,10 @@ class MarkdownFormatter(BaseFormatter):
                     num_loads = len(num_loads)
                 notes = circuit.get('notes', [])
                 
-                # VD% - lookup from wire_sizing by circuit_id/load_id
+                # VD% - Read directly from circuit (injected by service.py)
                 circuit_id = circuit.get('circuit_id') or circuit.get('id') or ckt_name
                 vd_data = wire_sizing.get(circuit_id, {})
-                vd = vd_data.get('voltage_drop_percent', 2.0) if isinstance(vd_data, dict) else 2.0
+                vd = circuit.get('voltage_drop_percent', 2.0)
                 
                 # 🆕 Debug logging for VD source tracking
                 is_default_vd = abs(vd - 2.0) < 0.001  # Compare with epsilon
