@@ -106,8 +106,75 @@ MISSING_FIELD_PROMPTS = {
 }
 
 
+# =============================================================================
+# VD Injection Helper (Fix for Key Mismatch: wire_sizing[load.id] vs circuit_id)
+# =============================================================================
+def _inject_vd_to_circuits(
+    grouped_circuits: list, 
+    wire_sizing: dict, 
+    service_logger: logging.Logger
+) -> list:
+    """Inject voltage_drop_percent from wire_sizing into grouped_circuits.
+    
+    MCP Core stores VD per load.id in wire_sizing, but compute.py reads by circuit_id.
+    This function bridges that gap by mapping load VDs to circuit VD (using max for safety).
+    
+    Args:
+        grouped_circuits: List of circuit dicts from MCP Core
+        wire_sizing: Dict of wire sizing results keyed by load.id
+        service_logger: Logger instance for debug output
+    
+    Returns:
+        grouped_circuits with voltage_drop_percent injected
+    """
+    if not grouped_circuits or not wire_sizing:
+        service_logger.warning("[VD-INJECT] No circuits or wire_sizing to process")
+        return grouped_circuits
+    
+    # Log wire_sizing keys for debugging
+    ws_keys = [k for k in wire_sizing.keys() if not k.startswith('_')]
+    service_logger.debug(f"[VD-INJECT] wire_sizing keys (first 5): {ws_keys[:5]}")
+    
+    injected_count = 0
+    for circuit in grouped_circuits:
+        circuit_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
+        loads = circuit.get('loads', [])
+        
+        if not loads:
+            service_logger.debug(f"[VD-INJECT] Circuit '{circuit_name}' has no loads")
+            circuit['voltage_drop_percent'] = 2.0  # Default
+            continue
+        
+        # Collect VD from each load in this circuit
+        vd_values = []
+        for load in loads:
+            if not isinstance(load, dict):
+                continue
+            load_id = load.get('id') or load.get('load_id')
+            if load_id and load_id in wire_sizing:
+                vd = wire_sizing[load_id].get('voltage_drop_percent', 2.0)
+                vd_values.append(vd)
+                service_logger.debug(f"[VD-INJECT] {load_id}: VD={vd:.2f}%")
+        
+        # Use max VD for safety (worst case)
+        if vd_values:
+            circuit['voltage_drop_percent'] = max(vd_values)
+            injected_count += 1
+            service_logger.info(
+                f"[VD-INJECT] {circuit_name}: VD={circuit['voltage_drop_percent']:.1f}% "
+                f"(from {len(vd_values)} loads)"
+            )
+        else:
+            circuit['voltage_drop_percent'] = 2.0
+            service_logger.warning(f"[VD-INJECT] {circuit_name}: No matching loads in wire_sizing, using default 2.0")
+    
+    service_logger.info(f"[VD-INJECT] Injected VD to {injected_count}/{len(grouped_circuits)} circuits")
+    return grouped_circuits
+
+
 def is_site_context_complete(ctx: Optional[Dict[str, Any]]) -> tuple:
     """Check if site_context has all required fields.
+
     
     Returns:
         tuple: (is_complete: bool, missing_fields: list)
@@ -2201,8 +2268,18 @@ Query: "{query}"
                     result['floor_distances'] = extracted_data['floor_distances']
                     logger.info(f"[CP-VD-BRIDGE] Injected floor_distances into mcp_result: {result['floor_distances']}")
 
+                # 🆕 [VD-FIX] Inject VD from wire_sizing[load.id] into grouped_circuits
+                # This fixes the key mismatch where compute.py looks for circuit_id but wire_sizing uses load.id
+                if result.get('grouped_circuits') and result.get('wire_sizing'):
+                    result['grouped_circuits'] = _inject_vd_to_circuits(
+                        result['grouped_circuits'], 
+                        result['wire_sizing'],
+                        logger
+                    )
+
                 # 🆕 [CP-DISPLAY] Compute display data FIRST (Source of Truth)
                 try:
+
                     display_data_dict = compute_display_data(result)
                 except Exception as compute_err:
                     logger.error(f"[CP-DISPLAY] Early compute failed: {compute_err}", exc_info=True)
