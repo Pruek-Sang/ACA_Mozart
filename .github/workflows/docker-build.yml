@@ -82,6 +82,18 @@ jobs:
           python -m pytest ../tests/test_e2e_data_flow.py -v --tb=short
           echo "✅ E2E tests PASSED"
 
+      - name: 🧹 Free Disk Space
+        run: |
+          echo "Listing free space before cleanup..."
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          echo "Listing free space after cleanup..."
+          df -h
+
       - name: 🛡️ Run MCP Core Input Sanitizer Tests
         id: sanitizer-test
         run: |
@@ -95,7 +107,7 @@ jobs:
         id: rag-test
         run: |
           cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]"
-          pip install --quiet pydantic pytest httpx fastapi starlette faiss-cpu google-generativeai sentence-transformers
+          pip install --quiet --no-cache-dir pydantic pytest httpx fastapi starlette faiss-cpu google-generativeai sentence-transformers
           export PYTHONPATH="${PYTHONPATH}:$(pwd)"
           echo "🧪 Running parser logic, merge, and integration tests..."
           # Pass secrets to test execution
