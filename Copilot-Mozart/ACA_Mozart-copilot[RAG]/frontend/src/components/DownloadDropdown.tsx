@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, FileSpreadsheet, FileText, Eye } from 'lucide-react';
+import { ChevronDown, FileSpreadsheet, FileText, Eye, Receipt, FileImage } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 /**
@@ -12,6 +12,14 @@ import { cn } from '../lib/utils';
  * - Click outside to close
  * - Three options: Excel, PDF, Preview
  */
+
+interface DownloadOption {
+    id: string;
+    label: string;
+    icon: React.ReactNode;
+    description: string;
+    color: string;
+}
 
 interface DownloadDropdownProps {
     onDownloadExcel: () => void;

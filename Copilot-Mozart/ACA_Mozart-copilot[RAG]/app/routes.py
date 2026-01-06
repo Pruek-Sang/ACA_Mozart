@@ -471,17 +471,41 @@ async def delete_doc(req: DeleteRequest):
 # =============================================================================
 
 @app.post("/api/v1/session/start")
-async def start_session(request: Request, project_name: str = None):
+async def start_session(request: Request):
     """
     Start a new conversation session.
     
-    Args:
+    Body (optional):
         project_name: Optional name for the project (default: บ้านนายสมหญิง)
     
     Returns session_id for subsequent calls.
     Session remembers user's answers across turns.
     """
-    user_id = getattr(request.state, "user_id", None)
+    import re
+    import uuid
+    
+    # Parse body if present
+    project_name = None
+    try:
+        body = await request.json()
+        project_name = body.get("project_name") if isinstance(body, dict) else None
+    except Exception:
+        pass  # No body or invalid JSON - use default
+    
+    # Get user_id, validate it's a proper UUID for Supabase
+    raw_user_id = getattr(request.state, "user_id", None)
+    user_id = None
+    
+    if raw_user_id:
+        # Check if it's a valid UUID format
+        is_valid_uuid = re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(raw_user_id), re.I)
+        if is_valid_uuid:
+            user_id = raw_user_id
+        else:
+            # Generate a proper UUID for non-UUID user identifiers (e.g., "guest_xxx")
+            logger.warning(f"⚠️ [SESSION-START] user_id '{raw_user_id}' is not UUID format, generating new UUID")
+            user_id = str(uuid.uuid4())
+    
     logger.info(f"🆕 [SESSION-START] Creating session for user={user_id}, project={project_name}")
     
     # Check if we are really using Supabase or falling back
