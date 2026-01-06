@@ -37,8 +37,9 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
         }
     };
 
-    const allCircuits = (data.metadata?.display_data?.circuits as any[]) || data.data?.grouped_circuits || data.data?.loads || [];
-    const loads = allCircuits; // Use circuits as the primary list
+    // Use data.loads as the primary list (DesignResult type only has 'loads' not 'circuits' or 'metadata')
+    const allCircuits = data.data?.loads || [];
+    const loads = allCircuits;
     const mainBreaker = data.data?.main_breaker || 50;
     const mainCbType = data.data?.main_cb_type || "MCB";
     const mainWire = data.data?.main_feeder_size || "16";
