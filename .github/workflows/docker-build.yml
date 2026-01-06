@@ -95,10 +95,10 @@ jobs:
         id: rag-test
         run: |
           cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]"
-          pip install --quiet pydantic pytest
+          pip install --quiet pydantic pytest httpx fastapi starlette
           export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-          echo "🧪 Running parser logic and merge tests..."
-          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py -v --tb=short
+          echo "🧪 Running parser logic, merge, and integration tests..."
+          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py tests/test_e2e_integration.py tests/backend/test_session_api.py tests/backend/test_design_api.py -v --tb=short
           echo "✅ RAG Backend tests PASSED"
 
       - name: 📊 Backend Test Summary
