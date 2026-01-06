@@ -46,7 +46,7 @@ def format_audit_report(audit_results: List[Dict[str, Any]]) -> str:
     pass_count = 0
     
     for result in audit_results:
-        circuit = result.get('circuit_name', 'Unknown')[:15]
+        circuit = result.get('circuit_name', 'Unknown')  # Full name, no truncation
         # device = result.get('device', '')  # Not used in table, kept for future
         
         for check in result.get('checks', []):
