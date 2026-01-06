@@ -1,14 +1,17 @@
 import React, { useState, useCallback } from 'react';
-import { Table, FileImage, ClipboardCheck, Box, Receipt, BookOpen } from 'lucide-react';
+import { Table, FileImage, ClipboardCheck, Box, Receipt, BookOpen, Download } from 'lucide-react';
 import type { DesignResult, LoadResult, SLDData } from '../types';
 import { cn } from '../lib/utils';
 import { SLDViewer } from './SLDViewer';
 import { PDFPreviewModal } from './PDFPreviewModal';
+import { BOQPDFPreviewModal } from './BOQPDFPreviewModal';
+import { SLDPDFPreviewModal } from './SLDPDFPreviewModal';
 import { DownloadDropdown } from './DownloadDropdown';
 import * as XLSX from 'xlsx';
 
 import { AssumptionsPanel } from './AssumptionsPanel';
 import { ExplainableWarningCard } from './ExplainableWarningCard';
+
 
 
 type ViewMode = 'table' | 'audit' | 'sld' | 'boq' | 'assumptions';
@@ -29,6 +32,8 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
     // === ALL HOOKS MUST BE CALLED FIRST (before any early returns) ===
     const [activeTab, setActiveTab] = useState<ViewMode>('table');
     const [isPDFPreviewOpen, setPDFPreviewOpen] = useState(false);
+    const [isBOQPDFOpen, setBOQPDFOpen] = useState(false);
+    const [isSLDPDFOpen, setSLDPDFOpen] = useState(false);
 
     // Tab Buttons (constant, not a hook, but define early for consistency)
     const tabs: { id: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -214,6 +219,19 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                 data={data}
                 isOpen={isPDFPreviewOpen}
                 onClose={() => setPDFPreviewOpen(false)}
+            />
+
+            <BOQPDFPreviewModal
+                data={data}
+                isOpen={isBOQPDFOpen}
+                onClose={() => setBOQPDFOpen(false)}
+            />
+
+            <SLDPDFPreviewModal
+                data={sldData || null}
+                projectName={data.data?.project_name}
+                isOpen={isSLDPDFOpen}
+                onClose={() => setSLDPDFOpen(false)}
             />
 
             {/* Content Area */}
@@ -495,7 +513,17 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
 
                 {/* SLD Tab */}
                 {activeTab === 'sld' && (
-                    <SLDViewer data={sldData || null} />
+                    <div className="relative">
+                        <div className="absolute top-4 right-4 z-10">
+                            <button
+                                onClick={() => setSLDPDFOpen(true)}
+                                className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 border border-slate-700 shadow-lg transition-all cursor-pointer"
+                            >
+                                <Download size={14} /> Download SLD (PDF)
+                            </button>
+                        </div>
+                        <SLDViewer data={sldData || null} />
+                    </div>
                 )}
 
                 {/* BOQ Tab - Bill of Quantities (Dynamic from Load Table) */}
@@ -560,14 +588,22 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     return (
                         <div className="space-y-6">
                             {/* BOQ Header */}
-                            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-6">
-                                <h3 className="text-amber-400 font-bold text-lg mb-2 flex items-center gap-2">
-                                    <Receipt size={24} /> Bill of Quantities (BOQ)
-                                </h3>
-                                <p className="text-slate-400 text-sm">
-                                    คำนวณจาก Load Schedule: <span className="text-sky-400 font-bold">{circuitCount}</span> วงจร
-                                    ({mcbCount} MCB + {rcboCount} RCBO)
-                                </p>
+                            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-6 flex justify-between items-start">
+                                <div>
+                                    <h3 className="text-amber-400 font-bold text-lg mb-2 flex items-center gap-2">
+                                        <Receipt size={24} /> Bill of Quantities (BOQ)
+                                    </h3>
+                                    <p className="text-slate-400 text-sm">
+                                        คำนวณจาก Load Schedule: <span className="text-sky-400 font-bold">{circuitCount}</span> วงจร
+                                        ({mcbCount} MCB + {rcboCount} RCBO)
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setBOQPDFOpen(true)}
+                                    className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+                                >
+                                    <Download size={16} /> Download Options
+                                </button>
                             </div>
 
                             {/* E.2 Breaker Details */}

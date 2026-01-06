@@ -314,6 +314,9 @@ function App() {
       const displayData = data.metadata?.display_data;
       if (displayData) {
         // 🆕 Use structured data from Backend
+        console.log('[DATA-DEBUG] displayData.circuits:', displayData.circuits?.length || 0, 'items');
+        console.log('[DATA-DEBUG] Sample circuit:', displayData.circuits?.[0]);
+
         setResultData({
           success: true,
           message: 'Design calculated',
@@ -324,10 +327,28 @@ function App() {
               circuit_name: string;
               total_kw: number;
               total_current: number;
+              total_watts?: number;
+              total_va?: number;
+              load_va_l1?: number;
+              load_va_l2?: number;
+              load_va_l3?: number;
               breaker_rating: number;
+              breaker_type?: string;
+              breaker_poles?: number;
+              breaker_ic_ka?: number;
+              breaker_af?: number;
+              breaker_at?: number;
               wire_size: string;
+              wire_size_l?: string;
+              wire_size_n?: string;
+              wire_size_grd?: string;
+              wire_type?: string;
+              ground_size?: string;
               conduit_size?: string;
+              conduit_type?: string;
               vd_percent?: number;
+              requires_rcbo?: boolean;
+              remark?: string;
             }) => ({
               room_name: ckt.room || ckt.floor || '',
               device_name: ckt.circuit_name,
@@ -337,6 +358,24 @@ function App() {
               wire_size: `${ckt.wire_size} mm²`,
               conduit_size: ckt.conduit_size,
               voltage_drop_percent: ckt.vd_percent,
+              // 🔧 FIX: Add fields needed by PDF
+              load_va_l1: ckt.load_va_l1 || ckt.total_va || Math.round(ckt.total_kw * 1000) || 0,
+              load_va_l2: ckt.load_va_l2 || 0,
+              load_va_l3: ckt.load_va_l3 || 0,
+              total_va: ckt.total_va || Math.round(ckt.total_kw * 1000) || 0,
+              breaker_type: ckt.breaker_type || 'MCB',
+              breaker_poles: ckt.breaker_poles || 1,
+              breaker_ic_ka: ckt.breaker_ic_ka || 6,
+              breaker_af: ckt.breaker_af || ckt.breaker_rating,
+              breaker_at: ckt.breaker_at || ckt.breaker_rating,
+              wire_size_l: ckt.wire_size_l || ckt.wire_size,
+              wire_size_n: ckt.wire_size_n || ckt.wire_size,
+              wire_size_grd: ckt.wire_size_grd || ckt.ground_size || '2.5',
+              wire_type: ckt.wire_type || 'IEC01',
+              ground_size: ckt.ground_size || '2.5',
+              conduit_type: ckt.conduit_type || 'PVC',
+              requires_rcbo: ckt.requires_rcbo || false,
+              remark: ckt.remark || '',
             })),
             warnings: displayData.warnings || [],
             explainable_warnings: displayData.explainable_warnings,
@@ -344,8 +383,17 @@ function App() {
             total_power_kw: displayData.total_kw,
             main_breaker: Number.parseInt(displayData.main_breaker) || 0,
             audit_table: data.metadata?.audit_results || undefined,
+            // 🔧 FIX: Add summary fields for PDF
+            project_name: displayData.project_name,
+            demand_factor: displayData.demand_factor,
+            main_cb_type: displayData.main_cb_type,
+            main_feeder_size: displayData.main_feeder_size,
+            main_feeder_type: displayData.main_feeder_type,
+            main_raceway_size: displayData.main_raceway_size,
+            main_raceway_type: displayData.main_raceway_type,
           }
         });
+
 
         // 🆕 Set SLD data from API response
         if (data.metadata?.sld_data) {
