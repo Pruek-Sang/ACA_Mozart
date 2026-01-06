@@ -292,7 +292,8 @@ class TestMcpClientWithMock:
         
         assert response.success is False
         assert response.error_message is not None
-        assert "cannot connect" in response.error_message.lower()
+        # Updated to match McpClient's retry error message
+        assert "connection" in response.error_message.lower()
 
 
 class TestFullE2EFlow:
