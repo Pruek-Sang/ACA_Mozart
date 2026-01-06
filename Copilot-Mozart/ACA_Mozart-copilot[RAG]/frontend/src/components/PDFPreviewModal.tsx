@@ -45,16 +45,26 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
     const mainConduit = data.data?.main_raceway_size || "1\"";
     const mainConduitType = data.data?.main_raceway_type || "EMT";
 
-    // Categorize Loads for Footer
-    const lightingLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('light') || l.device_name?.includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
-    const receptacleLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('socket') || l.device_name?.includes('เต้ารับ')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
-    const heaterLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('water') || l.device_name?.includes('น้ำอุ่น')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
-    const acLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('air') || l.device_name?.includes('แอร์')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
-    const spareLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('spare')).reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
+    // 🔧 DEBUG: Log what data PDF is receiving
+    console.log('[PDF-DEBUG] loads count:', loads.length);
+    console.log('[PDF-DEBUG] sample load:', loads[0]);
+    console.log('[PDF-DEBUG] main info:', { mainBreaker, mainCbType, mainWire });
 
-    const totalConnectedLoad = loads.reduce((sum: number, l: any) => sum + (l.load_va_l1 || 0), 0);
-    const demandFactor = 0.8;
+    // Categorize Loads for Footer - use total_va as fallback for load_va_l1
+    const getLoadVA = (l: any) => l.load_va_l1 || l.total_va || Math.round((l.power_kw || 0) * 1000) || 0;
+
+    const lightingLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('light') || l.device_name?.includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const receptacleLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('socket') || l.device_name?.includes('เต้ารับ')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const heaterLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('water') || l.device_name?.includes('น้ำอุ่น')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const acLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('air') || l.device_name?.includes('แอร์')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const spareLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('spare')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+
+    const totalConnectedLoad = loads.reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const demandFactor = data.data?.demand_factor || 0.8;
     const demandLoad = totalConnectedLoad * demandFactor;
+
+    console.log('[PDF-DEBUG] category totals:', { lightingLoad, receptacleLoad, heaterLoad, acLoad, totalConnectedLoad });
+
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -185,7 +195,7 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
                                                 <td className="border-r border-black">{load.conduit_type || 'EMT'}</td>
 
                                                 {/* Load */}
-                                                <td className="font-bold text-right px-2">{(load.total_va || load.load_va_l1 || 0).toLocaleString()}</td>
+                                                <td className="font-bold text-right px-2">{(load.load_va_l1 || load.total_va || Math.round((load.power_kw || 0) * 1000) || 0).toLocaleString()}</td>
                                             </tr>
                                         );
                                     })}

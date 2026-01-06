@@ -1591,3 +1591,154 @@ pylint --disable=all --enable=E0602 app/service.py  # E0602 = undefined-variable
 *ค้นพบโดย: Enigma (The Anomaly Hunter)*
 *สรุป: Typo "li_" vs "llm_" ใน try-except block = Silent Failure ทำให้ VD ผิดทุก request!*
 
+---
+
+## 🔴 ความผิดพลาดที่ 33: VD KEY MISMATCH - wire_sizing keyed by load.id, lookup by circuit_id
+
+> **วันที่:** 2026-01-07
+> **ความรุนแรง:** 💀 CRITICAL - VD แสดง 2.0% ตลอด (ค่า default)
+
+### อาการ:
+
+- VD คำนวณถูกต้องใน `pipeline.py`
+- แต่หน้าเว็บแสดง 2.0% ทุกวงจร (fallback default)
+
+### สาเหตุ:
+
+**Key Mismatch ระหว่าง Data Structures!**
+
+```python
+# pipeline.py สร้าง wire_sizing:
+wire_sizing["load_1"] = {..., "voltage_drop_percent": 1.23}  # keyed by LOAD ID
+wire_sizing["load_2"] = {..., "voltage_drop_percent": 2.45}
+
+# compute.py พยายาม lookup:
+vd = wire_sizing.get("ckt_1")  # ❌ ใช้ CIRCUIT ID → ไม่เจอ!
+vd = 2.0  # fallback default
+```
+
+### วิธีแก้:
+
+1. **สร้าง injection layer ใน `service.py`:**
+   ```python
+   def _inject_vd_to_circuits():
+       for ckt in grouped_circuits:
+           for load in ckt['loads']:
+               if load['id'] in wire_sizing:
+                   ckt['voltage_drop_percent'] = wire_sizing[load['id']]['voltage_drop_percent']
+   ```
+
+2. **แก้ `compute.py` ให้อ่านจาก circuit โดยตรง:**
+   ```python
+   vd = circuit.get('voltage_drop_percent', 2.0)  # อ่านจาก injected value
+   ```
+
+### 💀 บทเรียน:
+
+44. **ตรวจสอบ KEY ของ Dict ให้ตรงกัน!**
+    - `load.id` ≠ `circuit_id`
+    - ต้อง map ให้ถูกก่อน lookup
+
+45. **ถ้าค่าเป็น default ตลอด = Key lookup ผิด**
+    - เช็ค `.get()` ว่าใช้ key อะไร
+    - เช็คว่า source dict มี key นั้นจริงไหม
+
+---
+
+## 🔴 ความผิดพลาดที่ 34: SUPABASE SCHEMA MISMATCH - Backend ส่ง column ที่ไม่มี
+
+> **วันที่:** 2026-01-07
+> **ความรุนแรง:** 💀 CRITICAL - Session ไม่ถูก persist
+
+### อาการ:
+
+- กดสร้าง Project ใหม่ → "สำเร็จ" แต่จริงๆ ไม่ได้ save
+- Refresh หน้า → ข้อมูลหาย
+
+### สาเหตุ:
+
+**Backend Code ส่ง `project_name` แต่ Supabase ไม่มี column!**
+
+```
+Cloud Log:
+❌ Failed to create session: 
+   {'message': "Could not find the 'project_name' column", 'code': 'PGRST204'}
+```
+
+Backend fallback ไป in-memory → ข้อมูลหายเมื่อ Cloud Run restart
+
+### วิธีแก้:
+
+```sql
+ALTER TABLE mozart.sessions 
+ADD COLUMN IF NOT EXISTS project_name TEXT DEFAULT 'บ้านนายสมหญิง';
+```
+
+### 💀 บทเรียน:
+
+46. **Schema ใน DB ต้องตรงกับ Code!**
+    - เพิ่ม field ใน code → ต้องเพิ่ม column ใน DB ด้วย
+
+47. **Supabase ≠ MongoDB (ไม่ auto-create column)**
+    - PostgreSQL ต้อง ALTER TABLE เอง
+
+48. **ถ้า Cloud Log มี PGRST204 = Column Missing**
+    - ตรวจ DB schema ก่อน
+    - ไม่ใช่ปัญหา code logic
+
+---
+
+## 🔴 ความผิดพลาดที่ 35: AUDIT WARNING นับผิด - Loop ผ่าน load.id แต่แสดงจำนวน circuits
+
+> **วันที่:** 2026-01-07
+> **ความรุนแรง:** ⚠️ MEDIUM - ข้อความสับสน
+
+### อาการ:
+
+- แสดง "36 วงจร ใช้ระยะ Default" แต่จริงมี 10 วงจร
+- ชื่อวงจรตัด "INDUCTION-3000W in ห" (ตัดที่ 20 chars)
+
+### สาเหตุ:
+
+1. **นับ load.id (36 ตัว) แทน circuit_id (10 ตัว)**
+2. **Hardcoded truncation `[:20]`**
+
+### วิธีแก้:
+
+```python
+# สร้าง lookup: load_id → circuit_name
+load_to_circuit = {}
+for ckt in grouped_circuits:
+    for load in ckt['loads']:
+        load_to_circuit[load['id']] = ckt['circuit_name']
+
+# นับ unique circuits
+default_circuits = set()
+for load_id, w in wire_sizing.items():
+    if w.get('distance_source') == 'default_table':
+        default_circuits.add(load_to_circuit.get(load_id))
+```
+
+### 💀 บทเรียน:
+
+49. **นับ unique ต้องใช้ `set()` ไม่ใช่ `list.append()`**
+
+50. **Truncation ต้อง configurable หรือไม่มีเลย**
+    - `[:20]` ใน Thai text = ตัดกลางคำ!
+
+---
+
+## 🚨 กฎเหล็กใหม่ (เพิ่ม 2026-01-07)
+
+44. **Dict Key ต้องตรงกัน:** `load.id` ≠ `circuit_id` - verify ก่อน lookup
+45. **ค่า default ตลอด = Key mismatch** - เช็ค `.get()` key
+46. **Supabase Schema = Manual Update** - ALTER TABLE เมื่อเพิ่ม field
+47. **PGRST204 = Column Missing** - ไม่ใช่ code bug
+48. **Cloud Run In-Memory = ข้อมูลหาย** - ต้อง persist DB
+49. **นับ unique = ใช้ set()** - ไม่ใช่ list
+50. **Thai text truncation = อันตราย** - ตัดกลางคำ
+
+---
+
+*เพิ่มเติมเมื่อ: 2026-01-07 00:02*
+*สรุป: VD key mismatch + Supabase schema missing + Audit count bug - 3 ปัญหาที่เกี่ยวข้องกับ data structure mismatch!*
