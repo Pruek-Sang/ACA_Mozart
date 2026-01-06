@@ -68,48 +68,53 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
                         maxHeight: isExpanded ? 'none' : (needsExpand ? MAX_HEIGHT : 'none')
                     }}
                 >
-                    {isUser ? (
-                        // User messages: Plain text with preserved newlines (no Markdown for security)
-                        <div className="whitespace-pre-wrap break-words leading-relaxed">
+                    {/* Unified Markdown Rendering for BOTH User and Bot */}
+                    <div className={cn(
+                        "markdown-content",
+                        isUser ? "text-white" : "text-slate-300"
+                    )}>
+                        <Markdown
+                            components={{
+                                p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                                ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                                li: ({ children }) => <li className="mb-0.5">{children}</li>,
+                                strong: ({ children }) => (
+                                    <strong className={cn("font-bold", isUser ? "text-yellow-200" : "text-sky-200")}>
+                                        {children}
+                                    </strong>
+                                ),
+                                code: ({ children }) => (
+                                    <code className={cn(
+                                        "px-1 py-0.5 rounded font-mono text-xs",
+                                        isUser ? "bg-white/20" : "bg-black/30"
+                                    )}>
+                                        {children}
+                                    </code>
+                                ),
+                                pre: ({ children }) => (
+                                    <pre className={cn(
+                                        "p-2 rounded-md overflow-x-auto text-xs my-2",
+                                        isUser ? "bg-white/10" : "bg-black/50"
+                                    )}>
+                                        {children}
+                                    </pre>
+                                ),
+                                h1: ({ children }) => <h1 className="text-lg font-bold mb-2 opacity-90">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-base font-semibold mb-2 opacity-90">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 opacity-80">{children}</h3>,
+                                h4: ({ children }) => <h4 className="text-xs font-bold uppercase tracking-wider mb-1 opacity-70">{children}</h4>,
+                                a: ({ href, children }) => (
+                                    <a href={href} target="_blank" rel="noopener noreferrer"
+                                        className={cn("hover:underline", isUser ? "text-white underline" : "text-sky-400")}>
+                                        {children}
+                                    </a>
+                                ),
+                            }}
+                        >
                             {message.content}
-                        </div>
-                    ) : (
-                        // Bot messages: Full Markdown support
-                        <div className="markdown-content">
-                            <Markdown
-                                components={{
-                                    p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                                    ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-                                    ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-                                    li: ({ children }) => <li className="mb-0.5">{children}</li>,
-                                    strong: ({ children }) => (
-                                        <strong className="font-bold text-sky-200">{children}</strong>
-                                    ),
-                                    code: ({ children }) => (
-                                        <code className="px-1 py-0.5 rounded font-mono text-xs bg-black/30">
-                                            {children}
-                                        </code>
-                                    ),
-                                    pre: ({ children }) => (
-                                        <pre className="bg-black/50 p-2 rounded-md overflow-x-auto text-xs my-2">
-                                            {children}
-                                        </pre>
-                                    ),
-                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2 text-white">{children}</h1>,
-                                    h2: ({ children }) => <h2 className="text-base font-semibold mb-2 text-white">{children}</h2>,
-                                    h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 text-slate-200">{children}</h3>,
-                                    a: ({ href, children }) => (
-                                        <a href={href} target="_blank" rel="noopener noreferrer"
-                                            className="text-sky-400 hover:underline">
-                                            {children}
-                                        </a>
-                                    ),
-                                }}
-                            >
-                                {message.content}
-                            </Markdown>
-                        </div>
-                    )}
+                        </Markdown>
+                    </div>
                 </div>
 
                 {/* Gradient overlay when collapsed */}

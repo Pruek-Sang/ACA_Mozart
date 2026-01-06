@@ -37,7 +37,8 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
         }
     };
 
-    const loads = data.data?.loads || [];
+    const allCircuits = (data.metadata?.display_data?.circuits as any[]) || data.data?.grouped_circuits || data.data?.loads || [];
+    const loads = allCircuits; // Use circuits as the primary list
     const mainBreaker = data.data?.main_breaker || 50;
     const mainCbType = data.data?.main_cb_type || "MCB";
     const mainWire = data.data?.main_feeder_size || "16";
@@ -46,12 +47,18 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
     const mainConduitType = data.data?.main_raceway_type || "EMT";
 
     // 🔧 DEBUG: Log what data PDF is receiving
-    console.log('[PDF-DEBUG] loads count:', loads.length);
-    console.log('[PDF-DEBUG] sample load:', loads[0]);
-    console.log('[PDF-DEBUG] main info:', { mainBreaker, mainCbType, mainWire });
+    console.log('[PDF-DEBUG] circuits count:', loads.length);
+    if (loads.length > 0) console.log('[PDF-DEBUG] sample circuit:', loads[0]);
 
-    // Categorize Loads for Footer - use total_va as fallback for load_va_l1
-    const getLoadVA = (l: any) => l.load_va_l1 || l.total_va || Math.round((l.power_kw || 0) * 1000) || 0;
+    // Categorize Loads for Footer - use total_watts or connected_load from circuit data
+    const getLoadVA = (l: any) => {
+        // Try circuit computed fields first (single source of truth)
+        if (l.load_va_l1 !== undefined) return l.load_va_l1;
+        if (l.total_watts !== undefined) return l.total_watts;
+
+        // Fallback to legacy fields
+        return l.total_va || Math.round((l.power_kw || 0) * 1000) || 0;
+    };
 
     const lightingLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('light') || l.device_name?.includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
     const receptacleLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('socket') || l.device_name?.includes('เต้ารับ')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
@@ -171,31 +178,39 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
                                 <tbody>
                                     {loads.map((load: any, i: number) => {
                                         // Wire format: "2x2.5/2.5G"
-                                        const wireL = load.wire_size_l || load.wire_size?.replace(' mm²', '') || '2.5';
-                                        const wireG = load.wire_size_grd || load.ground_size || '2.5';
+                                        const wireSize = load.wire_size || load.wire_size_l || '2.5';
+                                        const wireL = wireSize.replace(' mm²', '');
+                                        const wireG = load.ground_size || load.wire_size_grd || '2.5';
                                         const wireStr = `2x${wireL}/${wireG}G`;
+
+                                        // Breaker Info
+                                        const poles = load.breaker_poles || 1;
+                                        const at = load.breaker_rating || load.breaker_at || load.breaker_size;
+                                        const type = load.breaker_type || 'MCB';
+                                        const ic = load.ic_ka || load.breaker_ic_ka || 6;
+                                        const name = load.circuit_name || load.device_name || load.name || 'Unknown';
 
                                         return (
                                             <tr key={i} className="border-b border-black h-7 text-center hover:bg-gray-50">
                                                 <td className="border-r border-black font-bold">{i + 1}</td>
-                                                <td className="border-r border-black text-left px-2 font-medium">{load.device_name}</td>
+                                                <td className="border-r border-black text-left px-2 font-medium truncate max-w-[200px]">{name}</td>
 
                                                 {/* CB */}
-                                                <td className="border-r border-black">{load.breaker_poles || 1}</td>
-                                                <td className="border-r border-black font-bold">{load.breaker_at || load.breaker_size}</td>
-                                                <td className="border-r border-black text-[10px]">{load.breaker_type || 'CB'}</td>
-                                                <td className="border-r border-black">{load.breaker_ic_ka || 6}</td>
+                                                <td className="border-r border-black">{poles}</td>
+                                                <td className="border-r border-black font-bold">{at}</td>
+                                                <td className="border-r border-black text-[10px]">{type}</td>
+                                                <td className="border-r border-black">{ic}</td>
 
                                                 {/* Wire */}
                                                 <td className="border-r border-black">{wireStr}</td>
                                                 <td className="border-r border-black">{load.wire_type || 'IEC01'}</td>
 
                                                 {/* Conduit */}
-                                                <td className="border-r border-black">{load.conduit_size || '1/2"'}</td>
+                                                <td className="border-r border-black">{load.conduit_size || load.trade_size || '1/2"'}</td>
                                                 <td className="border-r border-black">{load.conduit_type || 'EMT'}</td>
 
                                                 {/* Load */}
-                                                <td className="font-bold text-right px-2">{(load.load_va_l1 || load.total_va || Math.round((load.power_kw || 0) * 1000) || 0).toLocaleString()}</td>
+                                                <td className="font-bold text-right px-2">{getLoadVA(load).toLocaleString()}</td>
                                             </tr>
                                         );
                                     })}

@@ -77,7 +77,7 @@ function App() {
       setIsAuthLoading(false);
 
       if (session) {
-        logger.info('App initialized: Auth session found', { user: session.user.email });
+        logger.info('App initialized: Auth session found', { email: session.user.email });
       }
     });
 
@@ -117,111 +117,111 @@ function App() {
       return; // Wait for auth
     }
 
-    const initSession = async () => {
-      console.log('[SESSION-DEBUG] initSession started, current sessionId state:', sessionId);
-      // 🔧 FIX: Check if we have a saved session that's still valid
-      const savedSessionId = localStorage.getItem('mozart_session_id');
+    const fetchSessionData = async (id: string) => {
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || '';
+        const token = session?.access_token;
+        logger.debug(`[SESSION] Fetching data for ${id}...`);
 
-      if (savedSessionId) {
-        console.log('[SESSION-DEBUG] ✅ Found in localStorage:', savedSessionId);
-        setSessionId(savedSessionId);
-        console.log('[SESSION-DEBUG] setSessionId called with:', savedSessionId);
-
-        // 🔧 FIX 2026-01-05: Also load saved design data from backend
-        try {
-          const API_URL = import.meta.env.VITE_API_URL || '';
-          const token = session?.access_token;
-          const res = await fetch(`${API_URL}/api/v1/session/${savedSessionId}/data`, {
-            headers: {
-              ...(token && { 'Authorization': `Bearer ${token}` })
-            }
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            console.log('📂 Restored session data:', data.project_name);
-
-            // Restore project name
-            if (data.project_name) {
-              setProjectName(data.project_name);
-            }
-
-            // Restore design result if available
-            if (data.mcp_response?.display_data) {
-              const displayData = data.mcp_response.display_data;
-              setResultData({
-                success: true,
-                message: 'Design restored from session',
-                data: {
-                  loads: (displayData.circuits || []).map((ckt: {
-                    room?: string;
-                    floor?: string;
-                    circuit_name: string;
-                    total_kw: number;
-                    total_current: number;
-                    breaker_rating: number;
-                    wire_size: string;
-                    conduit_size?: string;
-                    vd_percent?: number;
-                  }) => ({
-                    room_name: ckt.room || ckt.floor || '',
-                    device_name: ckt.circuit_name,
-                    power_kw: ckt.total_kw,
-                    current_a: ckt.total_current,
-                    breaker_size: ckt.breaker_rating,
-                    wire_size: `${ckt.wire_size} mm²`,
-                    conduit_size: ckt.conduit_size,
-                    voltage_drop_percent: ckt.vd_percent,
-                  })),
-                  warnings: displayData.warnings || [],
-                  explainable_warnings: displayData.explainable_warnings,
-                  assumptions: displayData.assumptions,
-                  total_power_kw: displayData.total_kw,
-                  main_breaker: Number.parseInt(displayData.main_breaker) || 0,
-                  audit_table: data.mcp_response?.audit_results || undefined,
-                }
-              });
-              console.log('✅ Design restored with', displayData.circuits?.length || 0, 'circuits');
-            }
-
-            // Restore SLD data if available
-            if (data.mcp_response?.sld_data) {
-              setSldData(data.mcp_response.sld_data);
-            }
-          } else if (res.status !== 404) {
-            console.warn('⚠️ Could not load session data:', res.status);
+        const res = await fetch(`${API_URL}/api/v1/session/${id}/data`, {
+          headers: {
+            ...(token && { 'Authorization': `Bearer ${token}` })
           }
-        } catch (e) {
-          console.warn('⚠️ Session data load failed (non-blocking):', e);
-        }
+        });
 
+        if (res.ok) {
+          const data = await res.json();
+          logger.info('[SESSION] Data restored successfully', { sessionId: id, projectName: data.project_name });
+
+          if (data.project_name) setProjectName(data.project_name);
+
+          // Restore Result Data
+          if (data.mcp_response?.display_data) {
+            const displayData = data.mcp_response.display_data;
+            setResultData({
+              success: true,
+              message: 'Design restored',
+              data: {
+                loads: (displayData.circuits || []).map((ckt: any) => ({
+                  room_name: ckt.room || ckt.floor || '',
+                  device_name: ckt.circuit_name,
+                  power_kw: ckt.total_kw,
+                  current_a: ckt.total_current,
+                  breaker_size: ckt.breaker_rating,
+                  wire_size: `${ckt.wire_size} mm²`,
+                  conduit_size: ckt.conduit_size,
+                  voltage_drop_percent: ckt.vd_percent,
+                  // Full mapping for PDF support
+                  load_va_l1: ckt.load_va_l1 || ckt.total_va || 0,
+                  load_va_l2: ckt.load_va_l2 || 0,
+                  load_va_l3: ckt.load_va_l3 || 0,
+                  total_va: ckt.total_va || 0,
+                  breaker_type: ckt.breaker_type || 'MCB',
+                  breaker_poles: ckt.breaker_poles || 1,
+                  breaker_ic_ka: ckt.breaker_ic_ka || 6,
+                  wire_type: ckt.wire_type || 'IEC01',
+                  conduit_type: ckt.conduit_type || 'PVC',
+                  requires_rcbo: ckt.requires_rcbo || false,
+                  remark: ckt.remark || '',
+                })),
+                warnings: displayData.warnings || [],
+                explainable_warnings: displayData.explainable_warnings,
+                assumptions: displayData.assumptions,
+                total_power_kw: displayData.total_kw,
+                main_breaker: Number.parseInt(displayData.main_breaker) || 0,
+                audit_table: data.mcp_response?.audit_results,
+                project_name: displayData.project_name,
+                demand_factor: displayData.demand_factor,
+                main_cb_type: displayData.main_cb_type,
+                main_feeder_size: displayData.main_feeder_size,
+                main_feeder_type: displayData.main_feeder_type,
+                main_raceway_size: displayData.main_raceway_size,
+                main_raceway_type: displayData.main_raceway_type,
+              }
+            });
+          }
+
+          // Restore SLD
+          if (data.mcp_response?.sld_data) {
+            setSldData(data.mcp_response.sld_data);
+          }
+        }
+      } catch (e: any) {
+        logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
+      }
+    };
+
+    const initSession = async () => {
+      // Case 1: Session ID exists in state -> just fetch data
+      if (sessionId) {
+        await fetchSessionData(sessionId);
         setIsSessionLoading(false);
         return;
       }
 
-      // No saved session, create new one
+      // Case 2: Check LocalStorage (redundant if useState initialized correctly, but safe)
+      const savedSessionId = localStorage.getItem('mozart_session_id');
+      if (savedSessionId) {
+        setSessionId(savedSessionId);
+        // Effect will run again when sessionId changes, triggering Case 1
+        return;
+      }
+
+      // Case 3: Create NEW session
       try {
-        console.log('🚀 Starting new session...');
+        logger.info('🚀 Starting new session...', { from: 'initSession' });
         const result = await startSession();
         setSessionId(result.session_id);
-        setProjectName((result as { session_id: string; project_name?: string }).project_name || 'บ้านนายสมหญิง');
-        console.log('✅ Session started:', result.session_id);
-      } catch (error) {
-        console.error('❌ Failed to start session:', error);
-        // Fallback: generate local session ID
-        const localId = `local-${Date.now()}`;
-        setSessionId(localId);
-        console.log('⚠️ Using local session:', localId);
+        setProjectName(result.project_name || 'บ้านนายสมหญิง');
+        logger.info('✅ Session started successfully', { sessionId: result.session_id });
+      } catch (error: any) {
+        logger.error('❌ Failed to create session', { error: error.message });
       } finally {
         setIsSessionLoading(false);
       }
     };
 
-    if (!sessionId) {
-      initSession();
-    } else {
-      setIsSessionLoading(false);
-    }
+    initSession();
   }, [session, sessionId]);
 
   // === LOGOUT HANDLER ===
