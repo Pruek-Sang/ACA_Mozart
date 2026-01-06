@@ -127,7 +127,7 @@ class TestSessionIntegration(unittest.TestCase):
         self.assertIn('def list_projects', content)
     
     def test_09_start_session_accepts_project_name(self):
-        """Test that start_session accepts project_name parameter."""
+        """Test that start_session accepts project_name from request body."""
         import re
         
         routes_path = os.path.join(
@@ -136,8 +136,9 @@ class TestSessionIntegration(unittest.TestCase):
         with open(routes_path, 'r') as f:
             content = f.read()
         
-        # Check project_name parameter
-        self.assertIn('project_name: str = None', content)
+        # Check project_name is parsed from body (not query param anymore)
+        # New code uses: body.get("project_name")
+        self.assertIn('body.get("project_name")', content)
         self.assertIn('project_name=project_name', content)
 
 
