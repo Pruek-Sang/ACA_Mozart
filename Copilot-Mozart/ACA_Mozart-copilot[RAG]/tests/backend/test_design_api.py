@@ -10,6 +10,10 @@ Run: pytest tests/backend/test_design_api.py -v
 import pytest
 
 
+
+from unittest.mock import MagicMock, patch
+
+
 class TestDesignAsk:
     """Test POST /api/v1/ask"""
     
