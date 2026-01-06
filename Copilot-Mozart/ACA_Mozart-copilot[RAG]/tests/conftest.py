@@ -63,6 +63,11 @@ def test_client():
     Uses the actual app from routes.py.
     """
     from fastapi.testclient import TestClient
+    
+    # 🩹 CI HOTFIX: Inject dummy keys to pass startup checks in service.py
+    if not os.getenv("GOOGLE_API_KEY"):
+        os.environ["GOOGLE_API_KEY"] = "dummy-ci-key"
+        
     from app.routes import app
     
     with TestClient(app) as client:
