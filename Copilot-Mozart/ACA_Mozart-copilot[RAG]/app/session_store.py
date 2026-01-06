@@ -175,14 +175,61 @@ class SessionStore:
         return session
     
     def get_session(self, session_id: str) -> Optional[ConversationSession]:
-        """Get session by ID, returns None if expired or not found"""
+        """
+        Get session by ID.
+        1. Check In-Memory
+        2. If not found and Supabase enabled, Check Supabase
+        3. If found in Supabase, Restore to In-Memory
+        """
+        # 1. Check In-Memory
         session = self._sessions.get(session_id)
         if session:
             if session.is_expired(self.ttl):
-                logger.info(f"Session expired: {session_id}")
+                logger.info(f"Session expired (in-memory): {session_id}")
                 del self._sessions[session_id]
                 return None
             return session
+        
+        # 2. Check Supabase (Fallback)
+        if self._use_injector and self._injector:
+            import asyncio
+            try:
+                # Use async wrapper for synchronous call if needed, or if injector is async
+                # Assuming injector.load(id) is async, we need to run it.
+                # If it's sync, just call it. Based on context/session_injector.py, let's assume async.
+                
+                # NOTE: We need to properly handle async in sync context
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                session_data = loop.run_until_complete(self._injector.load(session_id))
+                loop.close()
+                
+                if session_data:
+                    # Convert SessionData (Pydantic model from injector) to ConversationSession
+                    logger.info(f"Restoring session from Supabase: {session_id}")
+                    
+                    # Manual mapping or if SessionData is compatible
+                    restored_session = ConversationSession(
+                        session_id=session_data.session_id,
+                        # Map other fields from session_data
+                    )
+                    # For now, let's assume we construct it manually since ConversationSession is a dataclass
+                    restored_session.stage = session_data.stage
+                    restored_session.created_at = session_data.created_at
+                    restored_session.updated_at = session_data.updated_at
+                    restored_session.project_name = session_data.project_name
+                    restored_session.partial_requirements = session_data.partial_requirements or {}
+                    restored_session.messages = session_data.messages or []
+                    restored_session.current_spec = session_data.current_spec
+                    restored_session.mcp_response = session_data.mcp_response
+                    
+                    # Cache in memory
+                    self._sessions[session_id] = restored_session
+                    return restored_session
+                    
+            except Exception as e:
+                logger.warning(f"Failed to load session from Supabase: {e}")
+        
         return None
     
     def update_requirements(self, session_id: str, new_data: Dict[str, Any]):

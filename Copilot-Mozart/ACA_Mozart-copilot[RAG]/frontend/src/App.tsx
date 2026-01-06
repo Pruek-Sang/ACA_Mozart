@@ -112,9 +112,16 @@ function App() {
 
   // === 🆕 AUTO-START SESSION (only if no saved session) ===
   useEffect(() => {
+    // 1. Wait until Auth is fully loaded
+    if (isAuthLoading) {
+      return;
+    }
+
+    // 2. Need Auth Session? (If your app requires login to fetch data)
     if (!session) {
-      console.log('[SESSION-DEBUG] Waiting for auth session...');
-      return; // Wait for auth
+      console.log('[SESSION-DEBUG] No auth session, skipping data fetch.');
+      // Optionally handles guest mode here if needed
+      return;
     }
 
     const fetchSessionData = async (id: string) => {
@@ -188,41 +195,40 @@ function App() {
         }
       } catch (e: any) {
         logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
-      }
-    };
-
-    const initSession = async () => {
-      // Case 1: Session ID exists in state -> just fetch data
-      if (sessionId) {
-        await fetchSessionData(sessionId);
-        setIsSessionLoading(false);
-        return;
-      }
-
-      // Case 2: Check LocalStorage (redundant if useState initialized correctly, but safe)
-      const savedSessionId = localStorage.getItem('mozart_session_id');
-      if (savedSessionId) {
-        setSessionId(savedSessionId);
-        // Effect will run again when sessionId changes, triggering Case 1
-        return;
-      }
-
-      // Case 3: Create NEW session
-      try {
-        logger.info('🚀 Starting new session...', { from: 'initSession' });
-        const result = await startSession();
-        setSessionId(result.session_id);
-        setProjectName(result.project_name || 'บ้านนายสมหญิง');
-        logger.info('✅ Session started successfully', { sessionId: result.session_id });
-      } catch (error: any) {
-        logger.error('❌ Failed to create session', { error: error.message });
       } finally {
         setIsSessionLoading(false);
       }
     };
 
+    const initSession = async () => {
+      // ✅ Case 1: Check LocalStorage FIRST (Priority)
+      const savedSessionId = localStorage.getItem('mozart_session_id');
+
+      // Use saved ID if available AND matches current state (or state is empty)
+      const targetId = savedSessionId || sessionId;
+
+      if (targetId) {
+        // Restore existing session
+        if (targetId !== sessionId) setSessionId(targetId); // Sync state
+        await fetchSessionData(targetId);
+      } else {
+        // ✅ Case 2: Only create NEW session if absolutely no ID exists
+        try {
+          logger.info('🚀 Starting new session...', { from: 'initSession' });
+          const result = await startSession();
+          setSessionId(result.session_id);
+          setProjectName(result.project_name || 'บ้านนายสมหญิง');
+          logger.info('✅ Session started successfully', { sessionId: result.session_id });
+        } catch (error: any) {
+          logger.error('❌ Failed to create session', { error: error.message });
+        } finally {
+          setIsSessionLoading(false);
+        }
+      }
+    };
+
     initSession();
-  }, [session, sessionId]);
+  }, [isAuthLoading, session]); // Run when Auth status settles
 
   // === LOGOUT HANDLER ===
   const handleLogout = async () => {
