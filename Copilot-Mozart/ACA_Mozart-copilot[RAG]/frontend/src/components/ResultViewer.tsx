@@ -149,6 +149,112 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
         console.log('[DOWNLOAD] 📄 Opening PDF Preview for download');
     }, []);
 
+    /**
+     * 🆕 BOQ Excel Download Function
+     * Exports Bill of Quantities with pricing to Excel
+     */
+    const handleDownloadBOQExcel = useCallback(() => {
+        try {
+            if (!data?.data?.loads) {
+                alert('❌ ไม่มีข้อมูลสำหรับ BOQ');
+                return;
+            }
+
+            const loads = data.data.loads;
+            const circuitCount = loads.length || 1;
+
+            // Price Catalog (same as BOQ tab)
+            const PRICES = {
+                MCB_1P: 78,
+                RCBO_1P: 1133,
+                LC_30: 6108,
+                LC_18: 3600,
+                WIRE_2_5: 10,
+                WIRE_4: 18,
+                PVC_HALF: 10,
+                MAIN_WIRE_M: 237,
+                MAIN_CONDUIT_M: 121,
+                LABOR_PERCENT: 0.35,
+            };
+
+            // Count breakers
+            let mcbCount = 0;
+            let rcboCount = 0;
+            loads.forEach((item: LoadResult) => {
+                if ((item as any).requires_rcbo || (item as any).breaker_type === 'RCBO') {
+                    rcboCount++;
+                } else {
+                    mcbCount++;
+                }
+            });
+
+            // Calculate costs
+            const lcPrice = circuitCount > 18 ? PRICES.LC_30 : PRICES.LC_18;
+            const lcSlots = circuitCount > 18 ? 30 : 18;
+            const mainBreakerPrice = 2884;
+            const wireLength = circuitCount * 15;
+
+            const e1_material = (50 * PRICES.MAIN_WIRE_M) + (15 * 62) + (18 * PRICES.MAIN_CONDUIT_M) + 1000;
+            const e1_labor = Math.round(e1_material * PRICES.LABOR_PERCENT);
+            const e2_material = lcPrice + mainBreakerPrice + (mcbCount * PRICES.MCB_1P) + (rcboCount * PRICES.RCBO_1P) + 1000;
+            const e2_labor = 4000;
+            const e3_material = (wireLength * PRICES.WIRE_2_5 * 3) + (wireLength * PRICES.PVC_HALF) + 5000;
+            const e3_labor = Math.round(e3_material * PRICES.LABOR_PERCENT);
+
+            const totalMaterial = e1_material + e2_material + e3_material;
+            const totalLabor = e1_labor + e2_labor + e3_labor;
+            const grandTotal = totalMaterial + totalLabor;
+            const vat = Math.round(grandTotal * 0.07);
+            const finalTotal = grandTotal + vat;
+
+            // Build Excel data
+            const excelData = [
+                ['Bill of Quantities (BOQ) - งานระบบไฟฟ้า'],
+                [`โครงการ: ${data.data?.project_name || 'Residential'}`],
+                [`วันที่: ${new Date().toLocaleDateString('th-TH')}`],
+                [],
+                ['หมวด', 'รายการ', 'จำนวน', 'หน่วย', 'ราคา/หน่วย', 'ค่าวัสดุ', 'ค่าแรง', 'รวม'],
+                [],
+                ['E.1', 'สายเมนไฟฟ้าแรงต่ำ', '', '', '', e1_material, e1_labor, e1_material + e1_labor],
+                ['', '- สายไฟ IEC01-50 Sq.mm', 50, 'ม.', PRICES.MAIN_WIRE_M, 50 * PRICES.MAIN_WIRE_M, '', ''],
+                ['', '- สายดิน IEC01-25 Sq.mm', 15, 'ม.', 62, 15 * 62, '', ''],
+                ['', '- ท่อ EMT 1-1/2"', 18, 'ม.', PRICES.MAIN_CONDUIT_M, 18 * PRICES.MAIN_CONDUIT_M, '', ''],
+                [],
+                ['E.2', `ตู้ไฟฟ้า Load Center ${lcSlots} ช่อง`, '', '', '', e2_material, e2_labor, e2_material + e2_labor],
+                ['', `- ตู้ LC ${lcSlots} ช่อง`, 1, 'ชุด', lcPrice, lcPrice, '', ''],
+                ['', `- Main MCB 2P ${data.data?.main_breaker || 100}AT`, 1, 'ตัว', mainBreakerPrice, mainBreakerPrice, '', ''],
+                ['', '- MCB 1P (Branch)', mcbCount, 'ตัว', PRICES.MCB_1P, mcbCount * PRICES.MCB_1P, '', ''],
+                ['', '- RCBO 1P 30mA', rcboCount, 'ตัว', PRICES.RCBO_1P, rcboCount * PRICES.RCBO_1P, '', ''],
+                [],
+                ['E.3', `สายไฟฟ้าวงจรย่อย (${wireLength} ม.)`, '', '', '', e3_material, e3_labor, e3_material + e3_labor],
+                ['', '- สายไฟ IEC01-2.5 Sq.mm (L,N,G)', wireLength * 3, 'ม.', PRICES.WIRE_2_5, wireLength * 3 * PRICES.WIRE_2_5, '', ''],
+                ['', '- ท่อ PVC 1/2"', wireLength, 'ม.', PRICES.PVC_HALF, wireLength * PRICES.PVC_HALF, '', ''],
+                [],
+                ['', 'รวมค่าวัสดุ', '', '', '', totalMaterial, '', ''],
+                ['', 'รวมค่าแรง', '', '', '', '', totalLabor, ''],
+                ['', 'รวมก่อน VAT', '', '', '', '', '', grandTotal],
+                ['', 'VAT 7%', '', '', '', '', '', vat],
+                ['', 'รวมทั้งสิ้น', '', '', '', '', '', finalTotal],
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'BOQ');
+
+            ws['!cols'] = [
+                { wch: 8 }, { wch: 35 }, { wch: 10 }, { wch: 8 },
+                { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+            ];
+
+            const dateStr = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `BOQ_${dateStr}.xlsx`);
+            console.log('[DOWNLOAD] ✅ BOQ Excel downloaded');
+        } catch (error) {
+            console.error('[DOWNLOAD] ❌ BOQ Excel error:', error);
+            alert(`❌ Download Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }, [data]);
+
     // === EARLY RETURNS AFTER ALL HOOKS ===
 
     // Loading State
@@ -209,14 +315,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     <DownloadDropdown
                         onDownloadExcel={handleDownloadExcel}
                         onDownloadPDF={handleDownloadPDF}
-                        onDownloadBOQExcel={() => {
-                            // Use existing Excel logic but adapted for BOQ if needed, 
-                            // or just alert 'Coming Soon' if logic not ready.
-                            // Actually, let's just trigger the BOQ Modal for now as it has the logic rendered?
-                            // No, better to direct to the implemented features.
-                            // Implementing simplistic BOQ Excel download reuse or specific message.
-                            alert('📥 Coming Soon: Direct BOQ Excel Download');
-                        }}
+                        onDownloadBOQExcel={handleDownloadBOQExcel}
                         onDownloadBOQPDF={() => setBOQPDFOpen(true)}
                         onDownloadSLD={() => setSLDPDFOpen(true)}
                         onPreview={() => setPDFPreviewOpen(true)}
