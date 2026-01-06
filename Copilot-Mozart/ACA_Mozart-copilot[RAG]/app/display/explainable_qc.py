@@ -160,14 +160,16 @@ def create_explainable_warning(
     if before_value:
         action_desc = action_desc.replace("{before}", before_value)
     else:
-        # Fallback: remove placeholder or use generic term
-        action_desc = action_desc.replace("{before}", "ขนาดเดิม")
+        # Fallback: use clearer instruction instead of vague placeholder
+        if "{before}" in action_desc:
+            action_desc = action_desc.replace("{before}", "(ดูค่าในตาราง)")
 
     if after_value:
         action_desc = action_desc.replace("{after}", after_value)
     else:
-        # Fallback
-        action_desc = action_desc.replace("{after}", "ขนาดที่เหมาะสม")
+        # Fallback: use clearer instruction
+        if "{after}" in action_desc:
+            action_desc = action_desc.replace("{after}", "(ดูค่าแนะนำในตาราง)")
     
     return {
         "code": warning_code,

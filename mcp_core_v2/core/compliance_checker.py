@@ -163,7 +163,7 @@ class ComplianceChecker:
             self.warnings.append({
                 'code': 'NEC_210.19_A_1',
                 'severity': 'info',
-                'message': f'{len(continuous_loads)} continuous loads require 125% sizing factor'
+                'message': f'✅ {len(continuous_loads)} continuous loads - ใช้ 125% sizing factor แล้ว (วสท./NEC)'
             })
     
     def _check_special_requirements(self, loads: List[ElectricalLoad]):

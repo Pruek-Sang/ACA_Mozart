@@ -78,19 +78,31 @@ class MarkdownFormatter(BaseFormatter):
             lines.extend(self._create_load_schedule(loads, wire_sizing, breaker_selections))
             lines.extend(self._create_breaker_summary(breaker_selections))
         
-        # 🆕 Collect circuits using default distance for Summary
-        default_circuits = []
-        for cid, w in wire_sizing.items():
-            if w.get('used_default_distance', False):
-                # Try to map ID to name if possible, or use ID
-                # (Simple lookup from grouped_circuits would be better but expensive here)
-                # We'll use the ID or try to find name in grouped_circuits
-                c_name = cid
-                for c in grouped_circuits:
-                    if c.get('circuit_id') == cid or c.get('id') == cid:
-                        c_name = c.get('circuit_name', cid)
-                        break
-                default_circuits.append(c_name)
+        # 🆕 FIX: Collect UNIQUE circuits using default distance (not load count!)
+        # Map: load.id → circuit_name, then deduplicate
+        default_circuits_set = set()  # Use set for unique names
+        
+        # Build a lookup: load_id → circuit_name
+        load_to_circuit = {}
+        for circuit in grouped_circuits:
+            circuit_name = circuit.get('circuit_name', circuit.get('name', 'Unknown'))
+            for load in circuit.get('loads', []):
+                load_id = load.get('id')
+                if load_id:
+                    load_to_circuit[load_id] = circuit_name
+        
+        # Now check wire_sizing for default distances
+        for load_id, w in wire_sizing.items():
+            if load_id.startswith('_'):  # Skip metadata
+                continue
+            if not isinstance(w, dict):
+                continue
+            # Only flag if distance_source is "default_table" (not user's floor_distances)
+            if w.get('distance_source') == 'default_table':
+                circuit_name = load_to_circuit.get(load_id, load_id)
+                default_circuits_set.add(circuit_name)
+        
+        default_circuits = list(default_circuits_set)
         
         lines.extend(self._create_notes_section(warnings, errors, default_circuits))
         lines.extend(self._create_footer())
@@ -518,7 +530,7 @@ class MarkdownFormatter(BaseFormatter):
             if key not in breaker_info:
                 breaker_info[key] = {'count': 0, 'circuits': []}
             breaker_info[key]['count'] += 1
-            breaker_info[key]['circuits'].append(ckt_name[:20])  # Increased from 12 to 20
+            breaker_info[key]['circuits'].append(ckt_name)  # Full name, no truncation
         
         for rating, info in sorted(breaker_info.items()):
             circuits_str = ", ".join(info['circuits'][:3])
