@@ -118,7 +118,7 @@ export async function askDesign(
  * Start a new design session
  * Sessions remember site_context across multiple turns
  */
-export async function startSession(): Promise<{ session_id: string }> {
+export async function startSession(): Promise<{ session_id: string; project_name?: string }> {
     const token = await getAccessToken();
 
     const response = await fetch(buildApiUrl('/api/v1/session/start'), {

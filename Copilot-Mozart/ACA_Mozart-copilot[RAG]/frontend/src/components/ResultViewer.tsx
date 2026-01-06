@@ -209,6 +209,16 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     <DownloadDropdown
                         onDownloadExcel={handleDownloadExcel}
                         onDownloadPDF={handleDownloadPDF}
+                        onDownloadBOQExcel={() => {
+                            // Use existing Excel logic but adapted for BOQ if needed, 
+                            // or just alert 'Coming Soon' if logic not ready.
+                            // Actually, let's just trigger the BOQ Modal for now as it has the logic rendered?
+                            // No, better to direct to the implemented features.
+                            // Implementing simplistic BOQ Excel download reuse or specific message.
+                            alert('📥 Coming Soon: Direct BOQ Excel Download');
+                        }}
+                        onDownloadBOQPDF={() => setBOQPDFOpen(true)}
+                        onDownloadSLD={() => setSLDPDFOpen(true)}
                         onPreview={() => setPDFPreviewOpen(true)}
                     />
                 </div>

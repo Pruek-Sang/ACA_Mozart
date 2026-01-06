@@ -13,17 +13,12 @@ import { cn } from '../lib/utils';
  * - Three options: Excel, PDF, Preview
  */
 
-export interface DownloadOption {
-    id: 'excel' | 'pdf' | 'preview';
-    label: string;
-    icon: React.ReactNode;
-    description: string;
-    color: string;
-}
-
 interface DownloadDropdownProps {
     onDownloadExcel: () => void;
     onDownloadPDF: () => void;
+    onDownloadBOQExcel: () => void;
+    onDownloadBOQPDF: () => void;
+    onDownloadSLD: () => void;
     onPreview: () => void;
     disabled?: boolean;
 }
@@ -31,6 +26,9 @@ interface DownloadDropdownProps {
 export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({
     onDownloadExcel,
     onDownloadPDF,
+    onDownloadBOQExcel,
+    onDownloadBOQPDF,
+    onDownloadSLD,
     onPreview,
     disabled = false,
 }) => {
@@ -42,29 +40,50 @@ export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({
     const options: DownloadOption[] = [
         {
             id: 'excel',
-            label: 'Download Excel',
+            label: 'Load Schedule (Excel)',
             icon: <FileSpreadsheet size={18} />,
-            description: 'ตารางละเอียด 18 columns',
+            description: 'ตารางโหลด .xlsx',
             color: 'text-emerald-400',
         },
         {
             id: 'pdf',
-            label: 'Download PDF',
+            label: 'Load Schedule (PDF)',
             icon: <FileText size={18} />,
-            description: 'เอกสารพร้อมพิมพ์',
+            description: 'เอกสารตารางโหลด',
             color: 'text-rose-400',
+        },
+        {
+            id: 'boq_excel',
+            label: 'BOQ (Excel)',
+            icon: <Receipt size={18} />,
+            description: 'ใบเสนอราคาวัสดุ',
+            color: 'text-amber-400',
+        },
+        {
+            id: 'boq_pdf',
+            label: 'BOQ (PDF)',
+            icon: <Receipt size={18} />,
+            description: 'เอกสาร BOQ พร้อมพิมพ์',
+            color: 'text-orange-400',
+        },
+        {
+            id: 'sld',
+            label: 'Circuit Diagram (SLD)',
+            icon: <FileImage size={18} />,
+            description: 'แผนภาพเส้นเดียว',
+            color: 'text-violet-400',
         },
         {
             id: 'preview',
             label: 'Print Preview',
             icon: <Eye size={18} />,
-            description: 'ดูตัวอย่างก่อนพิมพ์',
+            description: 'ดูตัวอย่างเอกสาร',
             color: 'text-sky-400',
         },
     ];
 
     // Handle option selection
-    const handleSelect = useCallback((optionId: DownloadOption['id']) => {
+    const handleSelect = useCallback((optionId: string) => {
         setIsOpen(false);
         setFocusedIndex(-1);
 
@@ -75,11 +94,20 @@ export const DownloadDropdown: React.FC<DownloadDropdownProps> = ({
             case 'pdf':
                 onDownloadPDF();
                 break;
+            case 'boq_excel':
+                onDownloadBOQExcel();
+                break;
+            case 'boq_pdf':
+                onDownloadBOQPDF();
+                break;
+            case 'sld':
+                onDownloadSLD();
+                break;
             case 'preview':
                 onPreview();
                 break;
         }
-    }, [onDownloadExcel, onDownloadPDF, onPreview]);
+    }, [onDownloadExcel, onDownloadPDF, onDownloadBOQExcel, onDownloadBOQPDF, onDownloadSLD, onPreview]);
 
     // Click outside to close
     useEffect(() => {

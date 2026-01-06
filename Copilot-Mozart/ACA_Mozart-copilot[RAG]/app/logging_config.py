@@ -21,7 +21,10 @@ def setup_logging():
     )
     
     # Cloud Integration
-    if settings.APP_ENV in ["production", "staging"]:
+    # Defensive programming: Handle case where APP_ENV might be missing or Pydantic version conflict
+    env = getattr(settings, "APP_ENV", "development")
+    
+    if env in ["production", "staging"]:
         try:
             import google.cloud.logging
             
@@ -32,11 +35,11 @@ def setup_logging():
             # effectively capturing all standard python logging calls
             client.setup_logging()
             
-            logging.info(f"✅ Google Cloud Logging enabled [{settings.APP_ENV}]")
+            logging.info(f"✅ Google Cloud Logging enabled [{env}]")
             
         except ImportError:
             logging.warning("⚠️ google-cloud-logging package not found. Skipping Cloud setup.")
         except Exception as e:
             logging.error(f"❌ Failed to initialize Cloud Logging: {e}")
     else:
-        logging.info(f"ℹ️ Local logging mode [{settings.APP_ENV}]")
+        logging.info(f"ℹ️ Local logging mode [{env}]")

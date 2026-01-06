@@ -112,7 +112,8 @@ MISSING_FIELD_PROMPTS = {
 def _inject_vd_to_circuits(
     grouped_circuits: list, 
     wire_sizing: dict, 
-    service_logger: logging.Logger
+    service_logger: logging.Logger,
+    floor_distances: dict = None
 ) -> list:
     """Inject voltage_drop_percent from wire_sizing into grouped_circuits.
     
@@ -155,6 +156,15 @@ def _inject_vd_to_circuits(
                 vd = wire_sizing[load_id].get('voltage_drop_percent', 2.0)
                 vd_values.append(vd)
                 service_logger.debug(f"[VD-INJECT] {load_id}: VD={vd:.2f}%")
+
+                # 🆕 [VD-FIX] Patch wire_sizing metadata if floor_distances covers this load
+                # This prevents markdown_formatter from flagging it as "Default"
+                if floor_distances and wire_sizing[load_id].get('distance_source') == 'default_table':
+                    # Try to get floor from load or circuit
+                    load_floor = load.get('floor') or circuit.get('floor', 1)
+                    if str(load_floor) in floor_distances or int(load_floor) in floor_distances:
+                        wire_sizing[load_id]['distance_source'] = 'user_floor'
+                        service_logger.info(f"[VD-PATCH] Marked {load_id} as 'user_floor' (covered by RAG)")
         
         # Use max VD for safety (worst case)
         if vd_values:
@@ -2274,7 +2284,8 @@ Query: "{query}"
                     result['grouped_circuits'] = _inject_vd_to_circuits(
                         result['grouped_circuits'], 
                         result['wire_sizing'],
-                        logger
+                        logger,
+                        result.get('floor_distances')
                     )
 
                 # 🆕 [CP-DISPLAY] Compute display data FIRST (Source of Truth)

@@ -1,9 +1,9 @@
+import { buildApiUrl } from './utils';
+
 /**
  * Remote Logger (Aura's Eyes)
  * Sends frontend logs to the backend for Cloud Logging ingestion.
  */
-
-const API_LOG_ENDPOINT = '/api/v1/logs';
 
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR' | 'DEBUG';
 
@@ -14,9 +14,11 @@ interface LogContext {
 class RemoteLogger {
     private static instance: RemoteLogger;
     private isDev: boolean;
+    private endpoint: string;
 
     private constructor() {
         this.isDev = import.meta.env.DEV;
+        this.endpoint = buildApiUrl('/api/v1/logs');
     }
 
     public static getInstance(): RemoteLogger {
@@ -52,7 +54,7 @@ class RemoteLogger {
 
         try {
             // Fire and forget - don't await response to avoid blocking UI
-            fetch(API_LOG_ENDPOINT, {
+            fetch(this.endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -63,8 +65,8 @@ class RemoteLogger {
                     context: enrichedContext
                 })
             }).catch(err => {
-                // Fallback if backend logging fails (don't create infinite loop)
-                console.warn('Failed to send log to backend:', err);
+                // Fallback if backend logging fails
+                if (this.isDev) console.warn('Failed to send log to backend:', err);
             });
         } catch {
             // Ignore network errors for logging
