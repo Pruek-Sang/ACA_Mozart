@@ -194,15 +194,20 @@ class SessionStore:
         if self._use_injector and self._injector:
             import asyncio
             try:
-                # Use async wrapper for synchronous call if needed, or if injector is async
-                # Assuming injector.load(id) is async, we need to run it.
-                # If it's sync, just call it. Based on context/session_injector.py, let's assume async.
-                
-                # NOTE: We need to properly handle async in sync context
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                session_data = loop.run_until_complete(self._injector.load(session_id))
-                loop.close()
+                # Use same pattern as create_session() for nested event loops
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # We're in an async context (e.g., FastAPI), use ThreadPoolExecutor
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        session_data = pool.submit(
+                            asyncio.run, 
+                            self._injector.load(session_id)
+                        ).result()
+                else:
+                    session_data = loop.run_until_complete(
+                        self._injector.load(session_id)
+                    )
                 
                 if session_data:
                     # Convert SessionData (Pydantic model from injector) to ConversationSession
@@ -210,14 +215,17 @@ class SessionStore:
                     
                     # Manual mapping or if SessionData is compatible
                     restored_session = ConversationSession(
-                        session_id=session_data.session_id,
+                        session_id=session_data.id,  # Use .id not .session_id
                         # Map other fields from session_data
                     )
                     # For now, let's assume we construct it manually since ConversationSession is a dataclass
                     restored_session.stage = session_data.stage
                     restored_session.created_at = session_data.created_at
                     restored_session.updated_at = session_data.updated_at
-                    restored_session.project_name = session_data.project_name
+                    # Note: ConversationSession doesn't have project_name in original dataclass
+                    # but we'll set it if the attribute exists
+                    if hasattr(restored_session, 'project_name'):
+                        restored_session.project_name = session_data.project_name
                     restored_session.partial_requirements = session_data.partial_requirements or {}
                     restored_session.messages = session_data.messages or []
                     restored_session.current_spec = session_data.current_spec
