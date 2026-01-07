@@ -508,20 +508,33 @@ async def start_session(request: Request):
     
     logger.info(f"🆕 [SESSION-START] Creating session for user={user_id}, project={project_name}")
     
-    # Check if we are really using Supabase or falling back
-    if session_store._use_injector:
-         logger.info("✅ [SESSION-START] Using Supabase storage")
-    else:
-         logger.warning("⚠️ [SESSION-START] Using In-Memory storage (Data will be lost on restart!)")
-         
-    session = session_store.create_session(user_id=user_id, project_name=project_name)
+    # 🔧 FIX: Call session_injector.create() DIRECTLY (async → async)
+    # Previously used sync session_store.create_session() which had async/sync mismatch issues
+    session_id = None
+    actual_project_name = project_name or "บ้านนายสมหญิง"
+    
+    if SUPABASE_AVAILABLE and session_injector and session_injector.is_available():
+        try:
+            logger.info("✅ [SESSION-START] Using Supabase storage (DIRECT)")
+            session_data = await session_injector.create(user_id=user_id, project_name=actual_project_name)
+            if session_data:
+                session_id = session_data.id
+                logger.info(f"✅ [SESSION-START] Supabase session created: {session_id[:8]}...")
+        except Exception as e:
+            logger.error(f"❌ [SESSION-START] Supabase create failed: {e}")
+    
+    # Fallback to in-memory if Supabase failed
+    if not session_id:
+        logger.warning("⚠️ [SESSION-START] Falling back to In-Memory storage!")
+        session = session_store.create_session(user_id=user_id, project_name=actual_project_name)
+        session_id = session.session_id
     
     # Return questionnaire immediately
-    questionnaire = build_site_context_questionnaire(session.session_id)
+    questionnaire = build_site_context_questionnaire(session_id)
     
     return {
-        "session_id": session.session_id,
-        "project_name": project_name or "บ้านนายสมหญิง",
+        "session_id": session_id,
+        "project_name": actual_project_name,
         "message": "Session created. Please answer site context questions.",
         "site_context": questionnaire.model_dump()
     }
