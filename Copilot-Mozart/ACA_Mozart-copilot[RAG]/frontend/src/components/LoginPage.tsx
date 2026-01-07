@@ -5,6 +5,7 @@ import { LogIn, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
     onLoginSuccess: () => void;
+    onGuestMode?: () => void;  // 🆕 Guest mode callback
 }
 
 /**
@@ -14,7 +15,7 @@ interface LoginPageProps {
  * - แสดง Error ชัดเจน
  * - Industrial Design Theme
  */
-export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGuestMode }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -187,6 +188,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                             )}
                         </button>
                     </form>
+
+                    {/* 🆕 Guest Mode Button */}
+                    {onGuestMode && (
+                        <>
+                            <div className="relative my-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-slate-700" />
+                                </div>
+                                <div className="relative flex justify-center text-xs">
+                                    <span className="px-2 bg-slate-900 text-slate-500">หรือ</span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onGuestMode}
+                                className={cn(
+                                    "w-full py-3 rounded-lg font-medium",
+                                    "bg-slate-800 hover:bg-slate-700 text-slate-300",
+                                    "border border-slate-700 hover:border-slate-600",
+                                    "transition-colors flex items-center justify-center gap-2"
+                                )}
+                            >
+                                🚀 เข้าใช้เลย (ทดลอง 24 ชม.)
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Footer */}

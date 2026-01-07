@@ -31,6 +31,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isGuestMode, setIsGuestMode] = useState(false);  // 🆕 Guest mode state
 
   // === CHAT STATE ===
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -117,10 +118,9 @@ function App() {
       return;
     }
 
-    // 2. Need Auth Session? (If your app requires login to fetch data)
-    if (!session) {
-      console.log('[SESSION-DEBUG] No auth session, skipping data fetch.');
-      // Optionally handles guest mode here if needed
+    // 2. Skip if not logged in AND not in Guest mode
+    if (!session && !isGuestMode) {
+      console.log('[SESSION-DEBUG] No auth session and not guest, skipping.');
       return;
     }
 
@@ -228,7 +228,7 @@ function App() {
     };
 
     initSession();
-  }, [isAuthLoading, session]); // Run when Auth status settles
+  }, [isAuthLoading, session, isGuestMode]); // Run when Auth status settles OR Guest mode activated
 
   // === LOGOUT HANDLER ===
   const handleLogout = async () => {
@@ -449,9 +449,14 @@ function App() {
     );
   }
 
-  // === NOT LOGGED IN: SHOW LOGIN PAGE ===
-  if (!session) {
-    return <LoginPage onLoginSuccess={() => { }} />;
+  // === NOT LOGGED IN: SHOW LOGIN PAGE OR GUEST MODE ===
+  if (!session && !isGuestMode) {
+    return (
+      <LoginPage
+        onLoginSuccess={() => { }}
+        onGuestMode={() => setIsGuestMode(true)}
+      />
+    );
   }
 
   // === LOGGED IN: SHOW MAIN APP ===
@@ -463,7 +468,7 @@ function App() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-slate-400 text-sm">
             <UserIcon size={16} />
-            <span className="font-mono">{user?.email}</span>
+            <span className="font-mono">{user?.email || '👤 Guest (24 ชม.)'}</span>
           </div>
 
           {/* 🆕 Project Selector (New/Load/Delete) */}
