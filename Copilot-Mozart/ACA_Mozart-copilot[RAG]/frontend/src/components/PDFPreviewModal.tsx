@@ -61,17 +61,23 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
         return l.total_va || Math.round((l.power_kw || 0) * 1000) || 0;
     };
 
-    const lightingLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('light') || l.device_name?.includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const receptacleLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('socket') || l.device_name?.includes('เต้ารับ')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const heaterLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('water') || l.device_name?.includes('น้ำอุ่น')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const acLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('air') || l.device_name?.includes('แอร์')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const spareLoad = loads.filter((l: any) => l.device_name?.toLowerCase().includes('spare')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    // 🔧 FIX: Use circuit_name (not device_name) and correct keywords that match MCP Core output
+    // Circuit names come as: "HEATER-4500W in ห้องน้ำ 1", "AC-12000BTU in ห้องนอน", "โคมไฟห้อง ชั้น 1-1", etc.
+    const getName = (l: any) => (l.circuit_name || l.device_name || '').toLowerCase();
+
+    const lightingLoad = loads.filter((l: any) => getName(l).includes('โคม') || getName(l).includes('light') || getName(l).includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const receptacleLoad = loads.filter((l: any) => getName(l).includes('เต้ารับ') || getName(l).includes('socket') || getName(l).includes('outlet')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const heaterLoad = loads.filter((l: any) => getName(l).includes('heater') || getName(l).includes('น้ำอุ่น')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const acLoad = loads.filter((l: any) => getName(l).includes('ac-') || getName(l).includes('แอร์') || getName(l).includes('air')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const motorLoad = loads.filter((l: any) => getName(l).includes('pump') || getName(l).includes('ปั๊ม') || getName(l).includes('motor')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const applianceLoad = loads.filter((l: any) => getName(l).includes('induction') || getName(l).includes('เตา') || getName(l).includes('microwave') || getName(l).includes('refrig') || getName(l).includes('ตู้เย็น')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const spareLoad = loads.filter((l: any) => getName(l).includes('spare')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
 
     const totalConnectedLoad = loads.reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
     const demandFactor = data.data?.demand_factor || 0.8;
     const demandLoad = totalConnectedLoad * demandFactor;
 
-    console.log('[PDF-DEBUG] category totals:', { lightingLoad, receptacleLoad, heaterLoad, acLoad, totalConnectedLoad });
+    console.log('[PDF-DEBUG] category totals:', { lightingLoad, receptacleLoad, heaterLoad, acLoad, motorLoad, applianceLoad, totalConnectedLoad });
 
 
     return (
@@ -237,19 +243,25 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
                             {/* Load Breakdown */}
                             <div className="w-[30%] border-r-2 border-black text-xs">
                                 <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
-                                    <span>LIGHTING</span><span>=</span><span className="text-right">{lightingLoad}</span><span className="pl-1">VA</span>
+                                    <span>LIGHTING</span><span>=</span><span className="text-right">{lightingLoad.toLocaleString()}</span><span className="pl-1">VA</span>
                                 </div>
                                 <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
-                                    <span>RECEPTACLE</span><span>=</span><span className="text-right">{receptacleLoad}</span><span className="pl-1">VA</span>
+                                    <span>RECEPTACLE</span><span>=</span><span className="text-right">{receptacleLoad.toLocaleString()}</span><span className="pl-1">VA</span>
                                 </div>
                                 <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
-                                    <span>WATER HEATER</span><span>=</span><span className="text-right">{heaterLoad}</span><span className="pl-1">VA</span>
+                                    <span>WATER HEATER</span><span>=</span><span className="text-right">{heaterLoad.toLocaleString()}</span><span className="pl-1">VA</span>
                                 </div>
                                 <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
-                                    <span>A/C</span><span>=</span><span className="text-right">{acLoad}</span><span className="pl-1">VA</span>
+                                    <span>A/C</span><span>=</span><span className="text-right">{acLoad.toLocaleString()}</span><span className="pl-1">VA</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
+                                    <span>MOTOR/PUMP</span><span>=</span><span className="text-right">{motorLoad.toLocaleString()}</span><span className="pl-1">VA</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_20px_60px_30px] border-b border-black py-1 px-2">
+                                    <span>APPLIANCE</span><span>=</span><span className="text-right">{applianceLoad.toLocaleString()}</span><span className="pl-1">VA</span>
                                 </div>
                                 <div className="grid grid-cols-[1fr_20px_60px_30px] py-1 px-2">
-                                    <span>SPARE</span><span>=</span><span className="text-right">{spareLoad}</span><span className="pl-1">VA</span>
+                                    <span>SPARE</span><span>=</span><span className="text-right">{spareLoad.toLocaleString()}</span><span className="pl-1">VA</span>
                                 </div>
                             </div>
 
@@ -262,7 +274,7 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
                                     <span className="pl-1">VA</span>
                                 </div>
                                 <div className="border-t-2 border-black grid grid-cols-[1fr_60px_30px] py-2 px-2 items-center bg-gray-100">
-                                    <span>DEMAND LOAD (80 %) :</span>
+                                    <span>DEMAND LOAD ({Math.round(demandFactor * 100)} %) :</span>
                                     <span className="text-right font-extrabold text-sm">{demandLoad.toLocaleString()}</span>
                                     <span className="pl-1">VA</span>
                                 </div>
