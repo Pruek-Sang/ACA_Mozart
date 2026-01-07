@@ -137,9 +137,9 @@ class TestSessionIntegration(unittest.TestCase):
             content = f.read()
         
         # Check project_name is parsed from body (not query param anymore)
-        # New code uses: body.get("project_name")
+        # New code uses: body.get("project_name") and stores in actual_project_name
         self.assertIn('body.get("project_name")', content)
-        self.assertIn('project_name=project_name', content)
+        self.assertIn('project_name=actual_project_name', content)
 
 
 class TestSessionExpiry(unittest.TestCase):
