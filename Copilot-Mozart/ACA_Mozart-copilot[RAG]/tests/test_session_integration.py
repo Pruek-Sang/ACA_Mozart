@@ -67,19 +67,25 @@ class TestSessionIntegration(unittest.TestCase):
         self.assertEqual(MAX_PROJECTS_PER_USER, 10)
         self.assertEqual(DEFAULT_PROJECT_NAME, "บ้านนายสมหญิง")
     
-    def test_05_guest_id_generation(self):
-        """Test guest ID generation."""
-        from app.context.session_injector import _generate_guest_id
+    def test_05_guest_mode_uses_null_user_id(self):
+        """Test that guest mode uses NULL user_id (not 'guest_xxx' string).
         
-        guest_id_1 = _generate_guest_id()
-        guest_id_2 = _generate_guest_id()
+        After Schema fix: Guest sessions use user_id = NULL 
+        instead of 'guest_xxx' which was incompatible with Supabase UUID column.
+        """
+        from app.context.session_injector import SessionInjector
         
-        # Should start with "guest_"
-        self.assertTrue(guest_id_1.startswith("guest_"))
-        self.assertTrue(guest_id_2.startswith("guest_"))
+        injector = SessionInjector()
         
-        # Should be unique
-        self.assertNotEqual(guest_id_1, guest_id_2)
+        # The create() method should pass user_id=None to Supabase for guests
+        # This is tested by checking the code does NOT use _generate_guest_id anymore
+        import inspect
+        source = inspect.getsource(injector.create)
+        
+        # Should NOT call _generate_guest_id() anymore
+        self.assertNotIn("_generate_guest_id()", source)
+        # Should use user_id directly (None for guest)
+        self.assertIn("actual_user_id = user_id", source)
     
     def test_06_session_injector_max_projects_check(self):
         """Test that create() checks max projects limit."""

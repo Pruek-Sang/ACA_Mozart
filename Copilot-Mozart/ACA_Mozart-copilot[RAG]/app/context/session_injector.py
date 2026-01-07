@@ -174,8 +174,9 @@ class SessionInjector:
             return None
         
         try:
-            # 🆕 Support anonymous guests
-            actual_user_id = user_id or _generate_guest_id()
+            # 🆕 Support anonymous guests - use NULL for guest (Schema allows nullable user_id)
+            # This fixes the "invalid input syntax for type uuid" error
+            actual_user_id = user_id  # None for Guest, UUID for logged-in user
             
             # 🆕 Enforce max projects limit
             if user_id:  # Only for authenticated users
