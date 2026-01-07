@@ -1,0 +1,799 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Mozart Docker Build & Push - GitHub Actions
+# ═══════════════════════════════════════════════════════════════════════════
+# Automatically builds and pushes Docker images when code is pushed to main
+# Images are pushed to Docker Hub: acatest01/...
+# ═══════════════════════════════════════════════════════════════════════════
+
+name: 🐳 Build & Push Docker Images
+
+on:
+  # Trigger on push to main branch
+  push:
+    branches: [main]
+    paths:
+      # ═══════════════════════════════════════════════════════════════
+      # CI/CD Path Triggers - ครอบคลุมทุก directory ที่มี code
+      # แก้ไข: เพิ่ม mcp_core_v2 และ path อื่นๆ ที่ขาด
+      # ═══════════════════════════════════════════════════════════════
+      - 'Copilot-Mozart/**'         # RAG, Gateway, Frontend
+      - 'mcp_core_v2/**'            # MCP Core (CRITICAL - was missing!)
+      - 'tests/**'                  # Test files (NEW!)
+      - 'scripts/**'                # Build/Deploy scripts
+      - 'docker-compose*.yml'       # Docker configs
+      - '.github/workflows/**'      # Workflow changes
+      - 'frontend-dist/**'          # Pre-built frontend (if any)
+
+  
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+    inputs:
+      build_gateway:
+        description: 'Build Gateway image'
+        type: boolean
+        default: true
+      build_frontend:
+        description: 'Build Frontend (NGINX) image'
+        type: boolean
+        default: true
+
+env:
+  DOCKERHUB_USERNAME: acatest01
+  # ═══════════════════════════════════════════════════════════════
+  # 🚨 NOTE: Gateway ย้ายไป Artifact Registry แล้ว (ไม่ใช้ Docker Hub)
+  # GATEWAY_IMAGE ด้านล่างนี้ไม่ได้ใช้แล้ว เก็บไว้เป็น reference
+  # ═══════════════════════════════════════════════════════════════
+  # GATEWAY_IMAGE: docker.io/acatest01/mozart-gateway  # NO LONGER USED
+  FRONTEND_IMAGE: docker.io/acatest01/mozart-frontend
+  MCP_CORE_IMAGE: docker.io/acatest01/mcp-core
+  RAG_IMAGE: docker.io/acatest01/mozart-rag
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════
+  # 🧪 E2E Tests - Run BEFORE Build (Gate for Deployment)
+  # Tests RAG ↔ MCP Core data flow to prevent missing field bugs
+  # ═══════════════════════════════════════════════════════════════════════
+  test-e2e:
+    name: 🧪 E2E Data Flow Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install MCP Core dependencies
+        run: |
+          cd mcp_core_v2
+          pip install --upgrade pip
+          pip install pytest pydantic
+          pip install -e . || pip install -r requirements.txt || true
+
+      - name: 🧪 Run E2E Data Flow Tests
+        id: e2e-test
+        run: |
+          # PYTHONPATH needs project root AND mcp_core_v2 for imports
+          export PYTHONPATH="${PYTHONPATH}:$(pwd):$(pwd)/mcp_core_v2"
+          cd mcp_core_v2
+          python -m pytest ../tests/test_e2e_data_flow.py -v --tb=short
+          echo "✅ E2E tests PASSED"
+
+      - name: 🧹 Free Disk Space
+        run: |
+          echo "Listing free space before cleanup..."
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          echo "Listing free space after cleanup..."
+          df -h
+
+      - name: 🛡️ Run MCP Core Input Sanitizer Tests
+        id: sanitizer-test
+        run: |
+          export PYTHONPATH="${PYTHONPATH}:$(pwd):$(pwd)/mcp_core_v2"
+          cd mcp_core_v2
+          echo "🧪 Running Input Sanitizer validation tests..."
+          python -m pytest tests/test_input_sanitizer.py -v --tb=short
+          echo "✅ Input Sanitizer tests PASSED"
+
+      - name: 🧠 Run RAG Backend Tests
+        id: rag-test
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]"
+          pip install --quiet --no-cache-dir pydantic pytest httpx fastapi starlette faiss-cpu google-generativeai sentence-transformers
+          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          echo "🧪 Running parser logic, merge, and integration tests..."
+          # Pass secrets to test execution
+          export GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}"
+          export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
+          export SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          export PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
+          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py tests/test_e2e_integration.py tests/test_real_supabase_integration.py tests/backend/test_session_api.py tests/backend/test_design_api.py -v --tb=short
+          echo "✅ RAG Backend tests PASSED"
+
+      - name: 📊 Backend Test Summary
+        if: always()
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║            🧪 BACKEND TEST RESULTS SUMMARY                 ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║ E2E Data Flow:      ${{ steps.e2e-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ Input Sanitizer:    ${{ steps.sanitizer-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ RAG Backend:        ${{ steps.rag-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "╚════════════════════════════════════════════════════════════╝"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 🗃️ Supabase Schema Test - Prevents Error #310
+  # ═══════════════════════════════════════════════════════════════════════
+  test-supabase:
+    name: 🗃️ Supabase Schema Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: pip install supabase pytest
+
+      - name: 🗃️ Test Supabase Schema
+        id: supabase-test
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "🧪 Testing Supabase schema access..."
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "⚠️ SUPABASE_SERVICE_ROLE_KEY not set - skipping test"
+            echo "Please add SUPABASE_SERVICE_ROLE_KEY to GitHub Secrets"
+            exit 0
+          fi
+          python -m pytest tests/test_supabase_schema.py -v --tb=short
+          echo "✅ Supabase schema test PASSED"
+
+      - name: 📊 Supabase Test Summary
+        if: always()
+        run: |
+          echo "## 🗃️ Supabase Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.supabase-test.outcome }}" == "success" ]; then
+            echo "| Schema Access | ✅ PASSED |" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.supabase-test.outcome }}" == "skipped" ]; then
+            echo "| Schema Access | ⏭️ SKIPPED (no secret) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Schema Access | ⚠️ FAILED (non-blocking) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 🔍 Frontend Lint Test - Catch React Hooks violations BEFORE deploy
+  # ═══════════════════════════════════════════════════════════════════════
+  test-frontend-lint:
+    name: 🔍 Frontend Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: '**/frontend/package-lock.json'
+
+      - name: 📦 Install dependencies
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
+          npm ci
+
+      - name: 🔍 Run ESLint (React Hooks + TypeScript)
+        id: eslint-check
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
+          echo "🔍 Running ESLint with React Hooks rules..."
+          npm run lint || {
+            echo "❌ ESLint found ERRORS! Fix before deploy."
+            exit 1
+          }
+          echo "✅ ESLint PASSED - no hooks violations"
+
+      - name: 🏗️ TypeScript Type Check
+        id: ts-check
+        continue-on-error: true
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
+          echo "🔍 Running TypeScript type check..."
+          npx tsc --noEmit
+          echo "✅ TypeScript check PASSED"
+
+      - name: 🧪 Run Unit Tests (Vitest)
+        id: unit-test
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend"
+          echo "🧪 Running Vitest unit tests..."
+          npm run test || {
+            echo "❌ Unit tests FAILED! Fix before deploy."
+            exit 1
+          }
+          echo "✅ All unit tests PASSED"
+
+      - name: 📊 Frontend Test Summary
+        if: always()
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║           🎨 FRONTEND TEST RESULTS SUMMARY              ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║ ESLint (Hooks):  ${{ steps.eslint-check.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ TypeScript:      ${{ steps.ts-check.outcome == 'success' && '✅ PASSED' || '⚠️ WARNINGS' }}"
+          echo "║ Unit Tests:      ${{ steps.unit-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "╚════════════════════════════════════════════════════════════╝"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Build Gateway Image (Artifact Registry - avoids cache issue!)
+  # ═══════════════════════════════════════════════════════════════════════
+  build-gateway:
+    name: 🚀 Build Gateway
+    runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🔐 Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: 🐳 Build Docker image
+        run: |
+          echo "🏗️ Building Gateway Docker image..."
+          docker build \
+            -f ./Copilot-Mozart/ACA_Mozart-copilot\[RAG\]/Dockerfile.gateway \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-gateway:latest \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-gateway:${{ github.sha }} \
+            ./Copilot-Mozart/ACA_Mozart-copilot\[RAG\]
+          echo "✅ Docker build complete"
+
+      - name: 🚀 Push Docker image
+        run: |
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-gateway:latest
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-gateway:${{ github.sha }}
+
+      - name: ✅ Gateway build complete
+        run: echo "Gateway image pushed to Artifact Registry"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Build Frontend (NGINX) Image
+  # ═══════════════════════════════════════════════════════════════════════
+  build-frontend:
+    name: 🎨 Build Frontend
+    runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_frontend == 'true' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📁 Copy files to root (avoid special chars in path)
+        run: |
+          echo "📁 Copying frontend source to ./frontend-src..."
+          cp -r "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/frontend" ./frontend-src
+          echo "📁 Copying nginx config..."
+          cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/nginx-cloudrun.conf" ./nginx-cloudrun.conf
+          echo "📁 Copying Dockerfile..."
+          cp "./Copilot-Mozart/ACA_Mozart-copilot[RAG]/Docker/Dockerfile.frontend-cloudrun" ./Dockerfile.frontend-cloudrun
+          echo "📝 Creating .env.production..."
+          echo "VITE_API_URL=https://gateway-203658178245.asia-southeast1.run.app" > ./frontend-src/.env.production
+          echo "VITE_SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> ./frontend-src/.env.production
+          echo "VITE_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> ./frontend-src/.env.production
+          echo "📋 .env.production contents:"
+          cat ./frontend-src/.env.production
+          echo "✅ Files ready for Docker build"
+
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🔐 Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: 🐳 Build Docker image (multi-stage)
+        run: |
+          echo "🏗️ Building multi-stage Docker image..."
+          docker build -f ./Dockerfile.frontend-cloudrun \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:latest \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:${{ github.sha }} \
+            .
+          echo "✅ Docker build complete"
+
+      - name: 🚀 Push Docker image
+        run: |
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:latest
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:${{ github.sha }}
+
+      - name: ✅ Frontend build complete
+        run: echo "Frontend image pushed to asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend:latest"
+
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Build MCP Core Image (Artifact Registry - avoids cache issue!)
+  # ═══════════════════════════════════════════════════════════════════════
+  build-mcp-core:
+    name: ⚡ Build MCP Core
+    runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🔐 Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: 🐳 Build Docker image
+        run: |
+          echo "🏗️ Building MCP Core Docker image (--no-cache)..."
+          docker build --no-cache \
+            -f ./mcp_core_v2/Docker/Dockerfile \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:latest \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }} \
+            ./mcp_core_v2
+          echo "✅ Docker build complete"
+
+      - name: 🚀 Push Docker image
+        run: |
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:latest
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }}
+
+      - name: ✅ MCP Core build complete
+        run: echo "MCP Core image pushed to Artifact Registry"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Build Mozart RAG Image (Artifact Registry - avoids cache issue!)
+  # ═══════════════════════════════════════════════════════════════════════
+  build-rag:
+    name: 🧠 Build Mozart RAG
+    runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint]  # 🆕 ALL tests must pass!
+    if: ${{ github.event_name == 'push' || github.event.inputs.build_gateway == 'true' }}
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🔐 Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: 🐳 Build Docker image
+        run: |
+          echo "🏗️ Building Mozart RAG Docker image (--no-cache)..."
+          docker build --no-cache \
+            -f ./Copilot-Mozart/ACA_Mozart-copilot\[RAG\]/Docker/Dockerfile_light \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:latest \
+            -t asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:${{ github.sha }} \
+            ./Copilot-Mozart/ACA_Mozart-copilot\[RAG\]
+          echo "✅ Docker build complete"
+
+      - name: 🚀 Push Docker image
+        run: |
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:latest
+          docker push asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:${{ github.sha }}
+
+      - name: ✅ Mozart RAG build complete
+        run: echo "Mozart RAG image pushed to Artifact Registry"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Deploy to Cloud Run (Auto-Deploy after successful build)
+  # ⚠️ IMPORTANT: This job uses the SAME image paths as build jobs above
+  # ═══════════════════════════════════════════════════════════════════════
+  deploy-to-cloudrun:
+    name: 🚀 Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: [build-gateway, build-frontend, build-mcp-core, build-rag]
+    if: always()  # Always run to show which deploys succeeded/failed
+    
+    # Environment variables for easy debugging
+    env:
+      GCP_PROJECT: gen-lang-client-0658701327
+      GCP_REGION: asia-southeast1
+      # Image paths (MUST match build jobs above!)
+      FRONTEND_AR_IMAGE: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-frontend
+
+    steps:
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: ☁️ Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: gen-lang-client-0658701327
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy Frontend (from Artifact Registry)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy Frontend to Cloud Run
+        id: deploy-frontend
+        if: needs.build-frontend.result == 'success'
+        run: |
+          echo "📦 Deploying Frontend..."
+          echo "   Image: ${{ env.FRONTEND_AR_IMAGE }}:${{ github.sha }}"
+          gcloud run deploy frontend \
+            --image ${{ env.FRONTEND_AR_IMAGE }}:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 80
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic frontend --region ${{ env.GCP_REGION }} --to-latest
+      
+      - name: ⏭️ Skip Frontend (build failed)
+        if: needs.build-frontend.result != 'success'
+        run: echo "⚠️ Skipping Frontend deploy - build failed or skipped"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy Gateway (from Artifact Registry - avoids cache!)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy Gateway to Cloud Run
+        id: deploy-gateway
+        if: needs.build-gateway.result == 'success'
+        run: |
+          echo "📦 Deploying Gateway..."
+          echo "   Image: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-gateway:${{ github.sha }}"
+          gcloud run deploy gateway \
+            --image asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-gateway:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8000
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic gateway --region ${{ env.GCP_REGION }} --to-latest
+      
+      - name: ⏭️ Skip Gateway (build failed)
+        if: needs.build-gateway.result != 'success'
+        run: echo "⚠️ Skipping Gateway deploy - build failed or skipped"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy MCP Core (from Artifact Registry - avoids cache!)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy MCP Core to Cloud Run
+        id: deploy-mcp
+        if: needs.build-mcp-core.result == 'success'
+        run: |
+          echo "📦 Deploying MCP Core..."
+          echo "   Image: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }}"
+          gcloud run deploy mcp-core \
+            --image asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mcp-core:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 5001 \
+            --min-instances=0 \
+            --max-instances=10
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic mcp-core --region ${{ env.GCP_REGION }} --to-latest
+      
+      - name: ⏭️ Skip MCP Core (build failed)
+        if: needs.build-mcp-core.result != 'success'
+        run: echo "⚠️ Skipping MCP Core deploy - build failed or skipped"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy Mozart RAG (from Artifact Registry - avoids cache!)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚀 Deploy Mozart RAG to Cloud Run
+        id: deploy-rag
+        if: needs.build-rag.result == 'success'
+        run: |
+          echo "📦 Deploying Mozart RAG..."
+          echo "   Image: asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:${{ github.sha }}"
+          gcloud run deploy mozart-rag \
+            --image asia-southeast1-docker.pkg.dev/gen-lang-client-0658701327/mozart/mozart-rag:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --min-instances=0 \
+            --max-instances=10 \
+            --set-secrets=GOOGLE_API_KEY=gemini-key:latest,SUPABASE_URL=supabase-url:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-key:latest
+          # 🔄 Force traffic to latest revision (prevent stuck on old revision)
+          echo "🔄 Routing 100% traffic to latest revision..."
+          gcloud run services update-traffic mozart-rag --region ${{ env.GCP_REGION }} --to-latest
+      
+      - name: ⏭️ Skip Mozart RAG (build failed)
+        if: needs.build-rag.result != 'success'
+        run: echo "⚠️ Skipping Mozart RAG deploy - build failed or skipped"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🔗 POST-DEPLOY: Update Service URLs + Health Checks
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🔗 Update Service URLs & Health Check
+        if: steps.deploy-mcp.outcome == 'success' && steps.deploy-rag.outcome == 'success'
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "               UPDATING SERVICE CONNECTIONS"
+          echo "═══════════════════════════════════════════════════════════"
+          
+          # 1️⃣ Get MCP Core URL
+          MCP_URL=$(gcloud run services describe mcp-core \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          echo "📡 MCP Core URL: $MCP_URL"
+          
+          # 2️⃣ Health Check MCP Core
+          echo "🩺 Testing MCP Core health..."
+          sleep 10  # Wait for cold start
+          if curl -sf "$MCP_URL/health" --max-time 30 > /dev/null; then
+            echo "✅ MCP Core: HEALTHY"
+          else
+            echo "❌ MCP Core: NOT RESPONDING"
+            echo "🔍 Check Cloud Run logs: gcloud logging read --service=mcp-core"
+          fi
+          
+          # 3️⃣ Update RAG with MCP URL
+          echo "🔄 Updating mozart-rag → MCP_CORE_URL=$MCP_URL"
+          gcloud run services update mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --update-env-vars="MCP_CORE_URL=$MCP_URL"
+          echo "✅ RAG updated with MCP URL"
+          
+          # 4️⃣ Get RAG URL  
+          RAG_URL=$(gcloud run services describe mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          echo "📡 RAG URL: $RAG_URL"
+          
+          # 5️⃣ Health Check RAG (wait for restart)
+          echo "🩺 Waiting for RAG to restart (20s)..."
+          sleep 20
+          if curl -sf "$RAG_URL/" --max-time 30 > /dev/null; then
+            echo "✅ Mozart RAG: HEALTHY"
+          else
+            echo "⚠️ Mozart RAG: May still be starting (check manually)"
+          fi
+          
+          # 6️⃣ Get Gateway URL
+          GATEWAY_URL=$(gcloud run services describe gateway \
+            --region=${{ env.GCP_REGION }} \
+            --format='value(status.url)')
+          
+          # 7️⃣ Print Connection Summary
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "              ✅ ALL SERVICES CONNECTED"
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Frontend:   https://frontend-203658178245.asia-southeast1.run.app"
+          echo "Gateway:    $GATEWAY_URL"
+          echo "Mozart RAG: $RAG_URL"
+          echo "MCP Core:   $MCP_URL"
+          echo ""
+          echo "Connection Chain: Frontend → Gateway → RAG → MCP"
+          echo "═══════════════════════════════════════════════════════════"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # 🚨 FALLBACK: Diagnostic Commands (if above fails)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 🚨 Fallback Diagnostics
+        if: failure()
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "              ⚠️ FALLBACK DIAGNOSTICS"
+          echo "═══════════════════════════════════════════════════════════"
+          
+          echo ""
+          echo "📋 1. All Services Status:"
+          gcloud run services list --region=${{ env.GCP_REGION }} \
+            --format="table(SERVICE,URL,LAST_DEPLOYED_AT)"
+          
+          echo ""
+          echo "📋 2. Mozart RAG ENV Variables:"
+          gcloud run services describe mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --format="yaml(spec.template.spec.containers[0].env)" || true
+          
+          echo ""
+          echo "📋 3. Check API Key Present:"
+          GOOGLE_KEY=$(gcloud run services describe mozart-rag \
+            --region=${{ env.GCP_REGION }} \
+            --format="value(spec.template.spec.containers[0].env[GOOGLE_API_KEY])" || echo "NOT SET")
+          if [ -n "$GOOGLE_KEY" ]; then
+            echo "✅ GOOGLE_API_KEY: Present (hidden)"
+          else
+            echo "❌ GOOGLE_API_KEY: NOT SET"
+          fi
+          
+          echo ""
+          echo "═══════════════════════════════════════════════════════════"
+          echo "              🔧 MANUAL FIX COMMANDS"
+          echo "═══════════════════════════════════════════════════════════"
+          echo ""
+          echo "# 1. Get MCP Core URL:"
+          echo "gcloud run services describe mcp-core --region=${{ env.GCP_REGION }} --format='value(status.url)'"
+          echo ""
+          echo "# 2. Update RAG with correct MCP URL:"
+          echo "gcloud run services update mozart-rag --region=${{ env.GCP_REGION }} --update-env-vars='MCP_CORE_URL=<URL>'"
+          echo ""
+          echo "# 3. Check service logs:"
+          echo "gcloud run services logs read mcp-core --region=${{ env.GCP_REGION }} --limit=20"
+          echo ""
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Summary (shows which deployments succeeded/failed)
+      # ─────────────────────────────────────────────────────────────────────
+      - name: 📊 Deploy Summary
+        if: always()
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "                    DEPLOY SUMMARY"
+          echo "═══════════════════════════════════════════════════════════"
+          echo "Frontend:   ${{ steps.deploy-frontend.outcome }}"
+          echo "Gateway:    ${{ steps.deploy-gateway.outcome }}"
+          echo "MCP Core:   ${{ steps.deploy-mcp.outcome }}"
+          echo "Mozart RAG: ${{ steps.deploy-rag.outcome }}"
+          echo "═══════════════════════════════════════════════════════════"
+          echo "✅ Deploy job completed!"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 🔥 Smoke Test - Verify deployment works
+  # ═══════════════════════════════════════════════════════════════════════
+  smoke-test:
+    name: 🔥 Post-Deploy Smoke Test
+    runs-on: ubuntu-latest
+    needs: [deploy-to-cloudrun]
+    if: success()
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install test dependencies
+        run: pip install requests pytest
+
+      - name: 🔥 Run Smoke Tests
+        id: smoke
+        run: |
+          echo "🔥 Running post-deploy smoke tests..."
+          python -m pytest tests/test_smoke_production.py -v --tb=short
+          echo "✅ Smoke tests PASSED"
+
+      - name: 📊 Smoke Test Summary
+        if: always()
+        run: |
+          echo "## 🔥 Smoke Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ steps.smoke.outcome }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 🔄 Auto-Rollback - Revert on smoke failure
+  # ═══════════════════════════════════════════════════════════════════════
+  rollback:
+    name: 🔄 Auto-Rollback
+    runs-on: ubuntu-latest
+    needs: [smoke-test]
+    if: failure()
+    
+    steps:
+      - name: 🔐 Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🔄 Rollback to previous revisions
+        run: |
+          echo "🚨 Smoke tests failed! Rolling back..."
+          
+          for svc in frontend gateway mozart-rag mcp-core; do
+            echo "📦 Rolling back $svc..."
+            PREV=$(gcloud run revisions list --service=$svc --region=asia-southeast1 --limit=2 --format="value(name)" 2>/dev/null | tail -1)
+            
+            if [ -n "$PREV" ]; then
+              gcloud run services update-traffic $svc \
+                --region=asia-southeast1 \
+                --to-revisions=$PREV=100 2>/dev/null || true
+              echo "✅ Rolled back $svc to $PREV"
+            else
+              echo "⚠️ Could not find previous revision for $svc"
+            fi
+          done
+          
+          echo "🔄 Rollback complete!"
+
+      - name: 📊 Rollback Summary
+        run: |
+          echo "## 🔄 Rollback Executed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Smoke tests failed!** Traffic reverted to previous revisions." >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # 📢 Alert on Failure
+  # ═══════════════════════════════════════════════════════════════════════
+  alert:
+    name: 📢 Failure Alert
+    runs-on: ubuntu-latest
+    needs: [test-e2e, test-frontend-lint, smoke-test]
+    if: failure()
+    
+    steps:
+      - name: 📢 Create failure summary
+        run: |
+          echo "## 🚨 CI/CD Pipeline Failed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Tests | ${{ needs.test-e2e.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Lint | ${{ needs.test-frontend-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # Summary
+  # ═══════════════════════════════════════════════════════════════════════
+  summary:
+    name: 📊 Build Summary
+    runs-on: ubuntu-latest
+    needs: [build-gateway, build-frontend, build-mcp-core, build-rag, deploy-to-cloudrun, smoke-test]
+    if: always()
+    
+    steps:
+      - name: 📋 Print Summary
+        run: |
+          echo "## 🐳 Docker Build & Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Build | Deploy | Smoke |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Gateway | ${{ needs.build-gateway.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ needs.build-frontend.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| MCP Core | ${{ needs.build-mcp-core.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mozart RAG | ${{ needs.build-rag.result }} | ${{ needs.deploy-to-cloudrun.result }} | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+

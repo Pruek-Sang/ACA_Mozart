@@ -68,24 +68,42 @@ class TestSessionIntegration(unittest.TestCase):
         self.assertEqual(DEFAULT_PROJECT_NAME, "บ้านนายสมหญิง")
     
     def test_05_guest_mode_uses_null_user_id(self):
-        """Test that guest mode uses NULL user_id (not 'guest_xxx' string).
+        """REAL Integration Test: Guest session creates with NULL user_id in Supabase.
         
-        After Schema fix: Guest sessions use user_id = NULL 
-        instead of 'guest_xxx' which was incompatible with Supabase UUID column.
+        This test ACTUALLY creates a session in Supabase with user_id=None
+        and verifies it persists correctly. Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
         """
-        from app.context.session_injector import SessionInjector
+        import asyncio
+        from app.context.session_injector import session_injector
         
-        injector = SessionInjector()
+        # Skip if Supabase not available
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available - skipping real integration test")
         
-        # The create() method should pass user_id=None to Supabase for guests
-        # This is tested by checking the code does NOT use _generate_guest_id anymore
-        import inspect
-        source = inspect.getsource(injector.create)
+        async def run_test():
+            # CREATE: Guest session (user_id = None)
+            session = await session_injector.create(user_id=None, project_name="TestGuestNullUserID")
+            
+            # Verify session was created
+            self.assertIsNotNone(session, "Session creation failed!")
+            self.assertIsNotNone(session.id, "Session ID is None!")
+            
+            # VERIFY: Load from DB and check user_id is NULL
+            loaded = await session_injector.load(session.id)
+            self.assertIsNotNone(loaded, "Failed to load session from Supabase!")
+            self.assertIsNone(loaded.user_id, f"Expected user_id=None for Guest, got: {loaded.user_id}")
+            
+            # CLEANUP: Delete test session
+            try:
+                await session_injector.delete(session.id)
+            except Exception:
+                pass  # Ignore cleanup errors
+            
+            return True
         
-        # Should NOT call _generate_guest_id() anymore
-        self.assertNotIn("_generate_guest_id()", source)
-        # Should use user_id directly (None for guest)
-        self.assertIn("actual_user_id = user_id", source)
+        # Run async test
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
     
     def test_06_session_injector_max_projects_check(self):
         """Test that create() checks max projects limit."""
