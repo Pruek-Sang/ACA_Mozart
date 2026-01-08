@@ -181,14 +181,19 @@ class SessionStore:
         2. If not found and Supabase enabled, Check Supabase
         3. If found in Supabase, Restore to In-Memory
         """
+        logger.debug(f"🔍 [GET-SESSION] Looking for session: {session_id[:8] if session_id else 'None'}...")
+        
         # 1. Check In-Memory
         session = self._sessions.get(session_id)
         if session:
             if session.is_expired(self.ttl):
-                logger.info(f"Session expired (in-memory): {session_id}")
+                logger.info(f"⏰ [GET-SESSION] Session expired (in-memory): {session_id[:8]}...")
                 del self._sessions[session_id]
                 return None
+            logger.debug(f"✅ [GET-SESSION] Found in memory: {session_id[:8]}...")
             return session
+        
+        logger.debug(f"❌ [GET-SESSION] Not in memory, checking Supabase: {session_id[:8]}...")
         
         # 2. Check Supabase (Fallback)
         if self._use_injector and self._injector:
@@ -244,8 +249,9 @@ class SessionStore:
                     return restored_session
                     
             except Exception as e:
-                logger.warning(f"Failed to load session from Supabase: {e}")
+                logger.warning(f"⚠️ [GET-SESSION] Failed to load from Supabase: {e}")
         
+        logger.warning(f"❌ [GET-SESSION] Session NOT FOUND anywhere: {session_id[:8] if session_id else 'None'}...")
         return None
     
     def update_requirements(self, session_id: str, new_data: Dict[str, Any]):
