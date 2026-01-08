@@ -143,6 +143,8 @@ def load_prices_from_csv() -> tuple[Dict[str, Dict[str, Any]], str]:
     """
     global _PRICE_SOURCE, _LOADED_PRICES
     
+    logger.info("[BOQ-PRICE] === Starting price loading ===")
+    
     # Try multiple possible paths
     csv_paths = [
         '/home/builder/Desktop/ACA_Mozart/mcp_core_v2/catalog/prices.csv',
@@ -151,6 +153,7 @@ def load_prices_from_csv() -> tuple[Dict[str, Dict[str, Any]], str]:
     ]
     
     for csv_path in csv_paths:
+        logger.debug(f"[BOQ-PRICE] Trying path: {csv_path}")
         if os.path.exists(csv_path):
             try:
                 prices_from_csv: Dict[str, Dict[str, Any]] = {}
@@ -179,7 +182,9 @@ def load_prices_from_csv() -> tuple[Dict[str, Dict[str, Any]], str]:
                     merged.update(prices_from_csv)
                     _LOADED_PRICES = merged
                     _PRICE_SOURCE = "prices.csv"
-                    logger.info(f"[BOQ] Loaded {len(prices_from_csv)} prices from {csv_path}")
+                    logger.info(f"[BOQ-PRICE] ✅ SUCCESS: Loaded {len(prices_from_csv)} prices from CSV")
+                    logger.info(f"[BOQ-PRICE] CSV path: {csv_path}")
+                    logger.info(f"[BOQ-PRICE] Mapped keys: {list(prices_from_csv.keys())[:5]}...")
                     return merged, "prices.csv"
             except Exception as e:
                 logger.warning(f"[BOQ] Failed to load prices from {csv_path}: {e}")
@@ -233,11 +238,17 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         BOQData structure for frontend
     """
     try:
+        logger.info("[BOQ-GEN] === Starting BOQ generation ===")
+        logger.info(f"[BOQ-GEN] Project: {project_name}")
+        
         sections: List[BOQSection] = []
         total_material = 0.0
         total_labor = 0.0
         
         circuits = display_data.get('circuits', [])
+        logger.info(f"[BOQ-GEN] Input circuits: {len(circuits)}")
+        logger.info(f"[BOQ-GEN] Main wire: {display_data.get('main_feeder_size', 'N/A')}")
+        logger.info(f"[BOQ-GEN] Main breaker: {display_data.get('main_cb_type', 'N/A')}")
         
         # === E.1: Main Cable Section ===
         e1_items: List[BOQItem] = []
@@ -430,6 +441,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         })
         
         e2_total = sum(item['total_price'] for item in e2_items)
+        logger.info(f"[BOQ-GEN] E.2 Generated: {len(e2_items)} items, Total: {e2_total:,.2f} THB")
         sections.append({
             'section_id': 'E.2',
             'section_name': 'ตู้ไฟฟ้า',
@@ -557,7 +569,15 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'price_source': current_price_source,
         }
         
-        logger.info(f"[BOQ] Generated BOQ: {len(sections)} sections, Total: {final_total:,.2f} THB")
+        # 🆕 Verbose logging for debugging
+        logger.info("[BOQ-GEN] === BOQ Generation Complete ===")
+        logger.info(f"[BOQ-GEN] Sections: {len(sections)}")
+        logger.info(f"[BOQ-GEN] Material Total: {total_material:,.2f} THB")
+        logger.info(f"[BOQ-GEN] Labor Total: {total_labor:,.2f} THB")
+        logger.info(f"[BOQ-GEN] Grand Total: {grand_total:,.2f} THB")
+        logger.info(f"[BOQ-GEN] Final (with VAT): {final_total:,.2f} THB")
+        logger.info(f"[BOQ-GEN] Price Source: {current_price_source}")
+        logger.info(f"[BOQ-GEN] Price Valid Until: {price_valid_date}")
         return boq_data
         
     except Exception as e:

@@ -171,10 +171,13 @@ class SessionInjector:
             SessionData or None if failed
         """
         if not self.is_available():
-            logger.warning("Supabase not available, cannot create session")
+            logger.warning("[SESSION-CREATE] ❌ Supabase not available")
             return None
         
         try:
+            logger.info("[SESSION-CREATE] === Creating new session ===")
+            logger.info(f"[SESSION-CREATE] User ID: {user_id or 'GUEST'}")
+            logger.info(f"[SESSION-CREATE] Project: {project_name or DEFAULT_PROJECT_NAME}")
             # 🆕 Support anonymous guests - use NULL for guest (Schema allows nullable user_id)
             # This fixes the "invalid input syntax for type uuid" error
             actual_user_id = user_id  # None for Guest, UUID for logged-in user
@@ -215,13 +218,16 @@ class SessionInjector:
             
             if result.data and len(result.data) > 0:
                 session = SessionData.from_dict(result.data[0])
-                logger.info(f"Created session: {session.id} ({session.project_name})")
+                logger.info(f"[SESSION-CREATE] ✅ Created: {session.id}")
+                logger.info(f"[SESSION-CREATE] Project: {session.project_name}")
+                logger.info(f"[SESSION-CREATE] Expires: {session.expires_at}")
                 return session
             
+            logger.warning("[SESSION-CREATE] ⚠️ No data returned from insert")
             return None
             
         except Exception as e:
-            logger.error(f"Failed to create session: {e}")
+            logger.error(f"[SESSION-CREATE] ❌ Failed: {e}")
             return None
     
     # =========================================================================
@@ -239,10 +245,11 @@ class SessionInjector:
             SessionData or None if not found
         """
         if not self.is_available():
-            logger.warning("Supabase not available, cannot load session")
+            logger.warning("[SESSION-LOAD] ❌ Supabase not available")
             return None
         
         try:
+            logger.info(f"[SESSION-LOAD] === Loading session: {session_id[:8]}... ===")
             result = (
                 self.client.schema(self.SCHEMA)
                 .table(self.TABLE)
@@ -254,12 +261,17 @@ class SessionInjector:
             )
             
             if result.data:
-                return SessionData.from_dict(result.data)
+                session = SessionData.from_dict(result.data)
+                logger.info(f"[SESSION-LOAD] ✅ Found: {session.project_name}")
+                logger.info(f"[SESSION-LOAD] Has MCP: {bool(session.mcp_response)}")
+                logger.info(f"[SESSION-LOAD] Messages: {len(session.messages) if session.messages else 0}")
+                return session
             
+            logger.warning(f"[SESSION-LOAD] ⚠️ Session not found: {session_id}")
             return None
             
         except Exception as e:
-            logger.error(f"Failed to load session {session_id}: {e}")
+            logger.error(f"[SESSION-LOAD] ❌ Failed: {e}")
             return None
     
     async def load_by_user(self, user_id: str, limit: int = 10) -> List[SessionData]:
@@ -310,10 +322,13 @@ class SessionInjector:
             True if successful
         """
         if not self.is_available():
-            logger.warning("Supabase not available, cannot update session")
+            logger.warning("[SESSION-UPDATE] ❌ Supabase not available")
             return False
         
         try:
+            logger.info(f"[SESSION-UPDATE] === Updating: {session_id[:8]}... ===")
+            logger.info(f"[SESSION-UPDATE] Fields: {list(updates.keys())}")
+            
             # Remove protected fields
             safe_updates = {k: v for k, v in updates.items() if k not in ["id", "user_id", "created_at"]}
             
@@ -327,12 +342,14 @@ class SessionInjector:
             
             success = result.data is not None and len(result.data) > 0
             if success:
-                logger.debug(f"Updated session {session_id}")
+                logger.info(f"[SESSION-UPDATE] ✅ Updated successfully")
+            else:
+                logger.warning(f"[SESSION-UPDATE] ⚠️ No data returned")
             
             return success
             
         except Exception as e:
-            logger.error(f"Failed to update session {session_id}: {e}")
+            logger.error(f"[SESSION-UPDATE] ❌ Failed: {e}")
             return False
     
     async def update_stage(self, session_id: str, stage: str) -> bool:
