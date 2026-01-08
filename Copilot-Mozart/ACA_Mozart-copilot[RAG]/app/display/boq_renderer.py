@@ -58,11 +58,38 @@ class BOQData(TypedDict):
     # 🆕 Price validity (30 days from generation)
     price_valid_date: str  # Format: DD/MM/YYYY
     price_valid_warning: str  # Warning message
+    # 🆕 Price source tracking
+    price_source: str  # "prices.csv" | "catalog_fallback"
 
 
 # === Price Catalog (with pack sizes and wastage) ===
 # Updated with practical purchasing information
 import math
+import csv
+import os
+
+# 🆕 Global: Track price source
+_PRICE_SOURCE = "catalog_fallback"
+_LOADED_PRICES: Dict[str, Dict[str, Any]] = {}
+
+# CSV device_code → PRICE_CATALOG key mapping
+CSV_KEY_MAPPING = {
+    'WIRE-THW-2.5': 'IEC01-2.5',
+    'WIRE-THW-4': 'IEC01-4',
+    'WIRE-THW-6': 'IEC01-6',
+    'WIRE-THW-10': 'IEC01-10',
+    'WIRE-THW-16': 'IEC01-16',
+    'WIRE-THW-25': 'IEC01-25',
+    'WIRE-THW-35': 'IEC01-35',
+    'WIRE-THW-50': 'IEC01-50',
+    'CB-1P-10A': 'MCB-1P-10AT',
+    'CB-1P-16A': 'MCB-1P-16AT',
+    'CB-1P-20A': 'MCB-1P-20AT',
+    'CB-1P-32A': 'MCB-1P-32AT',
+    'CB-2P-100A': 'MCB-2P-100AT',
+    'RCBO-1P-16A': 'RCBO-1P-16AT-30mA',
+    'RCBO-1P-20A': 'RCBO-1P-20AT-30mA',
+}
 
 PRICE_CATALOG: Dict[str, Dict[str, Any]] = {
     # Main Cables - Sold in 100m rolls
@@ -107,6 +134,68 @@ PRICE_CATALOG: Dict[str, Dict[str, Any]] = {
 }
 
 
+def load_prices_from_csv() -> tuple[Dict[str, Dict[str, Any]], str]:
+    """
+    Load prices from prices.csv if available.
+    
+    Returns:
+        (prices_dict, source_name)
+    """
+    global _PRICE_SOURCE, _LOADED_PRICES
+    
+    # Try multiple possible paths
+    csv_paths = [
+        '/home/builder/Desktop/ACA_Mozart/mcp_core_v2/catalog/prices.csv',
+        'mcp_core_v2/catalog/prices.csv',
+        '../mcp_core_v2/catalog/prices.csv',
+    ]
+    
+    for csv_path in csv_paths:
+        if os.path.exists(csv_path):
+            try:
+                prices_from_csv: Dict[str, Dict[str, Any]] = {}
+                with open(csv_path, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        csv_code = row.get('device_code', '')
+                        # Map CSV code to our catalog key
+                        catalog_key = CSV_KEY_MAPPING.get(csv_code)
+                        if catalog_key and catalog_key in PRICE_CATALOG:
+                            # Use CSV price for material, keep other fields from catalog
+                            base = PRICE_CATALOG[catalog_key].copy()
+                            try:
+                                base['material'] = float(row.get('price_thb', base['material']))
+                            except ValueError:
+                                pass
+                            # Update brand from source
+                            source = row.get('source', '')
+                            if source and source != 'mock':
+                                base['brand'] = source
+                            prices_from_csv[catalog_key] = base
+                
+                if prices_from_csv:
+                    # Merge: CSV prices override catalog for matching keys
+                    merged = PRICE_CATALOG.copy()
+                    merged.update(prices_from_csv)
+                    _LOADED_PRICES = merged
+                    _PRICE_SOURCE = "prices.csv"
+                    logger.info(f"[BOQ] Loaded {len(prices_from_csv)} prices from {csv_path}")
+                    return merged, "prices.csv"
+            except Exception as e:
+                logger.warning(f"[BOQ] Failed to load prices from {csv_path}: {e}")
+    
+    # Fallback to hardcoded catalog
+    _LOADED_PRICES = PRICE_CATALOG
+    _PRICE_SOURCE = "catalog_fallback"
+    logger.warning("[BOQ] Using fallback PRICE_CATALOG (no prices.csv found)")
+    return PRICE_CATALOG, "catalog_fallback"
+
+
+def get_price_source() -> str:
+    """Get the current price source (for UI display)."""
+    return _PRICE_SOURCE
+
+
 def calculate_order_qty(quantity: float, pack_size: float, wastage: float) -> float:
     """Calculate order quantity with wastage, rounded up to pack size"""
     if pack_size <= 0:
@@ -116,13 +205,17 @@ def calculate_order_qty(quantity: float, pack_size: float, wastage: float) -> fl
 
 
 def get_price(key: str) -> Dict[str, Any]:
-    """Get price from catalog with fallback"""
-    if key in PRICE_CATALOG:
-        return PRICE_CATALOG[key]
+    """Get price from loaded prices (CSV or catalog fallback)"""
+    # Ensure prices are loaded
+    if not _LOADED_PRICES:
+        load_prices_from_csv()
+    
+    if key in _LOADED_PRICES:
+        return _LOADED_PRICES[key]
     # Try partial match
-    for catalog_key in PRICE_CATALOG:
+    for catalog_key in _LOADED_PRICES:
         if catalog_key in key or key in catalog_key:
-            return PRICE_CATALOG[catalog_key]
+            return _LOADED_PRICES[catalog_key]
     # Fallback
     logger.warning(f"[BOQ] Price not found for: {key}, using fallback")
     return {'material': 100.00, 'labor': 50.00, 'unit': 'ชิ้น', 'brand': 'Unknown'}
@@ -444,6 +537,9 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         price_valid_until = datetime.now() + timedelta(days=30)
         price_valid_date = price_valid_until.strftime('%d/%m/%Y')
         
+        # 🆕 Get price source (CSV or fallback)
+        current_price_source = get_price_source()
+        
         boq_data: BOQData = {
             'project_name': project_name,
             'date': date_str,
@@ -457,6 +553,8 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             # 🆕 Price validity
             'price_valid_date': price_valid_date,
             'price_valid_warning': f'⚠️ ราคา ณ วันที่ {date_str} มีอายุ 30 วัน (ถึง {price_valid_date})',
+            # 🆕 Price source
+            'price_source': current_price_source,
         }
         
         logger.info(f"[BOQ] Generated BOQ: {len(sections)} sections, Total: {final_total:,.2f} THB")
@@ -475,4 +573,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'vat_percent': 7.0,
             'vat_amount': 0.0,
             'final_total': 0.0,
+            'price_valid_date': '',
+            'price_valid_warning': '❌ Error generating BOQ',
+            'price_source': 'error',
         }
