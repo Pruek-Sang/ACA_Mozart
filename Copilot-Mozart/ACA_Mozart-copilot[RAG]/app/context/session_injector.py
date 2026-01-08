@@ -106,6 +106,7 @@ class SessionData:
         return cls(
             id=data.get("id"),
             user_id=data.get("user_id"),
+            project_name=data.get("project_name", DEFAULT_PROJECT_NAME),  # 🔧 FIX: Was missing!
             stage=data.get("stage", "gathering"),
             rooms=data.get("rooms") or [],
             loads=data.get("loads") or [],
