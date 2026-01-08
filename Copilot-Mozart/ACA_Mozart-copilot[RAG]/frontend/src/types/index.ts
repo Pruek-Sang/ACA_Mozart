@@ -86,6 +86,7 @@ export interface AskResponse {
         audit_results?: AuditRow[];
         pdf_data?: PDFData;
         sld_data?: Record<string, unknown>;
+        boq_data?: BOQData; // 🆕 BOQ with price_source
     };
 }
 
@@ -253,6 +254,50 @@ export interface SLDData {
         canvas_width: number;
         canvas_height: number;
     };
+}
+
+/**
+ * 🆕 BOQ Item (single line in BOQ)
+ */
+export interface BOQItem {
+    item_no: string;
+    description: string;
+    quantity: number;
+    unit: string;
+    material_unit_price: number;
+    material_total: number;
+    labor_unit_price: number;
+    labor_total: number;
+    total_price: number;
+    remark: string;
+}
+
+/**
+ * 🆕 BOQ Section (E.1, E.2, E.3)
+ */
+export interface BOQSection {
+    section_id: string;
+    section_name: string;
+    items: BOQItem[];
+    section_total: number;
+}
+
+/**
+ * 🆕 Complete BOQ Data from Backend
+ */
+export interface BOQData {
+    project_name: string;
+    date: string;
+    sections: BOQSection[];
+    subtotal_material: number;
+    subtotal_labor: number;
+    grand_total: number;
+    vat_percent: number;
+    vat_amount: number;
+    final_total: number;
+    price_valid_date: string;
+    price_valid_warning: string;
+    price_source: 'prices.csv' | 'catalog_fallback' | 'error';
 }
 
 /**
