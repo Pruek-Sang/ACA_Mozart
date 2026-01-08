@@ -34,20 +34,48 @@ jobs:
           pip install requests beautifulsoup4
       
       - name: 🔍 Run Price Scraper
+        id: scrape
+        continue-on-error: true
         run: |
           cd mcp_core_v2
           
-          # Check if prices.csv exists, if not skip scraping
-          if [ ! -f catalog/prices.csv ]; then
-            echo "⚠️ prices.csv not found - creating empty file"
+          # Backup current prices (for fallback)
+          if [ -f catalog/prices.csv ]; then
+            cp catalog/prices.csv catalog/prices_backup.csv
+            echo "📦 Backed up current prices"
+          else
             echo "device_code,source,price_thb,unit,url,last_updated" > catalog/prices.csv
           fi
           
-          # Run scraper in mock mode (change to real mode when selectors are ready)
-          python -m core.price_scraper --update-all --mock --output catalog/prices.csv
+          # Try real scraping first
+          echo "🔍 Attempting real price scraping..."
+          python -m core.price_scraper --update-all --output catalog/prices.csv
           
-          echo "📊 Scraping complete!"
-          cat catalog/prices.csv | head -20
+          # Check if scraping succeeded (file should have more than just header)
+          LINE_COUNT=$(wc -l < catalog/prices.csv)
+          if [ "$LINE_COUNT" -le 1 ]; then
+            echo "⚠️ Real scraping failed or returned no data"
+            exit 1
+          fi
+          
+          echo "✅ Successfully scraped $LINE_COUNT price entries"
+          head -20 catalog/prices.csv
+      
+      - name: 🔄 Fallback to Previous Prices
+        if: steps.scrape.outcome == 'failure'
+        run: |
+          cd mcp_core_v2/catalog
+          echo "⚠️ Scraping failed - using previous prices"
+          
+          if [ -f prices_backup.csv ]; then
+            cp prices_backup.csv prices.csv
+            echo "✅ Restored from backup"
+          else
+            echo "❌ No backup available - prices remain unchanged"
+          fi
+          
+          # Add warning to commit message
+          echo "SCRAPE_FAILED=true" >> $GITHUB_ENV
       
       - name: 📤 Commit & Push prices.csv
         run: |
@@ -60,7 +88,11 @@ jobs:
           if git diff --staged --quiet; then
             echo "📋 No price changes detected"
           else
-            git commit -m "📊 Update prices $(date +'%Y-%m-%d %H:%M') TH"
+            if [ "$SCRAPE_FAILED" = "true" ]; then
+              git commit -m "⚠️ Price update failed $(date +'%Y-%m-%d') - used previous"
+            else
+              git commit -m "📊 Update prices $(date +'%Y-%m-%d %H:%M') TH"
+            fi
             git push
             echo "✅ Prices updated and pushed!"
           fi
