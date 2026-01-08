@@ -55,6 +55,9 @@ class BOQData(TypedDict):
     vat_percent: float
     vat_amount: float
     final_total: float
+    # 🆕 Price validity (30 days from generation)
+    price_valid_date: str  # Format: DD/MM/YYYY
+    price_valid_warning: str  # Warning message
 
 
 # === Price Catalog (with pack sizes and wastage) ===
@@ -151,9 +154,11 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         
         # Main cable (estimate 50m for residential)
         main_qty = 50.0
+        main_brand = price.get('brand', 'Yazaki')
+        main_wire_mm = main_wire.replace(' mm²', '').replace('Sq.mm', '').strip()
         e1_items.append({
             'item_no': '1',
-            'description': f'สาย {main_wire_key} (สายเมนหลักจากมิเตอร์ถึงตู้ไฟ)',
+            'description': f'สาย IEC01 (THW) {main_wire_mm} mm² ({main_brand}) - สายเมนหลัก',
             'quantity': main_qty,
             'unit': price['unit'],
             'material_unit_price': price['material'],
@@ -161,16 +166,17 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': price['labor'],
             'labor_total': round(price['labor'] * main_qty, 2),
             'total_price': round((price['material'] + price['labor']) * main_qty, 2),
-            'remark': price.get('brand', 'Yazaki'),
+            'remark': main_brand,
         })
         
         # Ground cable
         grd_key = 'IEC01-10'
         grd_price = get_price(grd_key)
         grd_qty = 15.0
+        grd_brand = grd_price.get('brand', 'Yazaki')
         e1_items.append({
             'item_no': '2',
-            'description': f'สาย {grd_key} (สายหลักดิน)',
+            'description': f'สาย IEC01 (THW) 10 mm² ({grd_brand}) - สายดินหลัก',
             'quantity': grd_qty,
             'unit': grd_price['unit'],
             'material_unit_price': grd_price['material'],
@@ -178,16 +184,17 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': grd_price['labor'],
             'labor_total': round(grd_price['labor'] * grd_qty, 2),
             'total_price': round((grd_price['material'] + grd_price['labor']) * grd_qty, 2),
-            'remark': grd_price.get('brand', 'Yazaki'),
+            'remark': grd_brand,
         })
         
         # EMT/PVC for main
         conduit_key = 'EMT-1-1/2'
         conduit_price = get_price(conduit_key)
         conduit_qty = 18.0
+        conduit_brand = conduit_price.get('brand', 'Panasonic')
         e1_items.append({
             'item_no': '3',
-            'description': f'ท่อ {conduit_key} (ท่อเมน)',
+            'description': f'ท่อ EMT 1-1/2" ({conduit_brand}) - ท่อเมนหลัก',
             'quantity': conduit_qty,
             'unit': conduit_price['unit'],
             'material_unit_price': conduit_price['material'],
@@ -195,7 +202,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': conduit_price['labor'],
             'labor_total': round(conduit_price['labor'] * conduit_qty, 2),
             'total_price': round((conduit_price['material'] + conduit_price['labor']) * conduit_qty, 2),
-            'remark': conduit_price.get('brand', 'Panasonic'),
+            'remark': conduit_brand,
         })
         
         # Accessories
@@ -228,9 +235,11 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         circuit_count = len(circuits)
         lc_size = 'LC-30' if circuit_count > 18 else ('LC-24' if circuit_count > 12 else 'LC-18')
         lc_price = get_price(lc_size)
+        lc_brand = lc_price.get('brand', 'Schneider')
+        lc_slots = lc_size.split("-")[1]
         e2_items.append({
             'item_no': '1',
-            'description': f'ตู้ไฟฟ้า Load Center {lc_size.split("-")[1]} ช่อง',
+            'description': f'ตู้ไฟฟ้า Load Center {lc_slots} ช่อง ({lc_brand})',
             'quantity': 1.0,
             'unit': 'ชุด',
             'material_unit_price': lc_price['material'],
@@ -238,16 +247,17 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': lc_price['labor'],
             'labor_total': lc_price['labor'],
             'total_price': lc_price['material'] + lc_price['labor'],
-            'remark': lc_price.get('brand', 'Schneider'),
+            'remark': lc_brand,
         })
         
         # Main Breaker
         main_breaker = display_data.get('main_breaker', 100)
         main_breaker_key = f"MCB-2P-{main_breaker}AT"
         mb_price = get_price(main_breaker_key)
+        mb_brand = mb_price.get('brand', 'Schneider')
         e2_items.append({
             'item_no': '2',
-            'description': f'MCB 2P {main_breaker}AT, 30kA (เมนเบรกเกอร์)',
+            'description': f'MCCB 2P {main_breaker}AT 10kA ({mb_brand}) - เมนเบรกเกอร์',
             'quantity': 1.0,
             'unit': 'ตัว',
             'material_unit_price': mb_price['material'],
@@ -255,7 +265,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': mb_price['labor'],
             'labor_total': mb_price['labor'],
             'total_price': mb_price['material'] + mb_price['labor'],
-            'remark': mb_price.get('brand', 'Schneider'),
+            'remark': mb_brand,
         })
         
         # Branch breakers - Group by rating
@@ -276,9 +286,12 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         item_no = 3
         for breaker_key, qty in mcb_groups.items():
             b_price = get_price(breaker_key)
+            b_brand = b_price.get('brand', 'Schneider')
+            # Extract AT value from key like 'MCB-1P-16AT'
+            at_val = breaker_key.split('-')[-1].replace('AT', '')
             e2_items.append({
                 'item_no': str(item_no),
-                'description': breaker_key.replace("-", " ").replace("1P", "1P "),
+                'description': f'MCB 1P {at_val}AT 6kA ({b_brand})',
                 'quantity': float(qty),
                 'unit': 'ตัว',
                 'material_unit_price': b_price['material'],
@@ -286,15 +299,18 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
                 'labor_unit_price': b_price['labor'],
                 'labor_total': round(b_price['labor'] * qty, 2),
                 'total_price': round((b_price['material'] + b_price['labor']) * qty, 2),
-                'remark': b_price.get('brand', 'Schneider'),
+                'remark': b_brand,
             })
             item_no += 1
             
         for breaker_key, qty in rcbo_groups.items():
             b_price = get_price(breaker_key)
+            b_brand = b_price.get('brand', 'Schneider')
+            # Extract AT value from key like 'RCBO-1P-16AT-30mA'
+            at_val = breaker_key.split('-')[2].replace('AT', '')
             e2_items.append({
                 'item_no': str(item_no),
-                'description': breaker_key.replace("-", " "),
+                'description': f'RCBO 1P {at_val}AT 30mA ({b_brand})',
                 'quantity': float(qty),
                 'unit': 'ตัว',
                 'material_unit_price': b_price['material'],
@@ -302,7 +318,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
                 'labor_unit_price': b_price['labor'],
                 'labor_total': round(b_price['labor'] * qty, 2),
                 'total_price': round((b_price['material'] + b_price['labor']) * qty, 2),
-                'remark': b_price.get('brand', 'Schneider'),
+                'remark': b_brand,
             })
             item_no += 1
         
@@ -351,9 +367,12 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         item_no = 1
         for wire_key, qty in wire_summary.items():
             w_price = get_price(wire_key)
+            w_brand = w_price.get('brand', 'Yazaki')
+            # Extract wire size from key like 'IEC01-2.5'
+            wire_mm = wire_key.split('-')[-1]
             e3_items.append({
                 'item_no': str(item_no),
-                'description': f'สาย {wire_key} (วงจรสาขา)',
+                'description': f'สาย IEC01 (THW) {wire_mm} mm² ({w_brand})',
                 'quantity': round(qty, 2),
                 'unit': w_price['unit'],
                 'material_unit_price': w_price['material'],
@@ -361,15 +380,18 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
                 'labor_unit_price': w_price['labor'],
                 'labor_total': round(w_price['labor'] * qty, 2),
                 'total_price': round((w_price['material'] + w_price['labor']) * qty, 2),
-                'remark': w_price.get('brand', 'Yazaki'),
+                'remark': w_brand,
             })
             item_no += 1
             
         for conduit_key, qty in conduit_summary.items():
             c_price = get_price(conduit_key)
+            c_brand = c_price.get('brand', 'PRI')
+            # Extract conduit size from key like 'PVC-1/2'
+            conduit_size = conduit_key.split('-')[-1]
             e3_items.append({
                 'item_no': str(item_no),
-                'description': f'ท่อ {conduit_key}',
+                'description': f'ท่อ PVC {conduit_size}" ({c_brand})',
                 'quantity': round(qty, 2),
                 'unit': c_price['unit'],
                 'material_unit_price': c_price['material'],
@@ -377,7 +399,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
                 'labor_unit_price': c_price['labor'],
                 'labor_total': round(c_price['labor'] * qty, 2),
                 'total_price': round((c_price['material'] + c_price['labor']) * qty, 2),
-                'remark': c_price.get('brand', 'PRI'),
+                'remark': c_brand,
             })
             item_no += 1
         
@@ -418,6 +440,10 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         from datetime import datetime
         date_str = datetime.now().strftime('%d/%m/%Y')
         
+        from datetime import timedelta
+        price_valid_until = datetime.now() + timedelta(days=30)
+        price_valid_date = price_valid_until.strftime('%d/%m/%Y')
+        
         boq_data: BOQData = {
             'project_name': project_name,
             'date': date_str,
@@ -428,6 +454,9 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'vat_percent': vat_percent,
             'vat_amount': vat_amount,
             'final_total': final_total,
+            # 🆕 Price validity
+            'price_valid_date': price_valid_date,
+            'price_valid_warning': f'⚠️ ราคา ณ วันที่ {date_str} มีอายุ 30 วัน (ถึง {price_valid_date})',
         }
         
         logger.info(f"[BOQ] Generated BOQ: {len(sections)} sections, Total: {final_total:,.2f} THB")
