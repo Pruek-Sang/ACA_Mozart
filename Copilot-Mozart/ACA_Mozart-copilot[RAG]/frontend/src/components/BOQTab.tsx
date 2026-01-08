@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { Receipt, Download } from 'lucide-react';
-import { BOQData, LoadResult } from '../types';
+import type { BOQData, LoadResult } from '../types';
 
 interface BOQTabProps {
     boqData?: BOQData;

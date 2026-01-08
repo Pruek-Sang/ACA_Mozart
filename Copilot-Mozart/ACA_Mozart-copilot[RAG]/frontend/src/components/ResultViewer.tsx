@@ -1,12 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { Table, FileImage, ClipboardCheck, Box, Receipt, BookOpen, Download } from 'lucide-react';
-import type { DesignResult, LoadResult, SLDData } from '../types';
+import type { DesignResult, LoadResult, SLDData, BOQData } from '../types';
 import { cn } from '../lib/utils';
 import { SLDViewer } from './SLDViewer';
 import { PDFPreviewModal } from './PDFPreviewModal';
 import { BOQPDFPreviewModal } from './BOQPDFPreviewModal';
 import { SLDPDFPreviewModal } from './SLDPDFPreviewModal';
 import { DownloadDropdown } from './DownloadDropdown';
+import { BOQTab } from './BOQTab'; // 🆕 BOQ with backend data + fallback
 import * as XLSX from 'xlsx';
 
 import { AssumptionsPanel } from './AssumptionsPanel';
@@ -636,197 +637,26 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                 )}
 
                 {/* BOQ Tab - Bill of Quantities (Dynamic from Load Table) */}
+                {/* BOQ Tab - Bill of Quantities (from Backend or Fallback) */}
                 {activeTab === 'boq' && (() => {
-                    // === BOQ Calculation from Load Table ===
-                    const loads = data?.data?.loads || [];
-                    const circuitCount = loads.length || 1;
-
-                    // Price Catalog (cheapest brands)
-                    const PRICES = {
-                        MCB_1P: 78,      // Schneider
-                        RCBO_1P: 1133,   // Schneider 30mA
-                        LC_30: 6108,     // Load Center 30 slot
-                        LC_18: 3600,     // Load Center 18 slot
-                        WIRE_2_5: 10,    // IEC01-2.5 per m
-                        WIRE_4: 18,      // IEC01-4 per m
-                        PVC_HALF: 10,    // PVC 1/2" per m
-                        MAIN_WIRE_M: 237, // IEC01-50 per m
-                        MAIN_CONDUIT_M: 121, // EMT 1-1/2"
-                        LABOR_PERCENT: 0.35, // 35% labor
-                    };
-
-                    // Count breakers
-                    let mcbCount = 0;
-                    let rcboCount = 0;
-                    loads.forEach((item: LoadResult) => {
-                        if ((item as any).requires_rcbo || (item as any).breaker_type === 'RCBO') {
-                            rcboCount++;
-                        } else {
-                            mcbCount++;
-                        }
-                    });
-
-                    // Calculate E.1 (Main Cable) - estimate 50m main, 15m ground
-                    const e1_material = (50 * PRICES.MAIN_WIRE_M) + (15 * 62) + (18 * PRICES.MAIN_CONDUIT_M) + 1000;
-                    const e1_labor = Math.round(e1_material * PRICES.LABOR_PERCENT);
-                    const e1_total = e1_material + e1_labor;
-
-                    // Calculate E.2 (Load Center + Breakers)
-                    const lcPrice = circuitCount > 18 ? PRICES.LC_30 : PRICES.LC_18;
-                    const lcSlots = circuitCount > 18 ? 30 : 18;
-                    const mainBreakerPrice = 2884; // MCB 2P 100AT
-                    const mcbTotal = mcbCount * PRICES.MCB_1P;
-                    const rcboTotal = rcboCount * PRICES.RCBO_1P;
-                    const e2_material = lcPrice + mainBreakerPrice + mcbTotal + rcboTotal + 1000;
-                    const e2_labor = 4000;
-                    const e2_total = e2_material + e2_labor;
-
-                    // Calculate E.3 (Branch Wiring) - 15m per circuit
-                    const wireLength = circuitCount * 15;
-                    const e3_material = (wireLength * PRICES.WIRE_2_5 * 3) + (wireLength * PRICES.PVC_HALF) + 5000;
-                    const e3_labor = Math.round(e3_material * PRICES.LABOR_PERCENT);
-                    const e3_total = e3_material + e3_labor;
-
-                    // Grand totals
-                    const totalMaterial = e1_material + e2_material + e3_material;
-                    const totalLabor = e1_labor + e2_labor + e3_labor;
-                    const grandTotal = totalMaterial + totalLabor;
-                    const vat = Math.round(grandTotal * 0.07);
-                    const finalTotal = grandTotal + vat;
-
+                    // 🆕 Cloud Log: Check if boq_data exists from backend
+                    const boqData = (data as any)?.metadata?.boq_data as BOQData | undefined;
+                    console.log('[BOQ-Tab] boq_data from backend:', boqData ? {
+                        sections: boqData.sections?.length || 0,
+                        price_source: boqData.price_source,
+                        final_total: boqData.final_total
+                    } : 'NOT_AVAILABLE');
+                    
                     return (
-                        <div className="space-y-6">
-                            {/* BOQ Header */}
-                            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-lg p-6 flex justify-between items-start">
-                                <div>
-                                    <h3 className="text-amber-400 font-bold text-lg mb-2 flex items-center gap-2">
-                                        <Receipt size={24} /> Bill of Quantities (BOQ)
-                                    </h3>
-                                    <p className="text-slate-400 text-sm">
-                                        คำนวณจาก Load Schedule: <span className="text-sky-400 font-bold">{circuitCount}</span> วงจร
-                                        ({mcbCount} MCB + {rcboCount} RCBO)
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => setBOQPDFOpen(true)}
-                                    className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer"
-                                >
-                                    <Download size={16} /> Download Options
-                                </button>
-                            </div>
-
-                            {/* E.2 Breaker Details */}
-                            <div className="border border-slate-800 rounded-lg overflow-hidden">
-                                <div className="bg-slate-900 p-3 border-b border-slate-800">
-                                    <span className="text-amber-400 font-bold">E.2</span>
-                                    <span className="text-slate-300 ml-2">ตู้ไฟฟ้า</span>
-                                </div>
-                                <table className="w-full text-xs">
-                                    <thead className="bg-slate-900/50 text-slate-500">
-                                        <tr>
-                                            <th className="p-2 text-left">รายการ</th>
-                                            <th className="p-2 text-center">จำนวน</th>
-                                            <th className="p-2 text-right">ราคา/หน่วย</th>
-                                            <th className="p-2 text-right">รวม</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800">
-                                        <tr className="hover:bg-slate-900/30">
-                                            <td className="p-2 text-slate-300">Load Center {lcSlots} ช่อง</td>
-                                            <td className="p-2 text-center text-slate-400">1 ชุด</td>
-                                            <td className="p-2 text-right font-mono text-slate-400">{lcPrice.toLocaleString()}</td>
-                                            <td className="p-2 text-right font-mono text-emerald-400">{lcPrice.toLocaleString()}</td>
-                                        </tr>
-                                        <tr className="hover:bg-slate-900/30">
-                                            <td className="p-2 text-slate-300">MCB 2P {data?.data?.main_breaker || 100}AT (Main)</td>
-                                            <td className="p-2 text-center text-slate-400">1 ตัว</td>
-                                            <td className="p-2 text-right font-mono text-slate-400">{mainBreakerPrice.toLocaleString()}</td>
-                                            <td className="p-2 text-right font-mono text-emerald-400">{mainBreakerPrice.toLocaleString()}</td>
-                                        </tr>
-                                        {mcbCount > 0 && (
-                                            <tr className="hover:bg-slate-900/30">
-                                                <td className="p-2 text-slate-300">MCB 1P (Branch)</td>
-                                                <td className="p-2 text-center text-slate-400">{mcbCount} ตัว</td>
-                                                <td className="p-2 text-right font-mono text-slate-400">{PRICES.MCB_1P}</td>
-                                                <td className="p-2 text-right font-mono text-emerald-400">{mcbTotal.toLocaleString()}</td>
-                                            </tr>
-                                        )}
-                                        {rcboCount > 0 && (
-                                            <tr className="hover:bg-slate-900/30">
-                                                <td className="p-2 text-sky-400">RCBO 1P 30mA (น้ำอุ่น/เปียก)</td>
-                                                <td className="p-2 text-center text-slate-400">{rcboCount} ตัว</td>
-                                                <td className="p-2 text-right font-mono text-slate-400">{PRICES.RCBO_1P.toLocaleString()}</td>
-                                                <td className="p-2 text-right font-mono text-emerald-400">{rcboTotal.toLocaleString()}</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {/* Summary Table */}
-                            <div className="border border-slate-800 rounded-lg overflow-hidden">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-900 text-slate-400 font-mono">
-                                        <tr>
-                                            <th className="p-3 text-left border-b border-slate-800">หมวด</th>
-                                            <th className="p-3 text-left border-b border-slate-800">รายการ</th>
-                                            <th className="p-3 text-right border-b border-slate-800">ค่าวัสดุ</th>
-                                            <th className="p-3 text-right border-b border-slate-800">ค่าแรง</th>
-                                            <th className="p-3 text-right border-b border-slate-800">รวม</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800">
-                                        <tr className="hover:bg-slate-900/50">
-                                            <td className="p-3 font-bold text-amber-400">E.1</td>
-                                            <td className="p-3 text-slate-300">สายเมนไฟฟ้าแรงต่ำ + ท่อ EMT</td>
-                                            <td className="p-3 text-right font-mono text-slate-400">{e1_material.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right font-mono text-slate-400">{e1_labor.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right font-mono text-emerald-400 font-bold">{e1_total.toLocaleString()} ฿</td>
-                                        </tr>
-                                        <tr className="hover:bg-slate-900/50">
-                                            <td className="p-3 font-bold text-amber-400">E.2</td>
-                                            <td className="p-3 text-slate-300">ตู้ไฟฟ้า (LC + {mcbCount} MCB + {rcboCount} RCBO)</td>
-                                            <td className="p-3 text-right font-mono text-slate-400">{e2_material.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right font-mono text-slate-400">{e2_labor.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right font-mono text-emerald-400 font-bold">{e2_total.toLocaleString()} ฿</td>
-                                        </tr>
-                                        <tr className="hover:bg-slate-900/50">
-                                            <td className="p-3 font-bold text-amber-400">E.3</td>
-                                            <td className="p-3 text-slate-300">สายไฟฟ้า + ท่อ PVC ({wireLength} ม.)</td>
-                                            <td className="p-3 text-right font-mono text-slate-400">{e3_material.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right font-mono text-slate-400">{e3_labor.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right font-mono text-emerald-400 font-bold">{e3_total.toLocaleString()} ฿</td>
-                                        </tr>
-                                    </tbody>
-                                    <tfoot className="bg-slate-800 font-mono">
-                                        <tr className="border-t-2 border-slate-600">
-                                            <td colSpan={2} className="p-3 text-right font-bold text-slate-400">รวมค่าดำเนินการ</td>
-                                            <td className="p-3 text-right text-slate-400">{totalMaterial.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right text-slate-400">{totalLabor.toLocaleString()} ฿</td>
-                                            <td className="p-3 text-right text-sky-400 font-bold text-lg">{grandTotal.toLocaleString()} ฿</td>
-                                        </tr>
-                                        <tr>
-                                            <td colSpan={4} className="p-3 text-right font-bold text-slate-400">VAT 7%</td>
-                                            <td className="p-3 text-right text-slate-400">{vat.toLocaleString()} ฿</td>
-                                        </tr>
-                                        <tr className="border-t border-slate-700">
-                                            <td colSpan={4} className="p-3 text-right font-bold text-amber-400 text-lg">รวมทั้งสิ้น</td>
-                                            <td className="p-3 text-right text-emerald-400 font-bold text-xl">{finalTotal.toLocaleString()} ฿</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-
-                            {/* Notice */}
-                            <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-4">
-                                <p className="text-slate-500 text-xs text-center">
-                                    💡 ราคาประมาณการใช้ยี่ห้อถูกสุด (Yazaki, Schneider, PRI) | ไม่รวมค่าขนส่ง
-                                </p>
-                            </div>
-                        </div>
+                        <BOQTab
+                            boqData={boqData}
+                            loads={data?.data?.loads || []}
+                            onDownloadClick={() => setBOQPDFOpen(true)}
+                        />
                     );
                 })()}
             </div>
         </div >
     );
 };
+
