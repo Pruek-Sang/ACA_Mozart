@@ -89,58 +89,135 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
     """
     [CP-SLD] Render SLD data from DisplayData.
     
+    Layout: แนวตั้ง (Vertical)
+    Power → kWh Meter → Main MCB → RCD → Branch MCBs → Loads
+    
+    Features:
+    - Switch สำหรับ Lighting circuits
+    - Cable Label (ขนาดสาย+ท่อ)
+    
     Args:
         display_data: DisplayData from compute.py
     
     Returns:
         SLDData: Structured data for frontend SVG rendering
     """
-    logger.info("[CP-SLD] Generating SLD diagram data...")
+    logger.info("[CP-SLD] Generating SLD diagram data (Vertical Layout)...")
     
     nodes: List[SLDNode] = []
     edges: List[SLDEdge] = []
     
     # Calculate center X
     center_x = CANVAS_WIDTH / 2
+    current_y = 40
     
-    # 1. Meter Node (Top)
-    meter_node = _create_meter_node(display_data, center_x, 40)
+    # 1. Power Source Node (Top)
+    power_node: SLDNode = {
+        'id': 'power',
+        'type': 'power_source',
+        'label': 'Power from MEA',
+        'x': center_x - NODE_WIDTH / 2,
+        'y': current_y,
+        'width': NODE_WIDTH,
+        'height': 40,
+        'data': {'icon': '⚡', 'cable_label': f"2 × {display_data.get('main_wire', '25')}mm² Cu"}
+    }
+    nodes.append(power_node)
+    current_y += 60
+    
+    # 2. kWh Meter Node
+    meter_node = _create_meter_node(display_data, center_x, current_y)
     nodes.append(meter_node)
+    edges.append({
+        'id': 'edge-power-meter',
+        'source': 'power',
+        'target': 'meter',
+        'style': 'solid'
+    })
+    current_y += VERTICAL_GAP
     
-    # 2. Main Breaker Node
-    main_breaker_node = _create_main_breaker_node(display_data, center_x, 40 + VERTICAL_GAP)
+    # 3. Main Breaker Node (MCCB/MCB)
+    main_breaker_node = _create_main_breaker_node(display_data, center_x, current_y)
     nodes.append(main_breaker_node)
-    
-    # 3. Edge: Meter -> Main Breaker
     edges.append({
         'id': 'edge-meter-main',
         'source': 'meter',
         'target': 'main_breaker',
         'style': 'solid'
     })
+    current_y += VERTICAL_GAP
     
-    # 4. Branch Circuits
+    # 4. RCD Node (optional - for circuits requiring ground fault protection)
+    rcd_node: SLDNode = {
+        'id': 'rcd',
+        'type': 'rcd',
+        'label': 'RCD 63A-30mA',
+        'x': center_x - NODE_WIDTH / 2,
+        'y': current_y,
+        'width': NODE_WIDTH,
+        'height': 50,
+        'data': {'icon': '🛡️', 'rating': '63A-30mA DP RCD'}
+    }
+    nodes.append(rcd_node)
+    edges.append({
+        'id': 'edge-main-rcd',
+        'source': 'main_breaker',
+        'target': 'rcd',
+        'style': 'solid'
+    })
+    current_y += VERTICAL_GAP
+    
+    # 5. Branch Circuits (arranged vertically)
     circuits = display_data.get('circuits', [])
     num_circuits = len(circuits)
     
     if num_circuits > 0:
         # Calculate circuit positions (distribute horizontally)
-        branch_y = 40 + VERTICAL_GAP * 2
-        total_width = num_circuits * NODE_WIDTH + (num_circuits - 1) * HORIZONTAL_GAP
+        branch_y = current_y
+        total_width = min(num_circuits, 8) * NODE_WIDTH + (min(num_circuits, 8) - 1) * HORIZONTAL_GAP
         start_x = center_x - total_width / 2 + NODE_WIDTH / 2
         
-        for i, circuit in enumerate(circuits[:12]):  # Limit to 12 circuits for layout
+        for i, circuit in enumerate(circuits[:8]):  # Limit to 8 circuits per row
             circuit_x = start_x + i * (NODE_WIDTH + HORIZONTAL_GAP)
-            circuit_node = _create_circuit_node(circuit, i, circuit_x, branch_y)
+            circuit_node = _create_circuit_node_vertical(circuit, i, circuit_x, branch_y)
             nodes.append(circuit_node)
             
-            # Edge: Main Breaker -> Circuit
+            # Edge: RCD -> Circuit
             edges.append({
-                'id': f'edge-main-c{i}',
-                'source': 'main_breaker',
+                'id': f'edge-rcd-c{i}',
+                'source': 'rcd',
                 'target': f'circuit_{i}',
                 'style': 'solid'
             })
+            
+            # 🆕 Add Switch for Lighting circuits
+            is_lighting = _is_lighting_circuit(circuit)
+            if is_lighting:
+                switch_y = branch_y + NODE_HEIGHT + 30
+                switch_node: SLDNode = {
+                    'id': f'switch_{i}',
+                    'type': 'switch',
+                    'label': 'Switch',
+                    'x': circuit_x - 30,
+                    'y': switch_y,
+                    'width': 60,
+                    'height': 30,
+                    'data': {'icon': '⊕', 'circuit_id': f'circuit_{i}'}
+                }
+                nodes.append(switch_node)
+                
+                # Edge: Circuit -> Switch
+                edges.append({
+                    'id': f'edge-c{i}-switch',
+                    'source': f'circuit_{i}',
+                    'target': f'switch_{i}',
+                    'style': 'solid'
+                })
+    
+    # Calculate canvas height based on content
+    canvas_height = max(CANVAS_HEIGHT, current_y + NODE_HEIGHT + 100)
+    if num_circuits > 0:
+        canvas_height = max(canvas_height, branch_y + NODE_HEIGHT + 80)
     
     # Metadata
     metadata = {
@@ -149,7 +226,9 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
         'demand_current': display_data.get('demand_current', 0),
         'circuit_count': num_circuits,
         'canvas_width': CANVAS_WIDTH,
-        'canvas_height': max(CANVAS_HEIGHT, branch_y + NODE_HEIGHT + 50),
+        'canvas_height': canvas_height,
+        'layout': 'vertical',  # 🆕 Indicate layout type
+        'has_switches': any(_is_lighting_circuit(c) for c in circuits),  # 🆕
     }
     
     sld_data: SLDData = {
@@ -158,8 +237,54 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
         'metadata': metadata,
     }
     
-    logger.info(f"[CP-SLD] Generated: {len(nodes)} nodes, {len(edges)} edges")
+    logger.info(f"[CP-SLD] Generated: {len(nodes)} nodes, {len(edges)} edges (vertical layout)")
     return sld_data
+
+
+def _is_lighting_circuit(circuit: Dict[str, Any]) -> bool:
+    """Check if circuit is a lighting circuit (for Switch display)."""
+    name = circuit.get('circuit_name', '').lower()
+    return any(k in name for k in ['lighting', 'light', 'ไฟ', 'โคม', 'หลอด', 'แสงสว่าง'])
+
+
+def _create_circuit_node_vertical(circuit: Dict[str, Any], index: int, x: float, y: float) -> SLDNode:
+    """Create branch circuit node with Cable Label."""
+    name = circuit.get('circuit_name', f'Circuit {index + 1}')
+    if len(name) > 12:
+        name = name[:10] + '...'
+    
+    breaker = circuit.get('breaker_rating', 15)
+    poles = circuit.get('breaker_poles', 1)
+    wire = circuit.get('wire_size', '2.5')
+    conduit = circuit.get('conduit_size', '1/2"')
+    rcbo = circuit.get('requires_rcbo', False)
+    is_lighting = _is_lighting_circuit(circuit)
+    
+    # 🆕 Cable Label (สาย + ท่อ)
+    cable_label = f"{wire}mm²/{conduit}"
+    
+    return {
+        'id': f'circuit_{index}',
+        'type': 'rcbo' if rcbo else 'branch_breaker',
+        'label': f"{name}\n{breaker}A/{poles}P",
+        'x': x - NODE_WIDTH / 2,
+        'y': y,
+        'width': NODE_WIDTH,
+        'height': NODE_HEIGHT,
+        'data': {
+            'name': circuit.get('circuit_name', '-'),
+            'breaker': f"{breaker}A/{poles}P",
+            'wire': f"{wire}mm²",
+            'conduit': conduit,
+            'cable_label': cable_label,  # 🆕
+            'kw': circuit.get('total_kw', 0),
+            'current': circuit.get('total_current', 0),
+            'rcbo': rcbo,
+            'is_lighting': is_lighting,  # 🆕
+            'vd_percent': circuit.get('vd_percent', 0),
+            'icon': '💡' if is_lighting else ('🛡️' if rcbo else '⚡'),
+        }
+    }
 
 
 # =============================================================================
