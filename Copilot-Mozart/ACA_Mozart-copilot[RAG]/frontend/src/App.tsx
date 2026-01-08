@@ -138,7 +138,18 @@ function App() {
 
         if (res.ok) {
           const data = await res.json();
-          logger.info('[SESSION] Data restored successfully', { sessionId: id, projectName: data.project_name });
+          logger.info('[SESSION-RESTORE] Data restored', { sessionId: id, projectName: data.project_name });
+
+          // 🆕 Verbose logging for debugging
+          console.log('[SESSION-RESTORE] === Session Data ===');
+          console.log('[SESSION-RESTORE] Project:', data.project_name);
+          console.log('[SESSION-RESTORE] Has MCP Response:', !!data.mcp_response);
+          console.log('[SESSION-RESTORE] Has Display Data:', !!data.mcp_response?.display_data);
+          console.log('[SESSION-RESTORE] Has BOQ Data:', !!data.mcp_response?.boq_data);
+          if (data.mcp_response?.boq_data) {
+            console.log('[SESSION-RESTORE] BOQ Price Source:', data.mcp_response.boq_data.price_source);
+            console.log('[SESSION-RESTORE] BOQ Sections:', data.mcp_response.boq_data.sections?.length || 0);
+          }
 
           if (data.project_name) setProjectName(data.project_name);
 
