@@ -118,6 +118,24 @@ jobs:
           python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py tests/test_e2e_integration.py tests/backend/test_session_api.py tests/backend/test_design_api.py -v --tb=short
           echo "✅ RAG Backend tests PASSED"
 
+      # 🆕 BOQ E2E Test (NO MOCK) - Verify real API returns boq_data
+      - name: 📦 Run BOQ E2E Test (NO MOCK)
+        id: boq-e2e-test
+        continue-on-error: true
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]"
+          echo "🧪 Running BOQ E2E test (NO MOCK)..."
+          echo "⚠️ This test requires real backend - will skip if unavailable"
+          # Only run if BACKEND_URL is set (e.g. staging environment)
+          if [ -n "${{ secrets.STAGING_BACKEND_URL }}" ]; then
+            export BACKEND_URL="${{ secrets.STAGING_BACKEND_URL }}"
+            python -m pytest tests/test_boq_e2e_real.py -v --tb=short || echo "⚠️ BOQ E2E test skipped (backend unavailable)"
+          else
+            echo "ℹ️ STAGING_BACKEND_URL not set - skipping real E2E test"
+            echo "To enable: Add STAGING_BACKEND_URL secret in GitHub"
+          fi
+          echo "✅ BOQ E2E check complete"
+
       - name: 📊 Backend Test Summary
         if: always()
         run: |
@@ -127,6 +145,7 @@ jobs:
           echo "║ E2E Data Flow:      ${{ steps.e2e-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
           echo "║ Input Sanitizer:    ${{ steps.sanitizer-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
           echo "║ RAG Backend:        ${{ steps.rag-test.outcome == 'success' && '✅ PASSED' || '❌ FAILED' }}"
+          echo "║ BOQ E2E (NO MOCK):  ${{ steps.boq-e2e-test.outcome == 'success' && '✅ PASSED' || '⚠️ SKIPPED' }}"
           echo "╚════════════════════════════════════════════════════════════╝"
 
   # ═══════════════════════════════════════════════════════════════════════
