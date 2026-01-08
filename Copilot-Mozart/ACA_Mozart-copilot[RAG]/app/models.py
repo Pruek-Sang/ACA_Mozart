@@ -110,7 +110,8 @@ class AnswerMetadata(BaseModel):
     display_data: Optional[Dict[str, Any]] = Field(None, description="Computed display data for Load Table tab")
     audit_results: Optional[List[Dict[str, Any]]] = Field(None, description="Audit results for Audit tab")
     pdf_data: Optional[Dict[str, Any]] = Field(None, description="BOQ data for PDF/Excel export")
-    sld_data: Optional[Dict[str, Any]] = Field(None, description="SLD data for Single Line Diagram (future)")
+    sld_data: Optional[Dict[str, Any]] = Field(None, description="SLD data for Single Line Diagram")
+    boq_data: Optional[Dict[str, Any]] = Field(None, description="BOQ with price_source for BOQ tab")
 
 
 class StandardResponse(BaseModel):
