@@ -578,5 +578,171 @@ class TestSessionExpiry(unittest.TestCase):
         self.assertTrue(session.is_expired(ttl_minutes=60))
 
 
+class TestAdvancedIntegration(unittest.TestCase):
+    """Advanced integration tests: Concurrency, Auth States, Edge Cases.
+    
+    NO MOCKS - All tests hit real Supabase!
+    """
+
+    def test_16_concurrent_session_writes(self):
+        """REAL Test: Multiple concurrent writes don't corrupt data.
+        
+        Simulates:
+        - 5 parallel updates to same session
+        - Verify no data corruption
+        
+        NO MOCKS!
+        """
+        import asyncio
+        from app.context.session_injector import session_injector
+        
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available")
+        
+        async def run_test():
+            # Create session
+            session = await session_injector.create(
+                user_id=None,
+                project_name="ConcurrencyTest"
+            )
+            session_id = session.id
+            
+            # Define multiple updates
+            async def update_loads(i: int):
+                return await session_injector.update(session_id, {
+                    "loads": [{"device": f"Device_{i}", "quantity": i}]
+                })
+            
+            # Run 5 concurrent updates
+            tasks = [update_loads(i) for i in range(5)]
+            results = await asyncio.gather(*tasks)
+            
+            # All should succeed (no crashes)
+            self.assertTrue(all(results), "Some concurrent updates failed!")
+            
+            # Load and verify - should have ONE of the updates (last-write-wins)
+            final = await session_injector.load(session_id)
+            self.assertIsNotNone(final, "Session corrupted after concurrent writes!")
+            self.assertEqual(len(final.loads), 1, "Loads corrupted - should have exactly 1!")
+            
+            # Cleanup
+            await session_injector.delete(session_id)
+            return True
+        
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
+
+    def test_17_null_user_id_handling(self):
+        """REAL Test: Guest sessions (NULL user_id) work correctly.
+        
+        Verifies:
+        - Can create session with user_id=None
+        - Can load session with NULL user_id
+        - Data persists correctly
+        
+        NO MOCKS!
+        """
+        import asyncio
+        from app.context.session_injector import session_injector
+        
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available")
+        
+        async def run_test():
+            # Create guest session (NULL user_id)
+            session = await session_injector.create(
+                user_id=None,  # Guest!
+                project_name="GuestProject",
+                initial_data={"loads": [{"device": "GuestDevice", "qty": 1}]}
+            )
+            self.assertIsNotNone(session, "Failed to create guest session!")
+            self.assertIsNone(session.user_id, "Guest session should have NULL user_id!")
+            
+            session_id = session.id
+            
+            # Load and verify
+            loaded = await session_injector.load(session_id)
+            self.assertIsNotNone(loaded, "Failed to load guest session!")
+            self.assertEqual(loaded.project_name, "GuestProject")
+            self.assertIsNone(loaded.user_id, "Loaded session user_id should be NULL!")
+            
+            # Cleanup
+            await session_injector.delete(session_id)
+            return True
+        
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
+
+    def test_18_session_data_integrity(self):
+        """REAL Test: Complex data structures persist correctly.
+        
+        Verifies:
+        - Nested objects (site_context) persist
+        - Arrays (loads, messages) persist
+        - Thai text persists without corruption
+        - Special characters persist
+        
+        NO MOCKS!
+        """
+        import asyncio
+        from app.context.session_injector import session_injector
+        
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available")
+        
+        async def run_test():
+            # Create session with complex data
+            complex_data = {
+                "loads": [
+                    {"device": "แอร์ 12000 BTU", "room": "ห้องนอนใหญ่", "qty": 2},
+                    {"device": "LED 20W", "room": "ห้องน้ำ #1", "qty": 4}
+                ],
+                "site_context": {
+                    "building_type": "residential",
+                    "floors": 2,
+                    "transformer_distance": 50.5,
+                    "notes": "บ้าน 2 ชั้น พร้อมโรงจอดรถ"
+                },
+                "messages": [
+                    {"role": "user", "content": "ออกแบบบ้าน 2 ชั้น มีแอร์ 3 ตัว"},
+                    {"role": "assistant", "content": "รับทราบครับ กำลังคำนวณ..."}
+                ]
+            }
+            
+            session = await session_injector.create(
+                user_id=None,
+                project_name="บ้านทดสอบ (Test House #1)",
+                initial_data=complex_data
+            )
+            session_id = session.id
+            
+            # Load and verify EVERYTHING
+            loaded = await session_injector.load(session_id)
+            
+            # Check Thai project name
+            self.assertEqual(loaded.project_name, "บ้านทดสอบ (Test House #1)")
+            
+            # Check loads
+            self.assertEqual(len(loaded.loads), 2)
+            self.assertEqual(loaded.loads[0]["device"], "แอร์ 12000 BTU")
+            self.assertEqual(loaded.loads[1]["room"], "ห้องน้ำ #1")
+            
+            # Check site_context
+            self.assertEqual(loaded.site_context["building_type"], "residential")
+            self.assertEqual(loaded.site_context["transformer_distance"], 50.5)
+            self.assertIn("โรงจอดรถ", loaded.site_context["notes"])
+            
+            # Check messages
+            self.assertEqual(len(loaded.messages), 2)
+            self.assertIn("แอร์ 3 ตัว", loaded.messages[0]["content"])
+            
+            # Cleanup
+            await session_injector.delete(session_id)
+            return True
+        
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
+
+
 if __name__ == '__main__':
     unittest.main()
