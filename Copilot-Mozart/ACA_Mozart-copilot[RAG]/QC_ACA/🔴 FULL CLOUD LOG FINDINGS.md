@@ -2,7 +2,8 @@
 
 > **Date**: 2026-01-09  
 > **Service**: mozart-rag (Cloud Run)  
-> **Analysis Period**: 2026-01-08 17:00 - 22:30 UTC
+> **Analysis Period**: 2026-01-08 17:00 - 22:30 UTC  
+> **Investigation**: Complete code + commit analysis
 
 ---
 
@@ -15,110 +16,103 @@
 | 22:05:26 | `[EDIT_INTENT] Detected 'ลบ'` | ✅ Keyword detected |
 | 22:05:26 | `[ASK] session_id: None` | ❌ ไม่มี session |
 | 22:05:26 | `⚠️ EDIT intent but no session_id` | ⚠️ Fallback to CREATE |
-| 22:05:28 | `[ASK-BACK] Has loads but no rooms` | ℹ️ Asking for rooms |
 | 22:05:48 | `[SESSION-CREATE] ✅ 36ccd37c` | ✅ Session สร้างสำเร็จ |
-| 22:05:53 | `[SESSION-LOAD] ✅ Found` | ✅ พบ session |
 | 22:05:53 | `[SESSION-LOAD] Has MCP: False` | ❌ **ไม่มี design data** |
-| 22:05:53 | `[SESSION-LOAD] Messages: 0` | ❌ ไม่มี messages |
 | 22:09:28 | `[ASK] session_id: None` | ❌ ยังคง None |
-| 22:09:28 | `[EDIT_INTENT] No edit keywords → CREATE` | ℹ️ Normal flow |
-| 22:10:00 | `POST /api/v1/ask - 200 - 32s` | ✅ Request สำเร็จ |
 | 22:24:33 | `[SESSION-LOAD] ❌ PGRST116: 0 rows` | ❌ Session 933b1c05 ไม่พบ |
 
 ---
 
-## 🔴 ปัญหา 4 ประเภทที่พบ:
+## 🔍 Commits Investigated:
 
-### 1. session_id = None ในทุก /ask request
-```log
-🚀 [ASK] Received request from session_id: None
-```
-- **สาเหตุ**: Frontend ส่ง /ask ก่อนที่ session จะถูกสร้าง (Race Condition)
-- **ผลกระทบ**: AUTO-SAVE ถูก skip, EDIT mode fallback
-
-### 2. EDIT Intent Fallback
-```log
-[EDIT_INTENT] Detected EDIT keyword (TH): 'ลบ'
-⚠️ EDIT intent detected but no session_id provided - falling back to CREATE mode
-```
-- **สาเหตุ**: session_id = None
-- **ผลกระทบ**: User พิมพ์ "ลบแอร์" แต่ได้ fallback ถามห้องใหม่
-
-### 3. Session Not Found (PGRST116)
-```log
-[SESSION-LOAD] ❌ Failed: {'code': 'PGRST116', 'details': 'The result contains 0 rows'}
-```
-- **สาเหตุ**: localStorage มี session ID เก่าที่ถูกลบออกจาก Supabase แล้ว (หมดอายุ/ลบ)
-- **Session IDs ที่หาไม่เจอ**:
-  - `96b0dee2...`
-  - `933b1c05...`
-
-### 4. Has MCP: False (Design Data Missing)
-```log
-[SESSION-LOAD] ✅ Found: บ้านนายสมหญิง
-[SESSION-LOAD] Has MCP: False
-[SESSION-LOAD] Messages: 0
-📂 Loaded session data for 36ccd37c... (0 loads)
-```
-- **สาเหตุ**: ไม่มี `[AUTO-SAVE]` log → data ไม่เคยถูก save
+| Commit | Date | What it Fixed | Status |
+|--------|------|---------------|--------|
+| `eeb1b5f` | Jan 4 | AUTO-SAVE logic in /ask | ⚠️ Had Pydantic bug |
+| `05d4071` | Jan 7 | session_injector.create() direct call | ✅ Deployed |
+| `78f6a94` | Jan 7 | Ghost bug (race condition + memory fallback) | ⚠️ Partial fix |
+| `c5776d4` | Jan 8 | Guest mode added | ⚠️ New dependency |
+| `be3fd0f` | Jan 9 | Comprehensive cloud logging | ✅ Deployed |
 
 ---
 
-## ❌ สิ่งที่ไม่พบใน Log เลย:
+## 🔴 Confirmed Bugs:
 
-| Expected Log | พบ? | ความสำคัญ |
-|--------------|-----|-----------|
-| `[AUTO-SAVE] Saved design` | ❌ ไม่พบ | 🔴 Critical |
-| `[AUTO-SAVE] Skipped` | ❌ ไม่พบ | 🔴 Critical |
-| `[SESSION-UPDATE]` | ❌ ไม่พบ | 🟡 Important |
-| `[BOQ-GEN]` | ❌ ไม่พบในช่วงเวลานี้ | 🟡 Important |
+### BUG 1: Stale Session ID Not Cleared (Frontend)
+
+**Location**: `App.tsx` Line 207-211
+
+```typescript
+} catch (e: any) {
+  logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
+} finally {
+  setIsSessionLoading(false);  // ← ไม่ clear sessionId!
+}
+```
+
+**Problem**: ถ้า fetchSessionData fail (PGRST116) → sessionId state ยังเป็น old/stale ID → แต่ไม่ได้ create session ใหม่
+
+**Fix Needed**: เมื่อ fetch fail ต้อง clear localStorage และ create session ใหม่
 
 ---
 
-## 🎯 Confirmed Root Causes:
+### BUG 2: AUTO-SAVE Skipped (Backend)
 
-### Primary: Race Condition in Frontend
-```
-User พิมพ์ + กด submit  →  /ask (session_id=None)  →  AUTO-SAVE skip
-        ↓
-    22 วินาทียผ่านไป
-        ↓
-Session สร้าง           →  แต่ data ไม่ถูก save แล้ว
-```
+**Location**: `routes.py` Line 257-258
 
-### Secondary: Stale Session IDs
-- localStorage เก็บ session ID ที่ไม่มีใน Supabase แล้ว
-- เมื่อ refresh → พยายาม load → PGRST116 error
-
-### Code Path (routes.py:258):
 ```python
-if session_id:  # ← None จึง SKIP!
-    await session_injector.set_mcp_response(session_id, metadata)
+if SUPABASE_AVAILABLE and session_injector:
+    if session_id:  # ← ถ้า None จะ SKIP ทั้งหมด!
 ```
 
----
+**Problem**: ถ้า session_id = None → AUTO-SAVE ไม่ทำงาน → design data ไม่ถูก save → refresh แล้วหาย
 
-## 📋 Action Items:
-
-- [ ] **FIX-1**: Block submit until session is ready (isSessionLoading=true)
-- [ ] **FIX-2**: Create session synchronously in handleSubmit if not exists
-- [ ] **FIX-3**: Clear localStorage if session not found (PGRST116)
-- [ ] **FIX-4**: Add E2E test for race condition scenario
+**Evidence**: ไม่มี `[AUTO-SAVE]` log เลยใน Cloud Logging
 
 ---
 
-## 📊 Log Stats:
+### BUG 3: Guest Mode Session Race (Frontend)
 
-| Metric | Value |
-|--------|-------|
-| Total `/ask` requests | 4+ |
-| Requests with session_id | 0 |
-| EDIT intents detected | 2 |
-| EDIT fallbacks | 2 |
-| Session creates | 1 |
-| Session load failures | 3 |
-| AUTO-SAVE successful | 0 |
+**Location**: `App.tsx` Line 242
+
+```typescript
+}, [isAuthLoading, session, isGuestMode]);
+```
+
+**Problem**: เมื่อกด Guest → `isGuestMode=true` → trigger useEffect → แต่ถ้า localStorage มี session ID เก่า → ไม่สร้างใหม่
+
+**Evidence**: Session create เกิดขึ้น 22 วินาที หลัง /ask request
 
 ---
 
-*Generated by: Cloud Log Analysis via gcloud CLI*
+## ❌ Logs ที่ไม่พบ:
+
+| Expected Log | Status | Impact |
+|--------------|--------|--------|
+| `[AUTO-SAVE] Saved design` | ❌ ไม่พบ | 🔴 Critical |
+| `[AUTO-SAVE] Skipped` | ❌ ไม่พบ | Data loss |
+| `[SESSION-UPDATE]` | ❌ ไม่พบ | No state saved |
+
+---
+
+## 📋 Fix Priority:
+
+1. **[HIGH]** Frontend: Clear stale session ID when fetch fails
+2. **[HIGH]** Frontend: Ensure sessionId state is set before submit
+3. **[MEDIUM]** Backend: Log why AUTO-SAVE was skipped (add else branch log)
+4. **[LOW]** Add E2E test for Guest mode → /ask flow
+
+---
+
+## 🎯 Root Cause Summary:
+
+**Frontend ส่ง session_id=None ไป Backend เพราะ:**
+1. localStorage มี session ID เก่า → fetch fail (PGRST116) → ไม่ clear ไม่สร้างใหม่
+2. หรือ sessionId state ยังเป็น null เพราะ initSession ยังไม่เสร็จ
+3. Guest mode trigger แต่ถ้ามี old localStorage → ไม่สร้าง session ใหม่
+
+**Backend ไม่ save data เพราะ:**
+1. session_id = None → `if session_id:` = False → skip AUTO-SAVE
+
+---
+
+*Generated by: Complete Code + Commit + Cloud Log Analysis*
