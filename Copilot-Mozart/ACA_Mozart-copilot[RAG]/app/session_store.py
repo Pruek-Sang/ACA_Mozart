@@ -220,8 +220,16 @@ class SessionStore:
                     )
                     # For now, let's assume we construct it manually since ConversationSession is a dataclass
                     restored_session.stage = session_data.stage
-                    restored_session.created_at = session_data.created_at
-                    restored_session.updated_at = session_data.updated_at
+                    # Convert string to datetime if needed (Supabase returns ISO string)
+                    from datetime import datetime
+                    if isinstance(session_data.created_at, str):
+                        restored_session.created_at = datetime.fromisoformat(session_data.created_at.replace('Z', '+00:00'))
+                    else:
+                        restored_session.created_at = session_data.created_at
+                    if isinstance(session_data.updated_at, str):
+                        restored_session.updated_at = datetime.fromisoformat(session_data.updated_at.replace('Z', '+00:00'))
+                    else:
+                        restored_session.updated_at = session_data.updated_at
                     # Note: ConversationSession doesn't have project_name in original dataclass
                     # but we'll set it if the attribute exists
                     if hasattr(restored_session, 'project_name'):
