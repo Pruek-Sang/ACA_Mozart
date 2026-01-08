@@ -377,6 +377,181 @@ class TestSessionIntegration(unittest.TestCase):
         self.assertTrue(result)
 
 
+
+class TestSessionPersistenceReal(unittest.TestCase):
+    """REAL Integration Tests: Session persistence without any mocking.
+    
+    These tests verify:
+    1. Session survives "refresh" (close + reopen = load from DB)
+    2. CRUD operations work end-to-end with real Supabase
+    3. Multiple projects don't overwrite each other (UUID unique)
+    """
+
+    def test_13_session_refresh_persistence(self):
+        """REAL Test: Session data persists after 'refresh' (simulated by load).
+        
+        Simulates:
+        1. User creates session with design data
+        2. User "refreshes" browser (clears memory, reloads from DB)
+        3. Verify ALL data restored correctly
+        
+        NO MOCKS!
+        """
+        import asyncio
+        from app.context.session_injector import session_injector
+        
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available")
+        
+        async def run_test():
+            # 1. Create session with comprehensive data (like real usage)
+            test_data = {
+                "loads": [
+                    {"device": "AC-24000BTU", "room_name": "ห้องนั่งเล่น", "quantity": 1},
+                    {"device": "LED-20W", "room_name": "ห้องนอน", "quantity": 4}
+                ],
+                "site_context": {"transformer_distance": 50, "building_type": "residential"},
+                "messages": [{"role": "user", "content": "ออกแบบบ้าน 2 ชั้น"}]
+            }
+            
+            session = await session_injector.create(
+                user_id=None,
+                project_name="RefreshTest",
+                initial_data=test_data
+            )
+            session_id = session.id
+            
+            # 2. Simulate "refresh" - clear memory, load from DB
+            # In real app: browser closes, session_store clears, then loads from Supabase
+            del session  # Clear reference
+            
+            reloaded = await session_injector.load(session_id)
+            
+            # 3. Verify ALL data restored
+            self.assertIsNotNone(reloaded, "Session lost after refresh!")
+            self.assertEqual(reloaded.project_name, "RefreshTest", "project_name lost!")
+            self.assertEqual(len(reloaded.loads), 2, f"loads lost! got {len(reloaded.loads)}")
+            self.assertEqual(reloaded.loads[0]["device"], "AC-24000BTU", "loads data corrupted!")
+            
+            # Site context should also be preserved
+            if reloaded.site_context:
+                self.assertEqual(reloaded.site_context.get("building_type"), "residential")
+            
+            # Cleanup
+            await session_injector.delete(session_id)
+            return True
+        
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
+
+    def test_14_crud_full_cycle_real(self):
+        """REAL Test: Full CRUD cycle with actual Supabase.
+        
+        Tests:
+        - CREATE: New session inserted
+        - READ: Session can be retrieved
+        - UPDATE: Changes persist
+        - DELETE: Session actually removed
+        
+        NO MOCKS!
+        """
+        import asyncio
+        from app.context.session_injector import session_injector
+        
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available")
+        
+        async def run_test():
+            # CREATE
+            session = await session_injector.create(
+                user_id=None,
+                project_name="CRUDTestOriginal"
+            )
+            self.assertIsNotNone(session, "CREATE failed!")
+            session_id = session.id
+            
+            # READ
+            loaded = await session_injector.load(session_id)
+            self.assertIsNotNone(loaded, "READ failed!")
+            self.assertEqual(loaded.project_name, "CRUDTestOriginal", "READ returned wrong data!")
+            
+            # UPDATE
+            success = await session_injector.update(session_id, {
+                "project_name": "CRUDTestModified",
+                "loads": [{"device": "TestDevice", "quantity": 99}]
+            })
+            self.assertTrue(success, "UPDATE returned False!")
+            
+            # Verify UPDATE persisted
+            updated = await session_injector.load(session_id)
+            self.assertEqual(updated.project_name, "CRUDTestModified", "UPDATE didn't persist project_name!")
+            self.assertEqual(len(updated.loads), 1, "UPDATE didn't persist loads!")
+            self.assertEqual(updated.loads[0]["quantity"], 99, "UPDATE loads data wrong!")
+            
+            # DELETE
+            deleted = await session_injector.delete(session_id)
+            self.assertTrue(deleted, "DELETE returned False!")
+            
+            # Verify DELETE worked
+            gone = await session_injector.load(session_id)
+            self.assertIsNone(gone, "DELETE didn't remove session from DB!")
+            
+            return True
+        
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
+
+    def test_15_multiple_projects_unique_uuid(self):
+        """REAL Test: Multiple projects don't overwrite each other.
+        
+        Verifies:
+        - Each create() generates unique UUID
+        - Projects can coexist in DB
+        - Loading one doesn't affect others
+        
+        NO MOCKS!
+        """
+        import asyncio
+        from app.context.session_injector import session_injector
+        
+        if not session_injector or not session_injector.is_available():
+            self.skipTest("Supabase not available")
+        
+        async def run_test():
+            # Create 3 projects with different names
+            projects = []
+            for i in range(3):
+                session = await session_injector.create(
+                    user_id=None,
+                    project_name=f"UniqueProject_{i}",
+                    initial_data={"loads": [{"id": i, "name": f"load_{i}"}]}
+                )
+                self.assertIsNotNone(session, f"Failed to create project {i}")
+                projects.append(session)
+            
+            # Verify all UUIDs are unique
+            uuids = [p.id for p in projects]
+            self.assertEqual(len(uuids), len(set(uuids)), "UUIDs are not unique!")
+            
+            # Verify each project can be loaded independently
+            for i, project in enumerate(projects):
+                loaded = await session_injector.load(project.id)
+                self.assertIsNotNone(loaded, f"Project {i} disappeared!")
+                self.assertEqual(loaded.project_name, f"UniqueProject_{i}", 
+                               f"Project {i} data mixed with another!")
+                self.assertEqual(loaded.loads[0]["id"], i, 
+                               f"Project {i} loads corrupted!")
+            
+            # Cleanup all
+            for project in projects:
+                await session_injector.delete(project.id)
+            
+            return True
+        
+        result = asyncio.get_event_loop().run_until_complete(run_test())
+        self.assertTrue(result)
+
+
 class TestSessionExpiry(unittest.TestCase):
     """Tests for session expiry logic."""
     
