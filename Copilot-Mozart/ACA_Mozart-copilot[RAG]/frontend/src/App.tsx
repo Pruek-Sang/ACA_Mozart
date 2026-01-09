@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { ChatPanel } from './components/ChatPanel';
 import { ContextPanel } from './components/ContextPanel';
@@ -6,6 +6,8 @@ import { ResultViewer } from './components/ResultViewer';
 import { LoginPage } from './components/LoginPage';
 import { FeedbackModal } from './components/FeedbackModal';
 import { ProjectSelector } from './components/ProjectSelector';
+import { HealthPanel } from './components/HealthPanel';  // 🩺 Health Panel
+import { useHealthTracker } from './hooks/useHealthTracker';  // 🩺 Health Tracker
 import type {
   ChatMessage,
   SiteContext,
@@ -70,6 +72,10 @@ function App() {
     return saved || 'บ้านนายสมหญิง';
   });
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+
+  // === 🩺 HEALTH TRACKER ===
+  const healthTracker = useHealthTracker();
+  const showDebug = useMemo(() => window.location.search.includes('debug=true'), []);
 
   // === AUTH EFFECT ===
   useEffect(() => {
@@ -635,6 +641,17 @@ function App() {
         onClose={() => setIsFeedbackOpen(false)}
         onSubmit={handleFeedbackSubmit}
       />
+
+      {/* 🩺 Health Panel (Show only in debug mode: ?debug=true) */}
+      {showDebug && (
+        <HealthPanel
+          tracker={healthTracker}
+          localStorageSessionId={localStorage.getItem('mozart_session_id')}
+          localStorageProjectName={localStorage.getItem('mozart_project_name')}
+          reactSessionId={sessionId}
+          reactProjectName={projectName}
+        />
+      )}
     </div>
   );
 }
