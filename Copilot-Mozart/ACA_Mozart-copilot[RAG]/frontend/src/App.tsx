@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { ChatPanel } from './components/ChatPanel';
 import { ContextPanel } from './components/ContextPanel';
@@ -75,7 +75,7 @@ function App() {
 
   // === 🩺 HEALTH TRACKER ===
   const healthTracker = useHealthTracker();
-  const showDebug = useMemo(() => window.location.search.includes('debug=true'), []);
+  const showDebug = useMemo(() => globalThis.location.search.includes('debug=true'), []);
 
   // === AUTH EFFECT ===
   useEffect(() => {
@@ -303,7 +303,7 @@ function App() {
     };
 
     initSession();
-  }, [isAuthLoading, session, isGuestMode]); // Run when Auth status settles OR Guest mode activated
+  }, [isAuthLoading, session, isGuestMode, sessionId]); // Run when Auth status settles OR Guest mode activated OR SessionID changes
 
   // === LOGOUT HANDLER ===
   const handleLogout = async () => {
@@ -358,7 +358,7 @@ function App() {
   };
 
   // === CORE LOGIC: API CALL ===
-  const handleSubmit = async (userPrompt: string) => {
+  const handleSubmit = useCallback(async (userPrompt: string) => {
     // 1. Add User Message to Chat
     const newUserMsg: ChatMessage = {
       role: 'user',
@@ -520,7 +520,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [context, sessionId]);
 
   // === AUTH LOADING STATE ===
   if (isAuthLoading) {

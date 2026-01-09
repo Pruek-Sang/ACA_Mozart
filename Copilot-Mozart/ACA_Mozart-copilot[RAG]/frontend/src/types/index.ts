@@ -315,6 +315,33 @@ export interface LoadResult {
     voltage_drop_percent?: number;
     phase?: number;
     warnings?: string[];
+
+    // Legacy / Alternative fields found in usage
+    total_watts?: number;
+    total_va?: number;
+    circuit_name?: string;
+    // More legacy fallbacks
+    name?: string;
+    trade_size?: string;
+    ic_ka?: number | string;
+    breaker_rating?: number;
+
+    // Optional fields for Excel Export (Professional Load Table)
+    load_va_l1?: number;
+    load_va_l2?: number;
+    load_va_l3?: number;
+    breaker_type?: string;
+    breaker_poles?: number;
+    breaker_ic_ka?: number | string;
+    breaker_af?: number;
+    breaker_at?: number;
+    wire_size_l?: string;
+    wire_size_n?: string;
+    wire_size_grd?: string;
+    ground_size?: string;
+    wire_type?: string;
+    conduit_type?: string;
+    remark?: string;
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { X, Download, Printer, Loader2 } from 'lucide-react';
-import type { DesignResult } from '../types';
+import type { DesignResult, LoadResult } from '../types';
 import html2pdf from 'html2pdf.js';
 
 interface PDFPreviewModalProps {
@@ -52,7 +52,7 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
     if (loads.length > 0) console.log('[PDF-DEBUG] sample circuit:', loads[0]);
 
     // Categorize Loads for Footer - use total_watts or connected_load from circuit data
-    const getLoadVA = (l: any) => {
+    const getLoadVA = (l: LoadResult) => {
         // Try circuit computed fields first (single source of truth)
         if (l.load_va_l1 !== undefined) return l.load_va_l1;
         if (l.total_watts !== undefined) return l.total_watts;
@@ -63,17 +63,17 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
 
     // 🔧 FIX: Use circuit_name (not device_name) and correct keywords that match MCP Core output
     // Circuit names come as: "HEATER-4500W in ห้องน้ำ 1", "AC-12000BTU in ห้องนอน", "โคมไฟห้อง ชั้น 1-1", etc.
-    const getName = (l: any) => (l.circuit_name || l.device_name || '').toLowerCase();
+    const getName = (l: LoadResult) => (l.circuit_name || l.device_name || l.name || '').toLowerCase();
 
-    const lightingLoad = loads.filter((l: any) => getName(l).includes('โคม') || getName(l).includes('light') || getName(l).includes('แสงสว่าง')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const receptacleLoad = loads.filter((l: any) => getName(l).includes('เต้ารับ') || getName(l).includes('socket') || getName(l).includes('outlet')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const heaterLoad = loads.filter((l: any) => getName(l).includes('heater') || getName(l).includes('น้ำอุ่น')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const acLoad = loads.filter((l: any) => getName(l).includes('ac-') || getName(l).includes('แอร์') || getName(l).includes('air')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const motorLoad = loads.filter((l: any) => getName(l).includes('pump') || getName(l).includes('ปั๊ม') || getName(l).includes('motor')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const applianceLoad = loads.filter((l: any) => getName(l).includes('induction') || getName(l).includes('เตา') || getName(l).includes('microwave') || getName(l).includes('refrig') || getName(l).includes('ตู้เย็น')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
-    const spareLoad = loads.filter((l: any) => getName(l).includes('spare')).reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const lightingLoad = loads.filter((l: LoadResult) => getName(l).includes('โคม') || getName(l).includes('light') || getName(l).includes('แสงสว่าง')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
+    const receptacleLoad = loads.filter((l: LoadResult) => getName(l).includes('เต้ารับ') || getName(l).includes('socket') || getName(l).includes('outlet')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
+    const heaterLoad = loads.filter((l: LoadResult) => getName(l).includes('heater') || getName(l).includes('น้ำอุ่น')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
+    const acLoad = loads.filter((l: LoadResult) => getName(l).includes('ac-') || getName(l).includes('แอร์') || getName(l).includes('air')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
+    const motorLoad = loads.filter((l: LoadResult) => getName(l).includes('pump') || getName(l).includes('ปั๊ม') || getName(l).includes('motor')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
+    const applianceLoad = loads.filter((l: LoadResult) => getName(l).includes('induction') || getName(l).includes('เตา') || getName(l).includes('microwave') || getName(l).includes('refrig') || getName(l).includes('ตู้เย็น')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
+    const spareLoad = loads.filter((l: LoadResult) => getName(l).includes('spare')).reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
 
-    const totalConnectedLoad = loads.reduce((sum: number, l: any) => sum + getLoadVA(l), 0);
+    const totalConnectedLoad = loads.reduce((sum: number, l: LoadResult) => sum + getLoadVA(l), 0);
     const demandFactor = data.data?.demand_factor || 0.8;
     const demandLoad = totalConnectedLoad * demandFactor;
 
@@ -183,7 +183,7 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {loads.map((load: any, i: number) => {
+                                    {loads.map((load: LoadResult, i: number) => {
                                         // Wire format: "2x2.5/2.5G"
                                         const wireSize = load.wire_size || load.wire_size_l || '2.5';
                                         const wireL = wireSize.replace(' mm²', '');
@@ -198,7 +198,7 @@ export const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({ data, isOpen, 
                                         const name = load.circuit_name || load.device_name || load.name || 'Unknown';
 
                                         return (
-                                            <tr key={i} className="border-b border-black h-7 text-center hover:bg-gray-50">
+                                            <tr key={load.id || i} className="border-b border-black h-7 text-center hover:bg-gray-50">
                                                 <td className="border-r border-black font-bold">{i + 1}</td>
                                                 <td className="border-r border-black text-left px-2 font-medium truncate max-w-[200px]">{name}</td>
 
