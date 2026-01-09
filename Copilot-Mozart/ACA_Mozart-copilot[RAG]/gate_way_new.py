@@ -735,6 +735,43 @@ async def proxy_ask(request: Request):
 
 
 # =============================================================================
+# 🆕 Logging Proxy Route (Frontend logger needs this!)
+# =============================================================================
+
+@app.post("/api/v1/logs")
+async def proxy_logs(request: Request):
+    """
+    Proxy /api/v1/logs to RAG Service (MOZART)
+    
+    This endpoint allows Frontend logger to send logs to backend.
+    """
+    try:
+        body = await request.json()
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{MOZART_ENDPOINT}/api/v1/logs",
+                json=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Forwarded-For": request.client.host if request.client else "unknown"
+                }
+            )
+            
+            return JSONResponse(
+                status_code=response.status_code,
+                content=response.json()
+            )
+    except Exception as e:
+        # Don't fail hard for logging - just log locally
+        logger.warning(f"Proxy /api/v1/logs failed: {e}")
+        return JSONResponse(
+            status_code=200,  # Return OK so frontend doesn't retry
+            content={"status": "logged_locally", "message": str(e)}
+        )
+
+
+# =============================================================================
 # 🆕 Session Proxy Routes (Frontend needs these!)
 # =============================================================================
 
