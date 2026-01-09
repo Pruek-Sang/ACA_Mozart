@@ -21,6 +21,7 @@ interface ResultViewerProps {
     data: DesignResult | null;
     isLoading: boolean;
     sldData?: SLDData | null;  // 🆕 SLD data from API
+    boqData?: BOQData | null;  // 🆕 BOQ data from API
 }
 
 /**
@@ -29,7 +30,7 @@ interface ResultViewerProps {
  * ตำแหน่ง: ขวา (กินพื้นที่หลัก)
  * หน้าที่: แสดง Table, Audit Report, SLD Image
  */
-export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sldData }) => {
+export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sldData, boqData }) => {
     // === ALL HOOKS MUST BE CALLED FIRST (before any early returns) ===
     const [activeTab, setActiveTab] = useState<ViewMode>('table');
     const [isPDFPreviewOpen, setPDFPreviewOpen] = useState(false);
@@ -636,20 +637,18 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                     </div>
                 )}
 
-                {/* BOQ Tab - Bill of Quantities (Dynamic from Load Table) */}
                 {/* BOQ Tab - Bill of Quantities (from Backend or Fallback) */}
                 {activeTab === 'boq' && (() => {
-                    // 🆕 Cloud Log: Check if boq_data exists from backend
-                    const boqData = (data as any)?.metadata?.boq_data as BOQData | undefined;
-                    console.log('[BOQ-Tab] boq_data from backend:', boqData ? {
+                    // 🆕 Use boqData prop passed from App.tsx (not from local data)
+                    console.log('[BOQ-Tab] boqData from prop:', boqData ? {
                         sections: boqData.sections?.length || 0,
                         price_source: boqData.price_source,
                         final_total: boqData.final_total
-                    } : 'NOT_AVAILABLE');
-                    
+                    } : 'NOT_AVAILABLE (using fallback)');
+
                     return (
                         <BOQTab
-                            boqData={boqData}
+                            boqData={boqData || undefined}
                             loads={data?.data?.loads || []}
                             onDownloadClick={() => setBOQPDFOpen(true)}
                         />
