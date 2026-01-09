@@ -373,7 +373,7 @@ export interface DesignResult {
         building_type?: string;
         meter_size?: string;
         main_cb_rating?: number;  // Alias for main_breaker if used
-        calculations?: any;       // Allow any calculation data
+        calculations?: Record<string, unknown>;       // Allow any calculation data
 
         // 🆕 Revision History (for HistoryPanel)
         revision_history?: Array<{
@@ -384,8 +384,8 @@ export interface DesignResult {
             changes: Array<{
                 field: string;
                 label: string;
-                before?: any;
-                after?: any;
+                before: string;
+                after: string;
                 changeType: 'added' | 'removed' | 'modified';
             }>;
             changeCount: number;
