@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { X, Download, Printer, Loader2, FileSpreadsheet } from 'lucide-react';
-import type { DesignResult, LoadResult } from '../types';
+import type { DesignResult, LoadResult, BOQData } from '../types';
 import html2pdf from 'html2pdf.js';
 import * as XLSX from 'xlsx';
 
 interface BOQPDFPreviewModalProps {
     data: DesignResult;
+    boqData?: BOQData | null;  // 🆕 Backend BOQ data
     isOpen: boolean;
     onClose: () => void;
 }
@@ -13,8 +14,9 @@ interface BOQPDFPreviewModalProps {
 /**
  * BOQ PDF Preview Modal
  * Black & White A4 Landscape format matching professional standards
+ * 🆕 Now uses boqData from Backend if available!
  */
-export const BOQPDFPreviewModal: React.FC<BOQPDFPreviewModalProps> = ({ data, isOpen, onClose }) => {
+export const BOQPDFPreviewModal: React.FC<BOQPDFPreviewModalProps> = ({ data, boqData, isOpen, onClose }) => {
     const contentRef = useRef<HTMLDivElement>(null);
     const [isGenerating, setIsGenerating] = useState(false);
 
@@ -24,10 +26,16 @@ export const BOQPDFPreviewModal: React.FC<BOQPDFPreviewModalProps> = ({ data, is
     const circuitCount = loads.length || 1;
 
     // 🔧 DEBUG
+    console.log('[BOQ-PDF-DEBUG] boqData from props:', boqData);
     console.log('[BOQ-PDF-DEBUG] loads:', loads.length);
-    console.log('[BOQ-PDF-DEBUG] sample load:', loads[0]);
 
-    // Price Catalog (cheapest brands)
+    // 🆕 USE BACKEND DATA IF AVAILABLE
+    const useBackendData = boqData && boqData.sections && boqData.sections.length > 0;
+
+    console.log('[BOQ-PDF-DEBUG] useBackendData:', useBackendData);
+    console.log('[BOQ-PDF-DEBUG] price_source:', boqData?.price_source);
+
+    // Fallback Price Catalog (only if no backend data)
     const PRICES = {
         MCB_1P: 78,
         RCBO_1P: 1133,
@@ -52,35 +60,85 @@ export const BOQPDFPreviewModal: React.FC<BOQPDFPreviewModalProps> = ({ data, is
         }
     });
 
-    // Calculate E.1 (Main Cable)
-    const e1_material = (50 * PRICES.MAIN_WIRE_M) + (15 * 62) + (18 * PRICES.MAIN_CONDUIT_M) + 1000;
-    const e1_labor = Math.round(e1_material * PRICES.LABOR_PERCENT);
-    const e1_total = e1_material + e1_labor;
+    // CALCULATE VALUES - Use Backend or Fallback
+    let e1_total = 0, e2_total = 0, e3_total = 0;
+    let e1_material = 0, e1_labor = 0;
+    let e2_material = 0, e2_labor = 0;
+    let e3_material = 0, e3_labor = 0;
+    let lcPrice = 0, lcSlots = 18, mainBreakerPrice = 2884, wireLength = 0;
+    let mcbTotal = 0, rcboTotal = 0;
+    let totalMaterial = 0, totalLabor = 0, grandTotal = 0, vat = 0, finalTotal = 0;
+    let priceSource = '';
+    let priceWarning = '';
 
-    // Calculate E.2 (Load Center + Breakers)
-    const lcPrice = circuitCount > 18 ? PRICES.LC_30 : PRICES.LC_18;
-    const lcSlots = circuitCount > 18 ? 30 : 18;
-    const mainBreakerPrice = 2884;
-    const mcbTotal = mcbCount * PRICES.MCB_1P;
-    const rcboTotal = rcboCount * PRICES.RCBO_1P;
-    const e2_material = lcPrice + mainBreakerPrice + mcbTotal + rcboTotal + 1000;
-    const e2_labor = 4000;
-    const e2_total = e2_material + e2_labor;
+    if (useBackendData && boqData) {
+        // 🆕 USE BACKEND DATA
+        totalMaterial = boqData.subtotal_material;
+        totalLabor = boqData.subtotal_labor;
+        grandTotal = boqData.grand_total;
+        vat = boqData.vat_amount;
+        finalTotal = boqData.final_total;
+        priceSource = boqData.price_source;
+        priceWarning = boqData.price_valid_warning;
 
-    // Calculate E.3 (Branch Wiring)
-    const wireLength = circuitCount * 15;
-    const e3_material = (wireLength * PRICES.WIRE_2_5 * 3) + (wireLength * PRICES.PVC_HALF) + 5000;
-    const e3_labor = Math.round(e3_material * PRICES.LABOR_PERCENT);
-    const e3_total = e3_material + e3_labor;
+        // Extract section totals and items from backend
+        boqData.sections.forEach(section => {
+            if (section.section_id === 'E.1') {
+                e1_total = section.section_total;
+                // Estimate material/labor split (65/35)
+                e1_material = Math.round(e1_total * 0.65);
+                e1_labor = Math.round(e1_total * 0.35);
+            }
+            if (section.section_id === 'E.2') {
+                e2_total = section.section_total;
+                e2_material = Math.round(e2_total * 0.65);
+                e2_labor = Math.round(e2_total * 0.35);
+            }
+            if (section.section_id === 'E.3') {
+                e3_total = section.section_total;
+                e3_material = Math.round(e3_total * 0.65);
+                e3_labor = Math.round(e3_total * 0.35);
+            }
+        });
 
-    // Grand totals
-    const totalMaterial = e1_material + e2_material + e3_material;
-    const totalLabor = e1_labor + e2_labor + e3_labor;
-    const grandTotal = totalMaterial + totalLabor;
-    const vat = Math.round(grandTotal * 0.07);
-    const finalTotal = grandTotal + vat;
+        // Get LC info from backend
+        lcSlots = circuitCount > 18 ? 30 : 18;
+        lcPrice = circuitCount > 18 ? PRICES.LC_30 : PRICES.LC_18;
+        wireLength = circuitCount * 15;
+        mcbTotal = mcbCount * PRICES.MCB_1P;
+        rcboTotal = rcboCount * PRICES.RCBO_1P;
 
-    console.log('[BOQ-PDF-DEBUG] totals:', { e1_total, e2_total, e3_total, grandTotal, finalTotal });
+        console.log('[BOQ-PDF-DEBUG] Using BACKEND data:', { e1_total, e2_total, e3_total, finalTotal });
+    } else {
+        // FALLBACK: Calculate locally
+        priceSource = 'local_fallback';
+        priceWarning = 'ราคา ณ วันที่ 08/02/2026';
+
+        e1_material = (50 * PRICES.MAIN_WIRE_M) + (15 * 62) + (18 * PRICES.MAIN_CONDUIT_M) + 1000;
+        e1_labor = Math.round(e1_material * PRICES.LABOR_PERCENT);
+        e1_total = e1_material + e1_labor;
+
+        lcPrice = circuitCount > 18 ? PRICES.LC_30 : PRICES.LC_18;
+        lcSlots = circuitCount > 18 ? 30 : 18;
+        mcbTotal = mcbCount * PRICES.MCB_1P;
+        rcboTotal = rcboCount * PRICES.RCBO_1P;
+        e2_material = lcPrice + mainBreakerPrice + mcbTotal + rcboTotal + 1000;
+        e2_labor = 4000;
+        e2_total = e2_material + e2_labor;
+
+        wireLength = circuitCount * 15;
+        e3_material = (wireLength * PRICES.WIRE_2_5 * 3) + (wireLength * PRICES.PVC_HALF) + 5000;
+        e3_labor = Math.round(e3_material * PRICES.LABOR_PERCENT);
+        e3_total = e3_material + e3_labor;
+
+        totalMaterial = e1_material + e2_material + e3_material;
+        totalLabor = e1_labor + e2_labor + e3_labor;
+        grandTotal = e1_total + e2_total + e3_total;
+        vat = Math.round(grandTotal * 0.07);
+        finalTotal = grandTotal + vat;
+
+        console.log('[BOQ-PDF-DEBUG] Using FALLBACK data:', { e1_total, e2_total, e3_total, finalTotal });
+    }
 
     const handleDownloadPDF = async () => {
         if (!contentRef.current) return;
@@ -192,6 +250,8 @@ export const BOQPDFPreviewModal: React.FC<BOQPDFPreviewModalProps> = ({ data, is
                                 <div><strong>DATE:</strong> {new Date().toLocaleDateString('th-TH')}</div>
                                 <div><strong>CIRCUITS:</strong> {circuitCount} วงจร ({mcbCount} MCB + {rcboCount} RCBO)</div>
                                 <div><strong>MAIN CB:</strong> {data.data?.main_cb_type || `MCCB 2P ${data.data?.main_breaker || 100}AT`}</div>
+                                <div><strong>PRICE SOURCE:</strong> {priceSource === 'prices.csv' ? '✅ ฐานข้อมูลราคา' : priceSource === 'catalog_fallback' ? '⚠️ Catalog Fallback' : '⚠️ Local Fallback'}</div>
+                                <div><strong>VALID:</strong> {priceWarning}</div>
                             </div>
                         </div>
 
