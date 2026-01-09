@@ -6,18 +6,31 @@ import { ChatBubble } from './ChatBubble';
 import { HistoryPanel } from './HistoryPanel';
 
 // Mock history data for demonstration
-const MOCK_HISTORY = [
-    {
-        fromVersion: 1,
-        toVersion: 2,
-        timestamp: new Date().toISOString(),
-        summary: "เพิ่มแอร์ 18000 BTU ห้องนอน 1",
-        changes: [
-            { field: "ac_bedroom1", label: "แอร์ห้องนอน 1", before: "12000 BTU", after: "18000 BTU", changeType: "modified" as const }
-        ],
-        changeCount: 1
-    }
-];
+const MOCK_HISTORY: Array<{
+    fromVersion: number;
+    toVersion: number;
+    timestamp: string;
+    summary: string;
+    changes: Array<{
+        field: string;
+        label: string;
+        before: string;
+        after: string;
+        changeType: 'added' | 'removed' | 'modified';
+    }>;
+    changeCount: number;
+}> = [
+        {
+            fromVersion: 1,
+            toVersion: 2,
+            timestamp: new Date().toISOString(),
+            summary: "เพิ่มแอร์ 18000 BTU ห้องนอน 1",
+            changes: [
+                { field: "ac_bedroom1", label: "แอร์ห้องนอน 1", before: "12000 BTU", after: "18000 BTU", changeType: "modified" }
+            ],
+            changeCount: 1
+        }
+    ];
 
 interface ChatPanelProps {
     messages: ChatMessage[];

@@ -139,7 +139,8 @@ export const BOQTab: React.FC<BOQTabProps> = ({ boqData, loads = [], onDownloadC
 
     let mcbCount = 0, rcboCount = 0;
     loads.forEach((item) => {
-        if ((item as any).requires_rcbo || (item as any).breaker_type === 'RCBO') rcboCount++;
+        const loadItem = item as LoadResult & { requires_rcbo?: boolean; breaker_type?: string };
+        if (loadItem.requires_rcbo || loadItem.breaker_type === 'RCBO') rcboCount++;
         else mcbCount++;
     });
 

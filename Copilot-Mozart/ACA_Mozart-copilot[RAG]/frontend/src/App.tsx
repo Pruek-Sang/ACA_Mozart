@@ -161,9 +161,10 @@ function App() {
             setProjectName(result.project_name || 'บ้านนายสมหญิง');
             console.log(`[SESSION-FIX] ✅ New session created: ${result.session_id.slice(0, 8)}...`);
             logger.info('[SESSION-FIX] Created new session after stale ID', { sessionId: result.session_id });
-          } catch (createError: any) {
-            console.error('[SESSION-FIX] ❌ Failed to create new session:', createError.message);
-            logger.error('❌ Failed to create new session', { error: createError.message });
+          } catch (createError: unknown) {
+            const errMsg = createError instanceof Error ? createError.message : String(createError);
+            console.error('[SESSION-FIX] ❌ Failed to create new session:', errMsg);
+            logger.error('❌ Failed to create new session', { error: errMsg });
           }
 
           setIsSessionLoading(false);
@@ -194,7 +195,7 @@ function App() {
             success: true,
             message: 'Design restored',
             data: {
-              loads: (displayData.circuits || []).map((ckt: any) => ({
+              loads: (displayData.circuits || []).map((ckt: Record<string, unknown>) => ({
                 room_name: ckt.room || ckt.floor || '',
                 device_name: ckt.circuit_name,
                 power_kw: ckt.total_kw,
@@ -241,18 +242,19 @@ function App() {
         // 🆕 Restore Chat Messages
         if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
           console.log('[SESSION-RESTORE] Restoring messages:', data.messages.length);
-          const restoredMessages = data.messages.map((msg: any) => ({
+          const restoredMessages = data.messages.map((msg: Record<string, unknown>) => ({
             role: msg.role as 'user' | 'assistant' | 'system',
-            content: msg.content,
-            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+            content: msg.content as string,
+            timestamp: msg.timestamp ? new Date(msg.timestamp as string | number) : new Date()
           }));
           setMessages(restoredMessages);
         }
 
         setIsSessionLoading(false);
-      } catch (e: any) {
-        console.error('[SESSION-FIX] ❌ Network error:', e.message);
-        logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
+      } catch (e: unknown) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        console.error('[SESSION-FIX] ❌ Network error:', errMsg);
+        logger.warn('[SESSION] Fetch failed', { error: errMsg, sessionId: id });
 
         // 🆕 FIX: Also handle network errors - clear stale and create new
         localStorage.removeItem('mozart_session_id');
@@ -291,8 +293,9 @@ function App() {
           setSessionId(result.session_id);
           setProjectName(result.project_name || 'บ้านนายสมหญิง');
           logger.info('✅ Session started successfully', { sessionId: result.session_id });
-        } catch (error: any) {
-          logger.error('❌ Failed to create session', { error: error.message });
+        } catch (error: unknown) {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          logger.error('❌ Failed to create session', { error: errMsg });
         } finally {
           setIsSessionLoading(false);
         }
@@ -498,9 +501,10 @@ function App() {
         });
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ ERROR OCCURRED:', error);
-      logger.error('Design submission error', { error: error.toString() });
+      const errorString = error instanceof Error ? error.message : String(error);
+      logger.error('Design submission error', { error: errorString });
 
       const errorDetails = classifyError(error);
 
@@ -508,7 +512,7 @@ function App() {
         role: 'assistant',
         content: `${errorDetails.message}${errorDetails.details ? '\n\n' + errorDetails.details : ''}`,
         timestamp: new Date(),
-        error_type: `${errorDetails.type}_error` as any
+        error_type: `${errorDetails.type}_error` as 'frontend_error' | 'backend_error' | 'network_error'
       };
 
       setMessages(prev => [...prev, errorMsg]);
@@ -600,7 +604,7 @@ function App() {
               messages={messages}
               onSendMessage={handleSubmit}
               isLoading={isLoading}
-              revisionHistory={(resultData?.data?.revision_history || []) as any}
+              revisionHistory={resultData?.data?.revision_history || []}
             />
           </div>
           <ContextPanel
