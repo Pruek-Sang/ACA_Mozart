@@ -10,7 +10,8 @@ import type {
   ChatMessage,
   SiteContext,
   DesignResult,
-  SLDData
+  SLDData,
+  BOQData  // 🆕 BOQ data from backend
 } from './types';
 import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
@@ -55,6 +56,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [resultData, setResultData] = useState<DesignResult | null>(null);
   const [sldData, setSldData] = useState<SLDData | null>(null);  // 🆕 SLD data
+  const [boqData, setBoqData] = useState<BOQData | null>(null);  // 🆕 BOQ data from backend
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);  // 🆕 Feedback modal
 
   // === 🆕 SESSION STATE ===
@@ -457,6 +459,15 @@ function App() {
         if (data.metadata?.sld_data) {
           setSldData(data.metadata.sld_data as unknown as SLDData);
         }
+
+        // 🆕 Set BOQ data from API response
+        if (data.metadata?.boq_data) {
+          console.log('[BOQ-DEBUG] Setting boqData from API:', {
+            sections: data.metadata.boq_data.sections?.length,
+            price_source: data.metadata.boq_data.price_source
+          });
+          setBoqData(data.metadata.boq_data as BOQData);
+        }
       } else if (data.metadata?.readable_report) {
         // Fallback: Backend ยังไม่ส่ง display_data (backward compat)
         setResultData({
@@ -587,6 +598,7 @@ function App() {
             data={resultData}
             isLoading={isLoading}
             sldData={sldData}
+            boqData={boqData}  // 🆕 Pass BOQ data from backend
           />
         </div>
       </div>

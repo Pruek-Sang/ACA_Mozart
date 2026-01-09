@@ -16,7 +16,7 @@
 import { buildApiUrl } from './utils';
 import { getAccessToken } from './supabase';
 import { logger } from './logger';
-import type { SiteContext, DisplayData, AuditRow, PDFData, SLDData } from '../types';
+import type { SiteContext, DisplayData, AuditRow, PDFData, SLDData, BOQData } from '../types';
 
 // ============================================================================
 // Types
@@ -42,6 +42,7 @@ export interface AskResponse {
         audit_results?: AuditRow[];
         pdf_data?: PDFData;
         sld_data?: SLDData;  // Fixed: was Record<string, unknown>
+        boq_data?: BOQData;  // 🆕 BOQ with price_source
     };
     error?: string;
 }
