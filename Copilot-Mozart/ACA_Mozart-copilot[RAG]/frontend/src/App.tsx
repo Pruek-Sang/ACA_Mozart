@@ -232,6 +232,17 @@ function App() {
           setSldData(data.mcp_response.sld_data);
         }
 
+        // 🆕 Restore Chat Messages
+        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+          console.log('[SESSION-RESTORE] Restoring messages:', data.messages.length);
+          const restoredMessages = data.messages.map((msg: any) => ({
+            role: msg.role as 'user' | 'assistant' | 'system',
+            content: msg.content,
+            timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date()
+          }));
+          setMessages(restoredMessages);
+        }
+
         setIsSessionLoading(false);
       } catch (e: any) {
         console.error('[SESSION-FIX] ❌ Network error:', e.message);
