@@ -854,6 +854,63 @@ async def proxy_session_delete(session_id: str, request: Request):
         return JSONResponse(status_code=502, content={"error": str(e)})
 
 
+# =============================================================================
+# 🆕 Site Context Proxy Routes (For site_context questionnaire)
+# =============================================================================
+
+@app.get("/api/v1/session/{session_id}/site")
+async def proxy_session_site_get(session_id: str, request: Request):
+    """Proxy GET /api/v1/session/{id}/site to RAG Service"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/site")
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy GET /api/v1/session/{session_id}/site failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+@app.post("/api/v1/session/{session_id}/site")
+async def proxy_session_site_post(session_id: str, request: Request):
+    """Proxy POST /api/v1/session/{id}/site to RAG Service (update site context)"""
+    try:
+        body = await request.json()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/site",
+                json=body
+            )
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy POST /api/v1/session/{session_id}/site failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
+
+# =============================================================================
+# 🆕 Design Proxy Route (For Edit/Merge functionality - CRITICAL!)
+# =============================================================================
+
+@app.post("/api/v1/session/{session_id}/design")
+async def proxy_session_design(session_id: str, request: Request):
+    """
+    Proxy POST /api/v1/session/{id}/design to RAG Service
+    
+    This is the EDIT/MERGE endpoint that uses previous design as base!
+    """
+    try:
+        body = await request.json()
+        logger.info(f"[PROXY] Design request for session: {session_id[:8]}...")
+        
+        async with httpx.AsyncClient(timeout=120.0) as client:  # Longer timeout for design
+            response = await client.post(
+                f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/design",
+                json=body
+            )
+            return JSONResponse(status_code=response.status_code, content=response.json())
+    except Exception as e:
+        logger.error(f"Proxy POST /api/v1/session/{session_id}/design failed: {e}")
+        return JSONResponse(status_code=502, content={"error": str(e)})
+
 @app.post("/orchestrate", response_model=GatewayResponse)
 async def orchestrate(
     request: GatewayRequest,
