@@ -136,77 +136,118 @@ function App() {
           }
         });
 
-        if (res.ok) {
-          const data = await res.json();
-          logger.info('[SESSION-RESTORE] Data restored', { sessionId: id, projectName: data.project_name });
+        // 🆕 FIX: Handle failed fetch (404 = stale session ID)
+        if (!res.ok) {
+          console.warn(`[SESSION-FIX] ❌ Fetch failed (${res.status}) for ${id.slice(0, 8)}...`);
+          console.warn('[SESSION-FIX] 🧹 Clearing stale localStorage and creating new session...');
 
-          // 🆕 Verbose logging for debugging
-          console.log('[SESSION-RESTORE] === Session Data ===');
-          console.log('[SESSION-RESTORE] Project:', data.project_name);
-          console.log('[SESSION-RESTORE] Has MCP Response:', !!data.mcp_response);
-          console.log('[SESSION-RESTORE] Has Display Data:', !!data.mcp_response?.display_data);
-          console.log('[SESSION-RESTORE] Has BOQ Data:', !!data.mcp_response?.boq_data);
-          if (data.mcp_response?.boq_data) {
-            console.log('[SESSION-RESTORE] BOQ Price Source:', data.mcp_response.boq_data.price_source);
-            console.log('[SESSION-RESTORE] BOQ Sections:', data.mcp_response.boq_data.sections?.length || 0);
+          // Clear stale data
+          localStorage.removeItem('mozart_session_id');
+          localStorage.removeItem('mozart_project_name');
+          setSessionId(null);
+
+          // Create new session
+          try {
+            const result = await startSession();
+            setSessionId(result.session_id);
+            setProjectName(result.project_name || 'บ้านนายสมหญิง');
+            console.log(`[SESSION-FIX] ✅ New session created: ${result.session_id.slice(0, 8)}...`);
+            logger.info('[SESSION-FIX] Created new session after stale ID', { sessionId: result.session_id });
+          } catch (createError: any) {
+            console.error('[SESSION-FIX] ❌ Failed to create new session:', createError.message);
+            logger.error('❌ Failed to create new session', { error: createError.message });
           }
 
-          if (data.project_name) setProjectName(data.project_name);
-
-          // Restore Result Data
-          if (data.mcp_response?.display_data) {
-            const displayData = data.mcp_response.display_data;
-            setResultData({
-              success: true,
-              message: 'Design restored',
-              data: {
-                loads: (displayData.circuits || []).map((ckt: any) => ({
-                  room_name: ckt.room || ckt.floor || '',
-                  device_name: ckt.circuit_name,
-                  power_kw: ckt.total_kw,
-                  current_a: ckt.total_current,
-                  breaker_size: ckt.breaker_rating,
-                  wire_size: `${ckt.wire_size} mm²`,
-                  conduit_size: ckt.conduit_size,
-                  voltage_drop_percent: ckt.vd_percent,
-                  // Full mapping for PDF support
-                  load_va_l1: ckt.load_va_l1 || ckt.total_va || 0,
-                  load_va_l2: ckt.load_va_l2 || 0,
-                  load_va_l3: ckt.load_va_l3 || 0,
-                  total_va: ckt.total_va || 0,
-                  breaker_type: ckt.breaker_type || 'MCB',
-                  breaker_poles: ckt.breaker_poles || 1,
-                  breaker_ic_ka: ckt.breaker_ic_ka || 6,
-                  wire_type: ckt.wire_type || 'IEC01',
-                  conduit_type: ckt.conduit_type || 'PVC',
-                  requires_rcbo: ckt.requires_rcbo || false,
-                  remark: ckt.remark || '',
-                })),
-                warnings: displayData.warnings || [],
-                explainable_warnings: displayData.explainable_warnings,
-                assumptions: displayData.assumptions,
-                total_power_kw: displayData.total_kw,
-                main_breaker: Number.parseInt(displayData.main_breaker) || 0,
-                audit_table: data.mcp_response?.audit_results,
-                project_name: displayData.project_name,
-                demand_factor: displayData.demand_factor,
-                main_cb_type: displayData.main_cb_type,
-                main_feeder_size: displayData.main_feeder_size,
-                main_feeder_type: displayData.main_feeder_type,
-                main_raceway_size: displayData.main_raceway_size,
-                main_raceway_type: displayData.main_raceway_type,
-              }
-            });
-          }
-
-          // Restore SLD
-          if (data.mcp_response?.sld_data) {
-            setSldData(data.mcp_response.sld_data);
-          }
+          setIsSessionLoading(false);
+          return;
         }
+
+        // Success path - restore data
+        const data = await res.json();
+        logger.info('[SESSION-RESTORE] Data restored', { sessionId: id, projectName: data.project_name });
+
+        // 🆕 Verbose logging for debugging
+        console.log('[SESSION-RESTORE] === Session Data ===');
+        console.log('[SESSION-RESTORE] Project:', data.project_name);
+        console.log('[SESSION-RESTORE] Has MCP Response:', !!data.mcp_response);
+        console.log('[SESSION-RESTORE] Has Display Data:', !!data.mcp_response?.display_data);
+        console.log('[SESSION-RESTORE] Has BOQ Data:', !!data.mcp_response?.boq_data);
+        if (data.mcp_response?.boq_data) {
+          console.log('[SESSION-RESTORE] BOQ Price Source:', data.mcp_response.boq_data.price_source);
+          console.log('[SESSION-RESTORE] BOQ Sections:', data.mcp_response.boq_data.sections?.length || 0);
+        }
+
+        if (data.project_name) setProjectName(data.project_name);
+
+        // Restore Result Data
+        if (data.mcp_response?.display_data) {
+          const displayData = data.mcp_response.display_data;
+          setResultData({
+            success: true,
+            message: 'Design restored',
+            data: {
+              loads: (displayData.circuits || []).map((ckt: any) => ({
+                room_name: ckt.room || ckt.floor || '',
+                device_name: ckt.circuit_name,
+                power_kw: ckt.total_kw,
+                current_a: ckt.total_current,
+                breaker_size: ckt.breaker_rating,
+                wire_size: `${ckt.wire_size} mm²`,
+                conduit_size: ckt.conduit_size,
+                voltage_drop_percent: ckt.vd_percent,
+                // Full mapping for PDF support
+                load_va_l1: ckt.load_va_l1 || ckt.total_va || 0,
+                load_va_l2: ckt.load_va_l2 || 0,
+                load_va_l3: ckt.load_va_l3 || 0,
+                total_va: ckt.total_va || 0,
+                breaker_type: ckt.breaker_type || 'MCB',
+                breaker_poles: ckt.breaker_poles || 1,
+                breaker_ic_ka: ckt.breaker_ic_ka || 6,
+                wire_type: ckt.wire_type || 'IEC01',
+                conduit_type: ckt.conduit_type || 'PVC',
+                requires_rcbo: ckt.requires_rcbo || false,
+                remark: ckt.remark || '',
+              })),
+              warnings: displayData.warnings || [],
+              explainable_warnings: displayData.explainable_warnings,
+              assumptions: displayData.assumptions,
+              total_power_kw: displayData.total_kw,
+              main_breaker: Number.parseInt(displayData.main_breaker) || 0,
+              audit_table: data.mcp_response?.audit_results,
+              project_name: displayData.project_name,
+              demand_factor: displayData.demand_factor,
+              main_cb_type: displayData.main_cb_type,
+              main_feeder_size: displayData.main_feeder_size,
+              main_feeder_type: displayData.main_feeder_type,
+              main_raceway_size: displayData.main_raceway_size,
+              main_raceway_type: displayData.main_raceway_type,
+            }
+          });
+        }
+
+        // Restore SLD
+        if (data.mcp_response?.sld_data) {
+          setSldData(data.mcp_response.sld_data);
+        }
+
+        setIsSessionLoading(false);
       } catch (e: any) {
+        console.error('[SESSION-FIX] ❌ Network error:', e.message);
         logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
-      } finally {
+
+        // 🆕 FIX: Also handle network errors - clear stale and create new
+        localStorage.removeItem('mozart_session_id');
+        setSessionId(null);
+
+        try {
+          const result = await startSession();
+          setSessionId(result.session_id);
+          setProjectName(result.project_name || 'บ้านนายสมหญิง');
+          console.log(`[SESSION-FIX] ✅ New session created after error: ${result.session_id.slice(0, 8)}...`);
+        } catch (createError: any) {
+          console.error('[SESSION-FIX] ❌ All session attempts failed');
+        }
+
         setIsSessionLoading(false);
       }
     };
