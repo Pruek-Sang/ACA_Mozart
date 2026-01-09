@@ -1,118 +1,90 @@
 # 🔴 FULL CLOUD LOG FINDINGS
 
 > **Date**: 2026-01-09  
-> **Service**: mozart-rag (Cloud Run)  
-> **Analysis Period**: 2026-01-08 17:00 - 22:30 UTC  
-> **Investigation**: Complete code + commit analysis
+> **Status**: ✅ **BUG CONFIRMED 100% via Browser Test**  
+> **Recording**: [session_debug_test.webp](./session_debug_test_1767974999980.webp)
 
 ---
 
-## ⏰ Timeline (22:04-22:24 UTC):
+## 🎯 ROOT CAUSE CONFIRMED:
 
-| Time | Event | Status |
-|------|-------|--------|
-| 22:04:30 | `[ASK] session_id: None` | ❌ ไม่มี session |
-| 22:05:16 | `[SESSION-LOAD] ❌ PGRST116: 0 rows` | Session 96b0dee2 ไม่พบ |
-| 22:05:26 | `[EDIT_INTENT] Detected 'ลบ'` | ✅ Keyword detected |
-| 22:05:26 | `[ASK] session_id: None` | ❌ ไม่มี session |
-| 22:05:26 | `⚠️ EDIT intent but no session_id` | ⚠️ Fallback to CREATE |
-| 22:05:48 | `[SESSION-CREATE] ✅ 36ccd37c` | ✅ Session สร้างสำเร็จ |
-| 22:05:53 | `[SESSION-LOAD] Has MCP: False` | ❌ **ไม่มี design data** |
-| 22:09:28 | `[ASK] session_id: None` | ❌ ยังคง None |
-| 22:24:33 | `[SESSION-LOAD] ❌ PGRST116: 0 rows` | ❌ Session 933b1c05 ไม่พบ |
-
----
-
-## 🔍 Commits Investigated:
-
-| Commit | Date | What it Fixed | Status |
-|--------|------|---------------|--------|
-| `eeb1b5f` | Jan 4 | AUTO-SAVE logic in /ask | ⚠️ Had Pydantic bug |
-| `05d4071` | Jan 7 | session_injector.create() direct call | ✅ Deployed |
-| `78f6a94` | Jan 7 | Ghost bug (race condition + memory fallback) | ⚠️ Partial fix |
-| `c5776d4` | Jan 8 | Guest mode added | ⚠️ New dependency |
-| `be3fd0f` | Jan 9 | Comprehensive cloud logging | ✅ Deployed |
-
----
-
-## 🔴 Confirmed Bugs:
-
-### BUG 1: Stale Session ID Not Cleared (Frontend)
+### **Frontend Bug: Stale Session ID Not Cleared**
 
 **Location**: `App.tsx` Line 207-211
 
 ```typescript
 } catch (e: any) {
   logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
+  // ❌ BUG: ไม่ clear localStorage และไม่สร้าง session ใหม่!
 } finally {
-  setIsSessionLoading(false);  // ← ไม่ clear sessionId!
+  setIsSessionLoading(false);
 }
 ```
 
-**Problem**: ถ้า fetchSessionData fail (PGRST116) → sessionId state ยังเป็น old/stale ID → แต่ไม่ได้ create session ใหม่
+---
 
-**Fix Needed**: เมื่อ fetch fail ต้อง clear localStorage และ create session ใหม่
+## 🧪 Browser Test Evidence:
+
+### Scenario 1: Stale ID in localStorage
+1. ตั้ง localStorage: `mozart_session_id = "stale-session-id-123"`
+2. กด Guest mode
+3. **ผล**: `GET /api/v1/session/stale.../data` → **404 Not Found**
+4. **localStorage ยังคงเป็น stale ID** (ไม่ clear)
+5. **sessionId state = null** (ไม่ได้ set)
+6. ส่ง `/ask` → **ไม่มี ?session_id ใน URL** → Backend รับ None
+
+### Scenario 2: Fresh Start (ทำงานปกติ)
+1. Clear localStorage
+2. กด Guest mode
+3. **ผล**: Session created → `5380e9a6...`
+4. **localStorage = session ID ใหม่**
+5. ส่ง `/ask?session_id=5380e9a6...` → **ทำงานถูกต้อง**
 
 ---
 
-### BUG 2: AUTO-SAVE Skipped (Backend)
+## � Evidence Summary:
 
-**Location**: `routes.py` Line 257-258
-
-```python
-if SUPABASE_AVAILABLE and session_injector:
-    if session_id:  # ← ถ้า None จะ SKIP ทั้งหมด!
-```
-
-**Problem**: ถ้า session_id = None → AUTO-SAVE ไม่ทำงาน → design data ไม่ถูก save → refresh แล้วหาย
-
-**Evidence**: ไม่มี `[AUTO-SAVE]` log เลยใน Cloud Logging
+| Test Case | localStorage | Session Created | /ask URL | Backend |
+|-----------|-------------|----------------|----------|---------|
+| Stale ID | `stale-xxx` | ❌ No (404) | `/ask` (no param) | `None` |
+| Fresh | (empty) | ✅ `5380e9a6` | `/ask?session_id=...` | OK |
 
 ---
 
-### BUG 3: Guest Mode Session Race (Frontend)
+## �️ Fix Required:
 
-**Location**: `App.tsx` Line 242
+**File**: `frontend/src/App.tsx` Line 207-211
 
 ```typescript
-}, [isAuthLoading, session, isGuestMode]);
+} catch (e: any) {
+  logger.warn('[SESSION] Fetch failed', { error: e.message, sessionId: id });
+  
+  // 🆕 FIX: Clear stale ID and create new session
+  localStorage.removeItem('mozart_session_id');
+  setSessionId(null);  // Force new session creation
+  
+  // Create new session
+  try {
+    const result = await startSession();
+    setSessionId(result.session_id);
+    setProjectName(result.project_name || 'บ้านนายสมหญิง');
+    logger.info('✅ Created new session after stale ID', { sessionId: result.session_id });
+  } catch (createError: any) {
+    logger.error('❌ Failed to create new session', { error: createError.message });
+  }
+} finally {
+  setIsSessionLoading(false);
+}
 ```
-
-**Problem**: เมื่อกด Guest → `isGuestMode=true` → trigger useEffect → แต่ถ้า localStorage มี session ID เก่า → ไม่สร้างใหม่
-
-**Evidence**: Session create เกิดขึ้น 22 วินาที หลัง /ask request
-
----
-
-## ❌ Logs ที่ไม่พบ:
-
-| Expected Log | Status | Impact |
-|--------------|--------|--------|
-| `[AUTO-SAVE] Saved design` | ❌ ไม่พบ | 🔴 Critical |
-| `[AUTO-SAVE] Skipped` | ❌ ไม่พบ | Data loss |
-| `[SESSION-UPDATE]` | ❌ ไม่พบ | No state saved |
 
 ---
 
 ## 📋 Fix Priority:
 
-1. **[HIGH]** Frontend: Clear stale session ID when fetch fails
-2. **[HIGH]** Frontend: Ensure sessionId state is set before submit
-3. **[MEDIUM]** Backend: Log why AUTO-SAVE was skipped (add else branch log)
-4. **[LOW]** Add E2E test for Guest mode → /ask flow
+1. **[CRITICAL]** Clear localStorage เมื่อ fetch fail (404)
+2. **[CRITICAL]** สร้าง session ใหม่เมื่อ stale ID detected
+3. **[HIGH]** Backend: Log `[AUTO-SAVE] Skipped: session_id=None`
 
 ---
 
-## 🎯 Root Cause Summary:
-
-**Frontend ส่ง session_id=None ไป Backend เพราะ:**
-1. localStorage มี session ID เก่า → fetch fail (PGRST116) → ไม่ clear ไม่สร้างใหม่
-2. หรือ sessionId state ยังเป็น null เพราะ initSession ยังไม่เสร็จ
-3. Guest mode trigger แต่ถ้ามี old localStorage → ไม่สร้าง session ใหม่
-
-**Backend ไม่ save data เพราะ:**
-1. session_id = None → `if session_id:` = False → skip AUTO-SAVE
-
----
-
-*Generated by: Complete Code + Commit + Cloud Log Analysis*
+*Verified via Browser Test on 2026-01-09*
