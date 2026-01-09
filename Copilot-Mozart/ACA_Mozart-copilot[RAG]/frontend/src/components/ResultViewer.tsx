@@ -334,6 +334,7 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
 
             <BOQPDFPreviewModal
                 data={data}
+                boqData={boqData}
                 isOpen={isBOQPDFOpen}
                 onClose={() => setBOQPDFOpen(false)}
             />
