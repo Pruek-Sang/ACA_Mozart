@@ -1742,3 +1742,32 @@ for load_id, w in wire_sizing.items():
 
 *เพิ่มเติมเมื่อ: 2026-01-07 00:02*
 *สรุป: VD key mismatch + Supabase schema missing + Audit count bug - 3 ปัญหาที่เกี่ยวข้องกับ data structure mismatch!*
+
+---
+
+## 🔴 ความผิดพลาดที่ 29 (Session War): ห้ามข้าม Architecture Review (Gateway Trap)
+
+> **วันที่เกิด:** 2026-01-10
+> **บทเรียนราคาแพง:** เสียเวลาแก้ Session Persistence นานมาก เพราะลืม Gateway
+
+**อาการ:**
+- Frontend ส่ง Header/Params ถูกต้อง
+- Backend (Service) ไม่ได้รับค่า หรือได้รับเป็น None
+- Debug Frontend อยู่นานว่าทำไมส่งไม่ไป
+- **ลืมว่ามีตัวกลาง (Gateway) ขวางอยู่!**
+
+**สาเหตุ:**
+- ระบบเรามี **API Gateway** คั่นกลางระหว่าง Frontend และ Backend
+- Gateway ไม่ได้ถูก config ให้ **Forward** headers หรือ models ที่เปลี่ยนไป
+- ทีม Dev มัวแต่แก้ endpoint ปลายทาง (Service) กับต้นทาง (Frontend) โดยข้ามการดู Architecture Diagram
+
+**วิธีแก้:**
+- ต้องอัปเดต Gateway ให้ Forward Parameters/Headers ใหม่เสมอ
+- เพิ่ม Route/Model ใน Gateway ให้ตรงกับ Backend
+
+**🚨 กฎเหล็กใหม่:**
+51. **ห้ามข้าม step การดู Architecture Diagram เด็ดขาด**
+52. **ถ้ามี Gateway → ทุกการแก้ API Backend ต้องแก้ Gateway ด้วยเสมอ**
+53. **Frontend ถูก → Backend ผิด = เช็ค Gateway 100%**
+
+---

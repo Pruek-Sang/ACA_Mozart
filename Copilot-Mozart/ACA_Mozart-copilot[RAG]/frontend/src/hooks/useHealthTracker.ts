@@ -30,7 +30,7 @@ export interface HealthEvent {
     type: HealthEventType;
     timestamp: Date;
     success: boolean;
-    details: Record<string, any>;
+    details: Record<string, unknown>;
 }
 
 export interface RequestInfo {
@@ -38,7 +38,7 @@ export interface RequestInfo {
     method: string;
     sentSessionId: string | null;
     sentProjectName: string | null;
-    body: any;
+    body: unknown;
     timestamp: Date;
 }
 
@@ -293,7 +293,7 @@ export function useHealthTracker() {
         method?: string;
         sessionId: string | null;
         projectName?: string | null;
-        body?: any;
+        body?: unknown;
     }) => {
         const requestInfo: RequestInfo = {
             endpoint,

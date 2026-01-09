@@ -2104,7 +2104,7 @@ Query: "{query}"
         
         return spec
 
-    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None) -> StandardResponse:
+    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None, session_id: Optional[str] = None) -> StandardResponse:
         """
         Build design response by chaining to MCP Core.
         
@@ -2397,6 +2397,13 @@ Query: "{query}"
                 except Exception as boq_err:
                     logger.warning(f"[CP-BOQ] Failed to generate BOQ: {boq_err}", exc_info=True)
                 
+                # [STATEFUL] Log Design Result
+                if session_id:
+                    try:
+                        await log_conversation(session_id, "assistant", final_text)
+                    except Exception:
+                        pass
+
                 return StandardResponse(
                     answer=final_text,
                     sources=[SourceRef(
@@ -2479,6 +2486,13 @@ Query: "{query}"
         logger.info(f"[DEBUG-SC-1] Query: {req.query[:100]}...")
         print(f"[DEBUG-SC-1] PRINT: req.site_context = {req.site_context}")  # Guaranteed output
         
+        # [STATEFUL] Log User Message
+        if session_id:
+             try:
+                 await log_conversation(session_id, "user", req.query)
+             except Exception as e:
+                 logger.warning(f"[AUDIT] Failed to log user message: {e}")
+        
         # =====================================================================
         # 🆕 PHASE 1: EDIT INTENT DETECTION (Stateful Intelligence)
         # Uses refactored module: app/intent/edit_detector.py
@@ -2500,6 +2514,15 @@ Query: "{query}"
                 loads_data = merge_result.get("loads", [])
                 site_ctx_data = merge_result.get("site_context", {})
                 
+                # [STATEFUL] Log Merge Action (Assistant side - implicit)
+                if session_id:
+                     try:
+                         # Log user intent first if not already logged
+                         # Note: We should ideally log USER message at start of process_ask
+                         pass 
+                     except Exception:
+                         pass
+
                 # Convert dicts to Pydantic models
                 current_rooms = [
                     RoomInput(
@@ -2535,7 +2558,7 @@ Query: "{query}"
                 
                 # [STATEFUL] 3. Recalculate (Call MCP Core)
                 # Re-use _build_design_response to get full formatted report + audit
-                return await self._build_design_response(project_req, req.language)
+                return await self._build_design_response(project_req, req.language, session_id=session_id)
             
             else:
                 logger.warning(f"⚠️ Merge failed or no changes detected - falling back to normal flow")
@@ -2573,8 +2596,7 @@ Query: "{query}"
                         # มีห้อง แต่ไม่มีอุปกรณ์ → ถามหาอุปกรณ์
                         room_names = [r.get("name", "?") for r in loads.get("rooms", [])]
                         logger.info(f"[ASK-BACK] Has rooms ({room_names}) but no loads - asking for loads")
-                        return StandardResponse(
-                            answer=f"""✅ ได้รับข้อมูลห้องแล้ว: {', '.join(room_names)}
+                        response_msg = f"""✅ ได้รับข้อมูลห้องแล้ว: {', '.join(room_names)}
 
 ❓ **กรุณาระบุอุปกรณ์ไฟฟ้าในแต่ละห้อง:**
 
@@ -2583,7 +2605,15 @@ Query: "{query}"
 • "ห้องนอนทุกห้องมีแอร์ 12000BTU"
 • "ห้องน้ำมีเครื่องทำน้ำอุ่น 4500W"
 • "ห้องครัวมีเตาไฟฟ้า 3000W, ตู้เย็น, ไมโครเวฟ"
-""",
+"""
+                        if session_id:
+                            try:
+                                await log_conversation(session_id, "assistant", response_msg)
+                            except Exception:
+                                pass
+
+                        return StandardResponse(
+                            answer=response_msg,
                             sources=[],
                             confidence="Medium",
                             grounding_status="PARTIAL_DATA_NEED_LOADS",
@@ -2679,7 +2709,7 @@ Query: "{query}"
                     
                     # Chain to MCP Core for calculations
                     # 🆕 [VD-FIX] Pass extracted loads (with floor_distances) to design builder
-                    result = await self._build_design_response(project_req, req.language, extracted_data=loads)
+                    result = await self._build_design_response(project_req, req.language, extracted_data=loads, session_id=session_id)
                     
                     logger.info("✅ Design response built successfully via NLP→MCP chain")
                     return result
@@ -2785,8 +2815,16 @@ Query: "{query}"
                 retrieved_docs=[],
                 retrieval_group=",".join(req.context_hint) if req.context_hint else "all"
             )
+            error_answer = "ไม่พบข้อมูลในเอกสาร" if req.language == "th" else "No information found in documents"
+            # [STATEFUL] Log Q&A response (Not Found)
+            if session_id:
+                try:
+                    await log_conversation(session_id, "assistant", error_answer)
+                except Exception:
+                    pass
+
             return StandardResponse(
-                answer="ไม่พบข้อมูลในเอกสาร" if req.language == "th" else "No information found in documents",
+                answer=error_answer,
                 sources=[],
                 confidence="Low",
                 grounding_status="NOT_FOUND",
@@ -2870,6 +2908,12 @@ Rules:
             retrieval_group=",".join(req.context_hint) if req.context_hint else "all"
         )
         
+        if session_id:
+            try:
+                await log_conversation(session_id, "assistant", answer)
+            except Exception:
+                pass
+
         return StandardResponse(
             answer=answer,
             sources=sources,
