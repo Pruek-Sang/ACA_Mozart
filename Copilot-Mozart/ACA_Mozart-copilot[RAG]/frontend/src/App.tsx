@@ -246,7 +246,8 @@ function App() {
           setSessionId(result.session_id);
           setProjectName(result.project_name || 'บ้านนายสมหญิง');
           console.log(`[SESSION-FIX] ✅ New session created after error: ${result.session_id.slice(0, 8)}...`);
-        } catch (createError: any) {
+        } catch {
+          // Intentionally empty - all session creation attempts failed
           console.error('[SESSION-FIX] ❌ All session attempts failed');
         }
 
