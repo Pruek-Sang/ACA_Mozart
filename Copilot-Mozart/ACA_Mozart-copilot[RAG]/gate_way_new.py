@@ -697,13 +697,24 @@ async def proxy_ask(request: Request):
     
     This endpoint allows Frontend to call /api/v1/ask directly on Gateway
     instead of needing to know RAG Service URL.
+    
+    🆕 FIX: Now forwards session_id query parameter to Backend!
     """
     try:
         body = await request.json()
         
+        # 🆕 FIX: Forward session_id from query params
+        session_id = request.query_params.get("session_id")
+        url = f"{MOZART_ENDPOINT}/api/v1/ask"
+        if session_id:
+            url += f"?session_id={session_id}"
+            logger.info(f"[PROXY] Forwarding session_id: {session_id[:8]}...")
+        else:
+            logger.warning("[PROXY] No session_id in request - Backend will receive None")
+        
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(
-                f"{MOZART_ENDPOINT}/api/v1/ask",
+                url,
                 json=body,
                 headers={
                     "Content-Type": "application/json",
