@@ -2496,10 +2496,22 @@ Query: "{query}"
         # =====================================================================
         # 🆕 PHASE 1: EDIT INTENT DETECTION (Stateful Intelligence)
         # Uses refactored module: app/intent/edit_detector.py
+        # 🔧 FIX: Also verify session has existing design before EDIT mode
         # =====================================================================
         is_edit_mode = detect_edit_intent(req.query)
+        has_existing_design = False
         
+        # 🆕 Quick check: Only enter EDIT mode if session has existing loads
         if is_edit_mode and session_id:
+            from app.context.session_injector import session_injector
+            session_check = await session_injector.load(session_id)
+            has_existing_design = bool(session_check and session_check.loads and len(session_check.loads) > 0)
+            
+            if not has_existing_design:
+                logger.info(f"[EDIT_INTENT] Edit keyword detected but session has no existing design → Falling back to CREATE mode")
+                is_edit_mode = False  # Override to CREATE mode
+        
+        if is_edit_mode and session_id and has_existing_design:
             logger.info(f"🔧 EDIT mode detected for session {session_id[:8]}... query: '{req.query[:50]}...'")
             
             # [STATEFUL] 1. Merge changes into session
