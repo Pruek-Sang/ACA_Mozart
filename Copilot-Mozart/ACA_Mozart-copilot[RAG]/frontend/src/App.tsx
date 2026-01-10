@@ -351,7 +351,7 @@ function App() {
       // 1. Call soft-delete API (mark as deleted in DB)
       if (sessionId) {
         const apiUrl = import.meta.env.VITE_API_URL || '';
-        await fetch(`${apiUrl}/api/v1/session/${sessionId}`, {
+        await fetch(`${apiUrl}/api/v1/session/${sessionId}?confirm=CONFIRM`, {
           method: 'DELETE',
         });
         console.log('[CLEAR] Soft-deleted session:', sessionId);
