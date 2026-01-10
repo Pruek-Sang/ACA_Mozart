@@ -186,6 +186,16 @@ function App() {
           console.log('[SESSION-RESTORE] BOQ Sections:', data.mcp_response.boq_data.sections?.length || 0);
         }
 
+        // 🩺 Track Session Restore Success
+        healthTracker.trackSessionRestore({
+          hasDisplayData: !!data.mcp_response?.display_data,
+          hasBoqData: !!data.mcp_response?.boq_data,
+          hasSldData: !!data.mcp_response?.sld_data,
+          hasMessages: (data.messages?.length || 0) > 0,
+          messageCount: data.messages?.length || 0
+        });
+        healthTracker.trackCrudRead(id, true);
+
         if (data.project_name) setProjectName(data.project_name);
 
         // Restore Result Data
@@ -237,6 +247,12 @@ function App() {
         // Restore SLD
         if (data.mcp_response?.sld_data) {
           setSldData(data.mcp_response.sld_data);
+        }
+
+        // 🆕 Restore BOQ Data
+        if (data.mcp_response?.boq_data) {
+          console.log('[SESSION-RESTORE] Setting BOQ data...');
+          setBoqData(data.mcp_response.boq_data as BOQData);
         }
 
         // 🆕 Restore Chat Messages
@@ -374,12 +390,22 @@ function App() {
       console.log('[SESSION-DEBUG] handleSubmit - sessionId state:', sessionId);
       console.log('[SESSION-DEBUG] handleSubmit - localStorage:', localStorage.getItem('mozart_session_id'));
 
+      // 🩺 Track API Request
+      healthTracker.trackApiRequest('/api/v1/ask', {
+        method: 'POST',
+        sessionId: sessionId,
+        body: { query: userPrompt }
+      });
+
       // 2. Call API via centralized api.ts module (with session_id)
       const data = await askDesign({
         query: userPrompt,
         language: 'th',
         site_context: context
       }, sessionId || undefined);
+
+      // 🩺 Track API Response
+      healthTracker.trackApiResponse(200, data, '/api/v1/ask');
 
       console.log('[SESSION-DEBUG] askDesign returned, checking metadata.display_data:', !!data.metadata?.display_data);
 
@@ -506,6 +532,9 @@ function App() {
       const errorString = error instanceof Error ? error.message : String(error);
       logger.error('Design submission error', { error: errorString });
 
+      // 🩺 Track Error
+      healthTracker.trackError(errorString, 'API_CALL');
+
       const errorDetails = classifyError(error);
 
       const errorMsg: ChatMessage = {
@@ -520,7 +549,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [context, sessionId]);
+  }, [context, sessionId, healthTracker]);
 
   // === AUTH LOADING STATE ===
   if (isAuthLoading) {

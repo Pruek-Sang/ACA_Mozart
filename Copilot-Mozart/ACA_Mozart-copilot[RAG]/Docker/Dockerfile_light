@@ -40,6 +40,9 @@ COPY rag_knowledge ./rag_knowledge
 # This avoids needing to run ingest on Local/Docker
 COPY vector_db ./vector_db
 
+# 🆕 Copy price catalog for BOQ
+COPY catalog ./catalog
+
 # Create log dirs
 RUN mkdir -p logs/mcp_spec
 

@@ -147,9 +147,11 @@ def load_prices_from_csv() -> tuple[Dict[str, Dict[str, Any]], str]:
     
     # Try multiple possible paths
     csv_paths = [
-        '/home/builder/Desktop/ACA_Mozart/mcp_core_v2/catalog/prices.csv',
-        'mcp_core_v2/catalog/prices.csv',
-        '../mcp_core_v2/catalog/prices.csv',
+        '/app/catalog/prices.csv',  # 🆕 Docker path (RAG service)
+        'catalog/prices.csv',  # Local development
+        '/home/builder/Desktop/ACA_Mozart/mcp_core_v2/catalog/prices.csv',  # Local absolute
+        'mcp_core_v2/catalog/prices.csv',  # Legacy
+        '../mcp_core_v2/catalog/prices.csv',  # Legacy
     ]
     
     for csv_path in csv_paths:
