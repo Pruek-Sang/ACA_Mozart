@@ -190,10 +190,11 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
                 'style': 'solid'
             })
             
-            # 🆕 Add Switch for Lighting circuits
+            # 🆕 Add Switch for Lighting circuits (ABOVE the circuit, not below)
             is_lighting = _is_lighting_circuit(circuit)
             if is_lighting:
-                switch_y = branch_y + NODE_HEIGHT + 30
+                # 🔧 FIX: Switch should be ABOVE the circuit breaker (between RCD and circuit)
+                switch_y = branch_y - 50  # Position above the circuit
                 switch_node: SLDNode = {
                     'id': f'switch_{i}',
                     'type': 'switch',
@@ -206,11 +207,19 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
                 }
                 nodes.append(switch_node)
                 
-                # Edge: Circuit -> Switch
+                # Edge: RCD -> Switch -> Circuit (Switch is between RCD and circuit)
+                # Remove direct RCD->Circuit edge and add RCD->Switch, Switch->Circuit
+                edges = [e for e in edges if e['id'] != f'edge-rcd-c{i}']  # Remove direct edge
                 edges.append({
-                    'id': f'edge-c{i}-switch',
-                    'source': f'circuit_{i}',
+                    'id': f'edge-rcd-switch{i}',
+                    'source': 'rcd',
                     'target': f'switch_{i}',
+                    'style': 'solid'
+                })
+                edges.append({
+                    'id': f'edge-switch{i}-c{i}',
+                    'source': f'switch_{i}',
+                    'target': f'circuit_{i}',
                     'style': 'solid'
                 })
     
@@ -250,8 +259,16 @@ def _is_lighting_circuit(circuit: Dict[str, Any]) -> bool:
 def _create_circuit_node_vertical(circuit: Dict[str, Any], index: int, x: float, y: float) -> SLDNode:
     """Create branch circuit node with Cable Label."""
     name = circuit.get('circuit_name', f'Circuit {index + 1}')
-    if len(name) > 12:
-        name = name[:10] + '...'
+    # 🆕 Allow 2-line wrap instead of truncation
+    if len(name) > 18:
+        # Split into 2 lines
+        mid = len(name) // 2
+        # Find space near middle
+        space_pos = name.rfind(' ', 0, mid + 5)
+        if space_pos > 4:
+            name = name[:space_pos] + '\n' + name[space_pos+1:]
+        else:
+            name = name[:16] + '...'
     
     breaker = circuit.get('breaker_rating', 15)
     poles = circuit.get('breaker_poles', 1)
