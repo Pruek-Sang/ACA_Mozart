@@ -640,6 +640,56 @@ async def get_session_data(session_id: str, request: Request):
         logger.error(f"Failed to load session data: {e}")
         raise HTTPException(500, f"Failed to load session: {str(e)}")
 
+
+# =============================================================================
+# 🆕 DELETE SESSION - Soft Delete (for Clear button)
+# [2026-01-11] User wants to clear UI but keep data in DB for history
+# =============================================================================
+@app.delete("/api/v1/session/{session_id}")
+async def delete_session(session_id: str, request: Request):
+    """
+    Soft-delete a session (mark as deleted, keep data for history).
+    
+    This is called by the "Clear" button in Frontend.
+    Data is kept in DB with status='deleted' and deleted_at timestamp.
+    Session will NOT appear in project list and cannot be restored.
+    
+    Returns:
+    - 200: Successfully marked as deleted
+    - 404: Session not found
+    - 503: Storage not available
+    """
+    if not SUPABASE_AVAILABLE or not session_injector:
+        # Fallback to in-memory
+        session_store.remove_session(session_id)
+        logger.info(f"🧹 [SOFT-DELETE] Removed in-memory session: {session_id[:8]}...")
+        return {"success": True, "storage": "memory", "session_id": session_id}
+    
+    try:
+        # Soft-delete: just set status to 'deleted' (no new column needed!)
+        client = get_supabase_client()
+        
+        result = client.table("sessions").update({
+            "status": "deleted",  # Just change status, DB already has this column
+        }).eq("id", session_id).execute()
+        
+        if not result.data:
+            raise HTTPException(404, f"Session not found: {session_id[:8]}...")
+        
+        logger.info(f"🧹 [SOFT-DELETE] Marked session as deleted: {session_id[:8]}...")
+        
+        return {
+            "success": True,
+            "storage": "supabase",
+            "session_id": session_id,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[SOFT-DELETE] Failed: {e}")
+        raise HTTPException(500, f"Failed to delete session: {str(e)}")
+
 @app.get("/api/v1/session/{session_id}/site", response_model=SiteContextQuestionnaire)
 async def get_site_context_questions(session_id: str):
     """

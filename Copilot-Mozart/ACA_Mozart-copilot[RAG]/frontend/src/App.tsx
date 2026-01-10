@@ -19,7 +19,7 @@ import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
 import { askDesign, startSession } from './lib/api';
 import { logger } from './lib/logger';
-import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen } from 'lucide-react';
+import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen, Trash2 } from 'lucide-react';
 
 /**
  * App - Main Application Controller
@@ -336,6 +336,59 @@ function App() {
     }
   };
 
+  // === 🆕 CLEAR HANDLER (Soft Delete) ===
+  const handleClear = async () => {
+    const confirmClear = window.confirm(
+      '⚠️ ต้องการล้างข้อมูลทั้งหมดหรือไม่?\n\n' +
+      '- ข้อความแชททั้งหมดจะหายไป\n' +
+      '- ผลการคำนวณจะหายไป\n' +
+      '- ข้อมูลจะถูกเก็บไว้ในประวัติ (ไม่ลบถาวร)'
+    );
+
+    if (!confirmClear) return;
+
+    try {
+      // 1. Call soft-delete API (mark as deleted in DB)
+      if (sessionId) {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        await fetch(`${apiUrl}/api/v1/session/${sessionId}`, {
+          method: 'DELETE',
+        });
+        console.log('[CLEAR] Soft-deleted session:', sessionId);
+      }
+
+      // 2. Clear all UI state
+      setMessages([{
+        role: 'system',
+        content: '🧹 ล้างข้อมูลเรียบร้อย! พร้อมเริ่มต้นใหม่',
+        timestamp: new Date()
+      }]);
+      setResultData(null);
+      setSldData(null);
+      setBoqData(null);
+
+      // 3. Clear localStorage and create new session
+      localStorage.removeItem('mozart_session_id');
+      localStorage.removeItem('mozart_project_name');
+      setSessionId(null);
+      setProjectName('โปรเจกต์ใหม่');
+
+      console.log('[CLEAR] All data cleared, ready for new project');
+
+    } catch (error) {
+      console.error('[CLEAR] Error:', error);
+      // Still clear UI even if API fails
+      setMessages([{
+        role: 'system',
+        content: '🧹 ล้างข้อมูล UI แล้ว (แต่อาจมีข้อมูลเก่าใน server)',
+        timestamp: new Date()
+      }]);
+      setResultData(null);
+      setSldData(null);
+      setBoqData(null);
+    }
+  };
+
   // === FEEDBACK HANDLER ===
   const handleFeedbackSubmit = async (feedback: {
     type: string;
@@ -615,13 +668,26 @@ function App() {
           </div>
         </div>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 text-slate-400 hover:text-red-400 text-sm transition-colors"
-        >
-          <LogOut size={16} />
-          <span>ออกจากระบบ</span>
-        </button>
+        <div className="flex items-center gap-3">
+          {/* 🆕 Clear Button */}
+          <button
+            onClick={handleClear}
+            className="flex items-center gap-2 text-slate-400 hover:text-orange-400 text-sm transition-colors"
+            title="ล้างข้อมูลทั้งหมด"
+          >
+            <Trash2 size={16} />
+            <span>ล้างข้อมูล</span>
+          </button>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-slate-400 hover:text-red-400 text-sm transition-colors"
+          >
+            <LogOut size={16} />
+            <span>ออกจากระบบ</span>
+          </button>
+        </div>
       </div>
 
       {/* MAIN CONTENT */}
