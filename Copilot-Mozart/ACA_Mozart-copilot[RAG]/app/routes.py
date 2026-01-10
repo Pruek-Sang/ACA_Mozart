@@ -646,30 +646,47 @@ async def get_session_data(session_id: str, request: Request):
 # [2026-01-11] User wants to clear UI but keep data in DB for history
 # =============================================================================
 @app.delete("/api/v1/session/{session_id}")
-async def delete_session(session_id: str, request: Request):
+async def delete_session(session_id: str, request: Request, confirm: str = None):
     """
     Soft-delete a session (mark as deleted, keep data for history).
     
     This is called by the "Clear" button in Frontend.
-    Data is kept in DB with status='deleted' and deleted_at timestamp.
+    Data is kept in DB with status='expired' (soft delete).
     Session will NOT appear in project list and cannot be restored.
+    
+    Query Parameters:
+    - confirm: Must be "CONFIRM" (case-sensitive) for safety
     
     Returns:
     - 200: Successfully marked as deleted
+    - 400: Missing or wrong confirm parameter
     - 404: Session not found
     - 503: Storage not available
     """
+    # 🔒 Safety check: Require explicit confirmation
+    if confirm != "CONFIRM":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": {
+                    "message": "Delete requires confirm=CONFIRM query parameter",
+                    "code": "CONFIRM_REQUIRED"
+                }
+            }
+        )
+    
     if not SUPABASE_AVAILABLE or not session_injector:
         # Fallback to in-memory
         session_store.remove_session(session_id)
         logger.info(f"🧹 [SOFT-DELETE] Removed in-memory session: {session_id[:8]}...")
-        return {"success": True, "storage": "memory", "session_id": session_id}
+        return {"status": "deleted", "storage": "memory", "session_id": session_id}
     
     try:
         # Soft-delete: set status to 'expired' (DB CHECK constraint: active/expired/migrated)
         client = get_supabase_client()
         
-        result = client.table("sessions").update({
+        # 🔧 FIX: Use 'mozart' schema (not 'public')
+        result = client.schema("mozart").table("sessions").update({
             "status": "expired",  # ⚠️ 'deleted' not in CHECK, use 'expired' instead
         }).eq("id", session_id).execute()
         
@@ -679,7 +696,7 @@ async def delete_session(session_id: str, request: Request):
         logger.info(f"🧹 [SOFT-DELETE] Marked session as deleted: {session_id[:8]}...")
         
         return {
-            "success": True,
+            "status": "deleted",  # Match test expectation
             "storage": "supabase",
             "session_id": session_id,
         }
