@@ -11,7 +11,7 @@ import re
 import logging
 from typing import Optional, Match
 
-from app.parsers.edit_command import EditCommand, EditAction
+from app.parsers.edit_command import EditCommand, EditAction, TargetType
 from app.parsers.device_catalog import (
     get_device_type,
     get_action,
@@ -95,6 +95,29 @@ PATTERNS = {
         rf"(?:\s*(?:ออก))?",    # Optional closing particle (for เอา...ออก)
         re.IGNORECASE
     ),
+    
+    # =========================================================================
+    # 🆕 ROOM PATTERNS - For adding/removing rooms
+    # =========================================================================
+    
+    # Pattern: เพิ่มห้องนอน, เพิ่มห้องน้ำ 2 ห้อง
+    "add_room_thai": re.compile(
+        r"(เพิ่ม|สร้าง|ใส่)"  # Add action
+        r"\s*"
+        r"ห้อง(นอน|น้ำ|ครัว|นั่งเล่น|เก็บของ|รถ)"  # Room type
+        r"(?:\s*(\d+))?(?:\s*(ห้อง))?",  # Optional quantity
+        re.IGNORECASE
+    ),
+    
+    # Pattern: ลบห้องนอน 1, ลบห้องน้ำ
+    "remove_room_thai": re.compile(
+        r"(ลบ|เอา|ยกเลิก)"  # Remove action
+        r"\s*"
+        r"ห้อง(นอน|น้ำ|ครัว|นั่งเล่น|เก็บของ|รถ)"  # Room type
+        r"(?:\s*(\d+|\S+?))?"  # Optional room number or name
+        r"(?:\s*(?:ออก))?",    # Optional closing particle
+        re.IGNORECASE
+    ),
 }
 
 
@@ -129,6 +152,55 @@ def _build_command_from_match(match: Match, pattern_name: str, raw_input: str) -
     Build EditCommand from regex match.
     """
     groups = match.groups()
+    
+    # =========================================================================
+    # 🆕 ROOM PATTERN HANDLING
+    # =========================================================================
+    if "room" in pattern_name:
+        action_word = groups[0] if groups[0] else ""
+        room_type_th = groups[1] if len(groups) > 1 and groups[1] else ""
+        
+        # Map Thai room type to English
+        room_type_map = {
+            "นอน": "bedroom",
+            "น้ำ": "bathroom",
+            "ครัว": "kitchen",
+            "นั่งเล่น": "living",
+            "เก็บของ": "storage",
+            "รถ": "garage",
+        }
+        room_type = room_type_map.get(room_type_th, "bedroom")
+        
+        # Get quantity for add_room
+        quantity = None
+        room_name = None
+        if "add" in pattern_name:
+            qty_str = groups[2] if len(groups) > 2 and groups[2] else None
+            quantity = int(qty_str) if qty_str and qty_str.isdigit() else 1
+            action = EditAction.ADD
+        else:  # remove
+            room_name_str = groups[2] if len(groups) > 2 and groups[2] else None
+            room_name = f"ห้อง{room_type_th}" + (f" {room_name_str}" if room_name_str else "")
+            action = EditAction.REMOVE
+        
+        cmd = EditCommand(
+            action=action,
+            target_type=TargetType.ROOM,
+            room_type=room_type,
+            room_name=room_name,
+            quantity=quantity,
+            confidence=0.95,
+            parse_method="regex",
+            raw_input=raw_input,
+            normalized_input=raw_input.lower(),
+        )
+        
+        logger.info(f"[REGEX] Parsed ROOM: {cmd.action.value} {cmd.room_type} (qty={cmd.quantity})")
+        return cmd
+    
+    # =========================================================================
+    # DEVICE PATTERN HANDLING (Original logic)
+    # =========================================================================
     
     # Determine action
     action_word = groups[0] if groups[0] else ""
@@ -176,6 +248,7 @@ def _build_command_from_match(match: Match, pattern_name: str, raw_input: str) -
     
     cmd = EditCommand(
         action=action,
+        target_type=TargetType.DEVICE,
         device_type=device_type,
         room_name=target_room,
         target_floor=None,  # Could extract from room name
