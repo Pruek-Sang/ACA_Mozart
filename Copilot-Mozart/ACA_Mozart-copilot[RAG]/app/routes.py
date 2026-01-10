@@ -666,11 +666,11 @@ async def delete_session(session_id: str, request: Request):
         return {"success": True, "storage": "memory", "session_id": session_id}
     
     try:
-        # Soft-delete: just set status to 'deleted' (no new column needed!)
+        # Soft-delete: set status to 'expired' (DB CHECK constraint: active/expired/migrated)
         client = get_supabase_client()
         
         result = client.table("sessions").update({
-            "status": "deleted",  # Just change status, DB already has this column
+            "status": "expired",  # ⚠️ 'deleted' not in CHECK, use 'expired' instead
         }).eq("id", session_id).execute()
         
         if not result.data:
