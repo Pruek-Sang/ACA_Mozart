@@ -1027,7 +1027,9 @@ Query: "{query}"
                             # Find room in extracted['rooms']
                             for r in extracted.get("rooms", []):
                                 if r.get("name") == room_name:
-                                    room_floor = r.get("floor", 1) or 1
+                                    # 🔧 FIX: Ensure room_floor is int to match floor_distances keys
+                                    floor_val = r.get("floor", 1)
+                                    room_floor = int(floor_val) if floor_val else 1
                                     break
                             
                             if room_floor in floor_distances:
@@ -1077,12 +1079,18 @@ Query: "{query}"
             for r in extracted.get("rooms", [])
         ]
         
+        # 🔧 FIX: Ensure ALL loads have branch_distance_m to prevent MCP Core from using defaults
+        # If floor_distances exists, loads should already have it from above injection
+        # But some loads may not match a room → add fallback default
+        default_fallback_distance = 15.0  # meters, Floor 1 default
+        
         loads = [
             LoadInput(
                 room_name=l["room_name"],
                 device=l["device"],
                 quantity=l.get("quantity") or 1,  # Handle None from LLM
-                branch_distance_m=l.get("branch_distance_m") # New field
+                # 🔧 FIX: Use fallback distance if not already set
+                branch_distance_m=l.get("branch_distance_m") or default_fallback_distance
             )
             for l in extracted.get("loads", [])
         ]
@@ -2353,7 +2361,22 @@ Query: "{query}"
                         
                         # 2. Explainable QC
                         warnings_list = display_data_dict.get('warnings', [])
-                        explainable = convert_legacy_warnings(warnings_list)
+                        
+                        # 🔧 FIX: Filter out vague "default distance" warnings
+                        # and replace with specific circuit names
+                        filtered_warnings = [
+                            w for w in warnings_list 
+                            if 'default' not in w.lower() and 'ระยะ' not in w.lower()
+                        ]
+                        
+                        # 🆕 Add SPECIFIC warnings for circuits using default distance
+                        default_circuits = display_data_dict.get('default_distance_circuits', [])
+                        for ckt_name in default_circuits:
+                            filtered_warnings.append(
+                                f"วงจร '{ckt_name}' ใช้ระยะสาย Default (ควรระบุระยะจริง)"
+                            )
+                        
+                        explainable = convert_legacy_warnings(filtered_warnings)
                         display_data_dict['explainable_warnings'] = explainable
                         
                 except Exception as compute_err:

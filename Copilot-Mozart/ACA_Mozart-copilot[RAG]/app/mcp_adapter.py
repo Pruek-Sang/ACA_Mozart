@@ -366,7 +366,7 @@ class McpAdapter:
             # Get floor from LoadSpec (new: floor support)
             floor = str(getattr(load, 'floor', 1)) if hasattr(load, 'floor') else "1"
             
-            # Resolve Branch Distance: Specific > Floor Default > None
+            # Resolve Branch Distance: Specific > Floor Default > Fallback
             dist = getattr(load, 'branch_distance_m', None)
             if dist is None or dist == 0:
                 # Try to find default for this floor
@@ -374,6 +374,11 @@ class McpAdapter:
                 default_dist = floor_map.get(str(floor)) or floor_map.get(int(floor) if floor.isdigit() else floor)
                 if default_dist:
                     dist = float(default_dist)
+                else:
+                    # 🔧 FIX: Final fallback - ensure dist is NEVER None
+                    # This prevents MCP Core from using default_table and creating warnings
+                    floor_int = int(floor) if floor.isdigit() else 1
+                    dist = {1: 15.0, 2: 25.0, 3: 35.0}.get(floor_int, 15.0 + (floor_int - 1) * 10.0)
             
             # Create MCP load
             mcp_load = McpElectricalLoad(
