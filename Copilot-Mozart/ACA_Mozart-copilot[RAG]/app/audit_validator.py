@@ -16,7 +16,7 @@ logger = logging.getLogger("Aura.Audit")
 def validate_user_specs(
     grouped_circuits: List[Dict[str, Any]],
     extracted_loads: List[Dict[str, Any]],
-    default_distance_circuits: List[str] = None  # 🆕 Accepted default distance list
+    default_distance_circuits: List[Any] = None  # 🔧 Changed: now accepts List[Dict] or List[str]
 ) -> List[Dict[str, Any]]:
     """
     [CP-AUDIT] Compare user-specified values with auto-calculated values.
@@ -25,7 +25,9 @@ def validate_user_specs(
     Args:
         grouped_circuits: Auto-calculated circuits from MCP Core
         extracted_loads: Loads with user_breaker/user_wire_size from LLM extraction
-        default_distance_circuits: List of circuit names using default distance
+        default_distance_circuits: List of circuit info using default distance
+            - New format: [{"name": str, "distance_m": float}, ...]
+            - Old format: [str, ...] (backward compatible)
     
     Returns:
         List of audit results with PASS/FAIL status for each check
@@ -39,22 +41,31 @@ def validate_user_specs(
     # Checks consistency with Chat Markdown Report
     if default_distance_circuits:
         logger.info(f"[CP-AUDIT] Found {len(default_distance_circuits)} circuits with default distance")
-        for ckt_name in default_distance_circuits:
+        for ckt_info in default_distance_circuits:
+            # 🔧 Handle both new dict format and old string format
+            if isinstance(ckt_info, dict):
+                ckt_name = ckt_info.get("name", "Unknown")
+                distance_m = ckt_info.get("distance_m", 15.0)
+            else:
+                # Backward compatibility: if it's just a string
+                ckt_name = str(ckt_info)
+                distance_m = 15.0  # Default
+            
             audit_results.append({
                 'check': f"ระยะสาย ({ckt_name})",
                 'user_value': "ไม่ระบุ (Default)",
                 'recommended_value': "วัดหน้างาน",
-                'auto_value': "Default",
+                'auto_value': f"Default {distance_m:.0f}m",
                 'status': 'WARN',
                 'circuit_name': ckt_name,
                 'device': 'Walking Distance',
                 'room': '-',
                 'checks': [{
                     'item': 'Distance',
-                    'user_value': 'Default',
-                    'auto_value': 'Risk',
+                    'user_value': f'Default {distance_m:.0f}m',
+                    'auto_value': 'ควรวัดจริง',
                     'status': 'WARN',
-                    'reason': 'ใช้ระยะ Default (ค่าประมาณการ) อาจมีผลต่อ Voltage Drop'
+                    'reason': f'ใช้ระยะ Default {distance_m:.0f}m (ค่าประมาณการ) อาจมีผลต่อ Voltage Drop'
                 }],
                 'overall_status': 'WARN'
             })

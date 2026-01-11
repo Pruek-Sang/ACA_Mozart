@@ -1079,18 +1079,16 @@ Query: "{query}"
             for r in extracted.get("rooms", [])
         ]
         
-        # 🔧 FIX: Ensure ALL loads have branch_distance_m to prevent MCP Core from using defaults
-        # If floor_distances exists, loads should already have it from above injection
-        # But some loads may not match a room → add fallback default
-        default_fallback_distance = 15.0  # meters, Floor 1 default
+        # NOTE: Do NOT add fallback default distance here!
+        # Let MCP Core track which loads use default via wire_sizing['used_default_distance']
+        # Then compute.py will track via default_distance_circuits list
         
         loads = [
             LoadInput(
                 room_name=l["room_name"],
                 device=l["device"],
                 quantity=l.get("quantity") or 1,  # Handle None from LLM
-                # 🔧 FIX: Use fallback distance if not already set
-                branch_distance_m=l.get("branch_distance_m") or default_fallback_distance
+                branch_distance_m=l.get("branch_distance_m")  # Allow None for proper tracking
             )
             for l in extracted.get("loads", [])
         ]
@@ -2362,18 +2360,40 @@ Query: "{query}"
                         # 2. Explainable QC
                         warnings_list = display_data_dict.get('warnings', [])
                         
-                        # 🔧 FIX: Filter out vague "default distance" warnings
-                        # and replace with specific circuit names
+                        # 🔧 FIX: Filter out vague "default distance" warnings from MCP Core
+                        # Replace with specific circuit names and distance values
                         filtered_warnings = [
                             w for w in warnings_list 
                             if 'default' not in w.lower() and 'ระยะ' not in w.lower()
                         ]
                         
                         # 🆕 Add SPECIFIC warnings for circuits using default distance
+                        # Format: [{"name": str, "distance_m": float}, ...]
                         default_circuits = display_data_dict.get('default_distance_circuits', [])
-                        for ckt_name in default_circuits:
+                        
+                        if default_circuits:
+                            # Add summary first
+                            circuit_count = len(default_circuits)
                             filtered_warnings.append(
-                                f"วงจร '{ckt_name}' ใช้ระยะสาย Default (ควรระบุระยะจริง)"
+                                f"📏 มี {circuit_count} วงจรใช้ค่าระยะทาง Default (ควรระบุระยะจริงเพื่อความแม่นยำ)"
+                            )
+                            # Then add specific circuits with distance values
+                            for ckt_info in default_circuits:
+                                if isinstance(ckt_info, dict):
+                                    ckt_name = ckt_info.get("name", "Unknown")
+                                    distance = ckt_info.get("distance_m", 15.0)
+                                    filtered_warnings.append(
+                                        f"วงจร '{ckt_name}' ใช้ระยะ Default {distance:.0f}m (ควรระบุระยะจริง)"
+                                    )
+                                else:
+                                    # Backward compatibility: if it's just a string
+                                    filtered_warnings.append(
+                                        f"วงจร '{ckt_info}' ใช้ระยะ Default (ควรระบุระยะจริง)"
+                                    )
+                        else:
+                            # ✅ No defaults used - show positive message
+                            filtered_warnings.append(
+                                "✅ ทุกวงจรใช้ค่าระยะทางที่ระบุ ไม่มีการใช้ค่า Default"
                             )
                         
                         explainable = convert_legacy_warnings(filtered_warnings)
