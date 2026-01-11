@@ -370,12 +370,7 @@ function App() {
       setBoqData(null);
 
       // 3. Clear localStorage and create new session
-      localStorage.removeItem('mozart_session_id');
-      localStorage.removeItem('mozart_project_name');
-      setSessionId(null);
-      setProjectName('โปรเจกต์ใหม่');
-
-      console.log('[CLEAR] All data cleared, ready for new project');
+      console.log('[CLEAR] Clear request sent to API');
 
     } catch (error) {
       console.error('[CLEAR] Error:', error);
@@ -388,6 +383,13 @@ function App() {
       setResultData(null);
       setSldData(null);
       setBoqData(null);
+    } finally {
+      // 3. Always clear localStorage and reset session ID
+      localStorage.removeItem('mozart_session_id');
+      localStorage.removeItem('mozart_project_name');
+      setSessionId(null);
+      setProjectName('โปรเจกต์ใหม่');
+      console.log('[CLEAR] Local session cleared');
     }
   };
 
