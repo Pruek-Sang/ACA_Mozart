@@ -173,6 +173,39 @@ def collect_assumptions(
             "standard_ref": "-",
         })
     
+    # 🆕 Add specific circuits using default distance
+    # This ensures Assumption tab shows same info as Audit tab
+    default_circuits = display_data.get("default_distance_circuits", [])
+    if default_circuits:
+        circuit_names = []
+        for ckt_info in default_circuits:
+            if isinstance(ckt_info, dict):
+                name = ckt_info.get("name", "Unknown")
+                dist = ckt_info.get("distance_m", 15.0)
+                circuit_names.append(f"{name} ({dist:.0f}m)")
+            else:
+                circuit_names.append(str(ckt_info))
+        
+        assumptions.append({
+            "key": "circuits_using_default_distance",
+            "label": "วงจรที่ใช้ระยะ Default",
+            "value": ", ".join(circuit_names) if len(circuit_names) <= 3 else f"{len(circuit_names)} วงจร",
+            "source": "default",
+            "category": "distance",
+            "standard_ref": "ควรวัดจริง",
+        })
+        logger.info(f"[ASSUMPTIONS] {len(circuit_names)} circuits using default distance")
+    else:
+        # All circuits have user-specified distance
+        assumptions.append({
+            "key": "circuits_using_default_distance",
+            "label": "วงจรที่ใช้ระยะ Default",
+            "value": "✅ ไม่มี (ทุกวงจรมีค่าที่ระบุ)",
+            "source": "user",
+            "category": "distance",
+            "standard_ref": "-",
+        })
+    
     result: AssumptionsData = {
         "project_name": display_data.get("project_name", "โครงการ"),
         "assumptions": assumptions,
