@@ -341,7 +341,9 @@ def _get_branch_distance(
     """
     # 1. Source: wire_sizing (from MCP Core)
     if isinstance(vd_data, dict) and vd_data.get('distance_m'):
-        return float(vd_data['distance_m']), False
+        # Respect the flag from Core pipeline
+        is_default = vd_data.get('used_default_distance', False)
+        return float(vd_data['distance_m']), is_default
     
     # 2. Source: grouped_circuits (from RAG service)
     dist = circuit.get('branch_distance_m') or circuit.get('distance_m')
@@ -416,8 +418,21 @@ def _process_circuits(
             if abs(vd_percent - 2.0) < 0.001:  # Check if using default
                 logger.warning(f"[VD-WARN] Circuit '{ckt_name}' has default VD 2.0 - check injection!")
             
-            # Ground size still from wire_sizing (fallback to first matching load or default)
+            # 🆕 [VD-FIX] Look up wire sizing data from constituent loads to get correct Default flag
+            vd_data = {}
+            # Fallback to circuit_id (legacy)
             vd_data = wire_sizing.get(circuit_id, {})
+            
+            # Try to match via loads (since wire_sizing is keyed by load_id)
+            loads_in_circuit = circuit.get('loads', [])
+            if isinstance(loads_in_circuit, list):
+                for load in loads_in_circuit:
+                    # If this load has wire sizing data, use it!
+                    load_id = load.get('id')
+                    if load_id and load_id in wire_sizing:
+                        vd_data = wire_sizing[load_id]
+                        break
+            
             ground_size = vd_data.get('ground_size', '2.5') if isinstance(vd_data, dict) else '2.5'
 
             
