@@ -2,6 +2,7 @@
 Full Report Builder - Combine all display modules into one PDF-ready document
 
 This module creates a comprehensive work package with:
+- QC Certificate (FIRST PAGE)
 - Cover page
 - Table of Contents
 - Load Schedule
@@ -12,6 +13,7 @@ This module creates a comprehensive work package with:
 
 Author: Fixia
 Date: 2026-01-03
+Updated: 2026-01-12 - Added QC Certificate as first page
 """
 
 import logging
@@ -113,6 +115,176 @@ def generate_toc(sections: List[ReportSection]) -> str:
     
     lines.append("")
     return "\n".join(lines)
+
+
+def generate_qc_certificate_section(qc_data: Optional[Dict[str, Any]]) -> ReportSection:
+    """
+    Generate QC Certificate section as FIRST page of PDF.
+    
+    This creates a formal Design Assumptions Certificate with:
+    - Header: Company name + Document ID
+    - Project Info
+    - Scope & Limitations
+    - Electrical Parameters with validation status
+    - VD Validation per circuit
+    - References
+    - Signature area
+    
+    Args:
+        qc_data: From generate_qc_certificate() in qc_certificate.py
+    
+    Returns:
+        ReportSection to prepend to report
+    """
+    if not qc_data:
+        return {
+            "id": "qc_certificate",
+            "title": "QC Certificate",
+            "content": "# ⚠️ QC Certificate\n\nFailed to generate QC Certificate.",
+            "page_break_before": False,
+        }
+    
+    lines = [
+        "# 📋 DESIGN ASSUMPTIONS CERTIFICATE",
+        "",
+        "---",
+        "",
+        f"**{qc_data.get('company_name', 'MOZART ELECTRICAL ENGINEERING')}**",
+        "",
+        f"Document No: **{qc_data['document_id']}**",
+        f"Date Generated: {qc_data['date_generated']}",
+        f"Valid Until: {qc_data['valid_until']}",
+        f"Revision: {qc_data['revision']}",
+        "",
+        "---",
+        "",
+        "## PROJECT INFORMATION",
+        "",
+        "| Property | Value |",
+        "|----------|-------|",
+        f"| Project Name | **{qc_data['project_name']}** |",
+        f"| Total Load | {qc_data['total_kw']:.2f} kW |",
+        f"| Main Breaker | {qc_data['main_breaker']} A |",
+        f"| Circuit Count | {qc_data['circuit_count']} |",
+        "",
+        "---",
+        "",
+        "## SCOPE & LIMITATIONS",
+        "",
+    ]
+    
+    for scope_item in qc_data.get('scope_items', []):
+        lines.append(f"- {scope_item}")
+    
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## SECTION A: ELECTRICAL PARAMETERS",
+        "",
+        "| Parameter | Value | Standard | Range | Status |",
+        "|-----------|-------|----------|-------|--------|",
+    ])
+    
+    for param in qc_data.get('static_params', []):
+        lines.append(
+            f"| {param['parameter']} | {param['value']} | "
+            f"{param['standard']} | {param['valid_range']} | {param['status']} |"
+        )
+    
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## SECTION B: VOLTAGE DROP LIMITS",
+        "",
+        "| Limit Type | Value | Standard | Max | Status |",
+        "|------------|-------|----------|-----|--------|",
+    ])
+    
+    for limit in qc_data.get('vd_limits', []):
+        lines.append(
+            f"| {limit['parameter']} | {limit['value']} | "
+            f"{limit['standard']} | {limit['valid_range']} | {limit['status']} |"
+        )
+    
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## SECTION C: VOLTAGE DROP VALIDATION (Per Circuit)",
+        "",
+        "| Circuit | VD% | Limit | Status |",
+        "|---------|-----|-------|--------|",
+    ])
+    
+    for vd_item in qc_data.get('circuit_vd_validation', [])[:10]:  # Limit to 10 for space
+        lines.append(
+            f"| {vd_item['circuit_name']} | {vd_item['vd_percent']:.2f}% | "
+            f"≤{vd_item['limit']:.1f}% | {vd_item['status']} |"
+        )
+    
+    if len(qc_data.get('circuit_vd_validation', [])) > 10:
+        lines.append(f"| ... | ... | ... | ({len(qc_data['circuit_vd_validation'])} circuits total) |")
+    
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## SECTION D: DISTANCE ASSUMPTIONS",
+        "",
+        f"- Circuits using default distance: **{qc_data['default_circuit_count']}**",
+        "- (See Audit Report for specific circuits)",
+        "",
+        "---",
+        "",
+        "## REFERENCES",
+        "",
+    ])
+    
+    for ref in qc_data.get('references', []):
+        lines.append(f"- {ref}")
+    
+    # Summary
+    summary = qc_data.get('summary', {})
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## VALIDATION SUMMARY",
+        "",
+        "| ✓ PASS | ⚠️ WARN | ❌ FAIL | Total |",
+        "|--------|---------|--------|-------|",
+        f"| {summary.get('pass_count', 0)} | {summary.get('warn_count', 0)} | "
+        f"{summary.get('fail_count', 0)} | {summary.get('total_count', 0)} |",
+        "",
+        "---",
+        "",
+        "## CERTIFICATION",
+        "",
+        "☐ I acknowledge and accept the assumptions listed above.",
+        "☐ Corrections required (see notes below).",
+        "",
+        "**Notes:** _______________________________________________",
+        "",
+        "| Role | Name | Signature | Date | License |",
+        "|------|------|-----------|------|---------|",
+        "| Designer | | | | |",
+        "| Reviewer | | | | |",
+        "",
+        "---",
+        "",
+        "*🤖 Generated by Mozart Electrical Design System v2.0*",
+        "*This document is valid for 30 days from generation date.*",
+        "",
+    ])
+    
+    return {
+        "id": "qc_certificate",
+        "title": "QC Certificate (ใบรับรองค่าสมมติฐาน)",
+        "content": "\n".join(lines),
+        "page_break_before": False,  # First page, no break needed
+    }
 
 
 def generate_load_schedule_section(display_data: Dict[str, Any]) -> ReportSection:
@@ -278,7 +450,8 @@ def build_full_report(
     audit_results: Dict[str, Any],
     assumptions: List[Dict[str, Any]],
     version: int = 1,
-    client_name: Optional[str] = None
+    client_name: Optional[str] = None,
+    qc_data: Optional[Dict[str, Any]] = None  # 🆕 QC Certificate data
 ) -> FullReportData:
     """
     Build complete report package.
@@ -292,6 +465,7 @@ def build_full_report(
         assumptions: From collect_assumptions()
         version: Report version
         client_name: Optional client name
+        qc_data: 🆕 From generate_qc_certificate() - displayed as FIRST page
         
     Returns:
         FullReportData ready for PDF generation
@@ -300,6 +474,11 @@ def build_full_report(
     
     # Generate sections
     sections: List[ReportSection] = []
+    
+    # 0. 🆕 QC Certificate (FIRST PAGE)
+    if qc_data:
+        sections.append(generate_qc_certificate_section(qc_data))
+        logger.info(f"[REPORT] Added QC Certificate: {qc_data.get('document_id', 'N/A')}")
     
     # 1. Load Schedule
     sections.append(generate_load_schedule_section(display_data))
