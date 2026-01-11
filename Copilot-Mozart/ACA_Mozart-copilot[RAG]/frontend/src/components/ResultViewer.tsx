@@ -11,6 +11,7 @@ import { BOQTab } from './BOQTab'; // 🆕 BOQ with backend data + fallback
 import * as XLSX from 'xlsx';
 
 import { AssumptionsPanel } from './AssumptionsPanel';
+import { QCCertificatePanel } from './QCCertificatePanel'; // 🆕 QC Certificate
 import { ExplainableWarningCard } from './ExplainableWarningCard';
 
 
@@ -610,18 +611,28 @@ export const ResultViewer: React.FC<ResultViewerProps> = ({ data, isLoading, sld
                 )}
 
                 {/* Assumptions Tab */}
-                {activeTab === 'assumptions' && data.data?.assumptions && (
-                    <AssumptionsPanel
-                        assumptions={data.data.assumptions.map(a => ({
-                            key: a.key,
-                            label: a.label,
-                            value: String(a.value),
-                            source: a.source,
-                            category: a.category,
-                            isDefault: a.source === 'default'
-                        }))}
-                        totalDefaults={data.data.assumptions.filter(a => a.source === 'default').length}
-                    />
+                {activeTab === 'assumptions' && (
+                    <div className="space-y-6">
+                        {/* 🆕 QC Certificate Panel (if available) */}
+                        {data.data?.qc_certificate && (
+                            <QCCertificatePanel qcData={data.data.qc_certificate} />
+                        )}
+
+                        {/* Original Assumptions Panel */}
+                        {data.data?.assumptions && (
+                            <AssumptionsPanel
+                                assumptions={data.data.assumptions.map(a => ({
+                                    key: a.key,
+                                    label: a.label,
+                                    value: String(a.value),
+                                    source: a.source,
+                                    category: a.category,
+                                    isDefault: a.source === 'default'
+                                }))}
+                                totalDefaults={data.data.assumptions.filter(a => a.source === 'default').length}
+                            />
+                        )}
+                    </div>
                 )}
 
                 {/* SLD Tab */}

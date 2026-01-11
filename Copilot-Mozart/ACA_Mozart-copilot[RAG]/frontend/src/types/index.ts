@@ -135,6 +135,9 @@ export interface DisplayData {
     // Audit Summary (for when all values are correct)
     rcbo_count?: number;            // Count of RCBO circuits
     mcb_count?: number;             // Count of MCB circuits
+
+    // 🆕 QC Certificate Data
+    qc_certificate?: QCCertificateData;
 }
 
 /**
@@ -186,6 +189,68 @@ export interface CircuitData {
 
     // Summary
     remark?: string;               // Combined notes as string
+}
+
+// ============================
+// 🆕 QC CERTIFICATE TYPES
+// ============================
+
+/**
+ * Single validation item with status
+ */
+export interface ValidationItem {
+    parameter: string;
+    value: string;
+    standard: string;
+    valid_range: string;
+    status: '✓ OK' | '⚠️ WARN' | '❌ FAIL' | string;
+}
+
+/**
+ * Per-circuit VD validation
+ */
+export interface CircuitVDValidation {
+    circuit_name: string;
+    vd_percent: number;
+    limit: number;
+    status: '✓ OK' | '⚠️ WARN' | '❌ FAIL' | string;
+}
+
+/**
+ * 🆕 QC Certificate Data from Backend
+ * Contains formal validation results for Design Assumptions Certificate
+ */
+export interface QCCertificateData {
+    document_id: string;
+    company_name: string;
+    project_name: string;
+    date_generated: string;
+    valid_until: string;
+    revision: string;
+    total_kw: number;
+    main_breaker: string;
+    circuit_count: number;
+
+    // Validation sections
+    static_params: ValidationItem[];
+    vd_limits: ValidationItem[];
+    circuit_vd_validation: CircuitVDValidation[];
+
+    // Distance info
+    default_circuit_count: number;
+    default_circuits: Array<{ name: string; distance_m: number }>;
+
+    // Summary
+    summary: {
+        pass_count: number;
+        warn_count: number;
+        fail_count: number;
+        total_count: number;
+    };
+
+    // Scope & References
+    scope_items: string[];
+    references: string[];
 }
 
 /**
@@ -395,6 +460,9 @@ export interface DesignResult {
         rcbo_count?: number;
         mcb_count?: number;
 
+        // 🆕 QC Certificate Data
+        qc_certificate?: QCCertificateData;
+
         // 🆕 PDF/UI Explicit Fields
         project_name?: string;
         building_type?: string;
@@ -444,10 +512,10 @@ export interface ErrorResponse {
 // === DEVICE CODES (ตัวอย่าง) ===
 export const DEVICE_CODES = {
     'AC-12000BTU': { name: 'แอร์ 12000 BTU', power_kw: 1.4 },
-    'AC-18000BTU': { name: 'แอร์ 18000 BTU', power_kw: 2.0 },
+    'AC-18000BTU': { name: 'แอร์ 18000 BTU', power_kw: 2 },
     'HEATER-3500W': { name: 'เครื่องทำน้ำอุ่น 3500W', power_kw: 3.5 },
     'HEATER-4500W': { name: 'เครื่องทำน้ำอุ่น 4500W', power_kw: 4.5 },
-    'INDUCTION-3000W': { name: 'เตาแม่เหล็กไฟฟ้า', power_kw: 3.0 },
+    'INDUCTION-3000W': { name: 'เตาแม่เหล็กไฟฟ้า', power_kw: 3 },
     'OUTLET-16A': { name: 'ปลั๊กไฟ 16A', power_kw: 0.18 },
     'LIGHT-10W': { name: 'หลอดไฟ LED 10W', power_kw: 0.01 },
 } as const;

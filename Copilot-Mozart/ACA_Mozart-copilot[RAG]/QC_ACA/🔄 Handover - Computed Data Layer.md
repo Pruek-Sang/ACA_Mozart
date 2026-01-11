@@ -1,6 +1,6 @@
 # 🔄 Handover Document - Computed Data Layer
 
-> **Session:** 2025-12-30  
+> **Session:** 2025-12-30 (Updated: 2026-01-12)  
 > **Status:** ⚠️ Partial Complete - มี pending issues  
 > **Next Developer:** [ชื่อ]
 
@@ -12,7 +12,7 @@
 |:-----:|:------:|-------------|
 | 0 | ✅ | Deep Dive Analysis - หา root cause |
 | 1 | ✅ | Computed Data Layer - `compute.py` (Source of Truth) |
-| 2 | ⚠️ | Audit - มีแค่ warning, ยังไม่มี QC Form |
+| 2 | ✅ | Audit - **[2026-01-12] Added QC Assumptions Certificate** |
 | 3 | ✅ | BOQ - ต่อท่อ `pdf_data` แล้ว |
 | 4 | ⚠️ | SLD - ใช้งานได้ แต่ดูการ์ตูน |
 | 5 | ✅ | Frontend SLD Viewer |
@@ -21,43 +21,47 @@
 
 ---
 
-## ❌ Known Issues (ต้องแก้)
+## 🆕 [2026-01-12] QC Assumptions Certificate
 
-### Issue 1: ตาราง Load Table ไม่ตรงกับ PDF Reference
+### สิ่งที่เพิ่มใหม่:
 
-**ปัญหา:**
-- ตาราง Load Table ปัจจุบันไม่ตรงกับ format ที่ต้องการ
-- ต้องตรวจสอบว่ามี reference PDF อยู่ที่ไหน
+| File | Purpose |
+|------|---------|
+| `app/display/qc_certificate.py` | **NEW** - Main generator with VD validation |
+| `frontend/src/components/QCCertificatePanel.tsx` | **NEW** - Formal certificate UI |
+| `app/formatters/full_report_builder.py` | Updated - QC as first PDF section |
+| `app/service.py` | Updated - Generate QC after compute_display_data() |
+| `frontend/src/types/index.ts` | Updated - QCCertificateData type |
+| `frontend/src/components/ResultViewer.tsx` | Updated - Display QC in Assumptions tab |
+| `app/display/assumptions_renderer.py` | Updated - Removed duplicate, added constants |
 
-**ตรวจสอบ:**
+### Key Features:
+- **Real VD Validation:** VD > 3% = ❌ FAIL, VD > 2.5% = ⚠️ WARN
+- **Cloud Logging:** `[QC-CERT-*]` prefix for all checkpoints
+- **Data Source:** Reads from `display_data` ONLY (Single Source of Truth)
+- **PDF Integration:** QC Certificate as first page in full report
+
+### Data Flow:
 ```
-QC_ACA/Pasted image.png  ← reference format?
+display_data (compute.py)
+    ↓
+generate_qc_certificate(display_data) → qc_certificate.py
+    ↓
+display_data['qc_certificate'] → service.py
+    ↓
+Frontend → QCCertificatePanel.tsx
 ```
-
-**แก้ที่:**
-- `app/display/compute.py` - ปรับ CircuitData fields
-- `frontend/src/components/ResultViewer.tsx` - ปรับ columns
 
 ---
 
-### Issue 2: Audit ไม่มี QC Form
+## ❌ Known Issues (ต้องแก้)
 
-**ปัญหา:**
-- ปัจจุบันแสดงแค่ warnings
-- ยังไม่มี formal QC checklist form
+### ~~Issue 2: Audit ไม่มี QC Form~~ ✅ RESOLVED (2026-01-12)
 
-**แก้ที่:**
-- `app/display/audit_document.py` - เพิ่ม QC form template
-- `app/audit_validator.py` - เพิ่ม checklist items
-
-**Expected Output:**
-```
-| รายการตรวจสอบ | มาตรฐาน | ค่าที่ได้ | ผล |
-|---------------|---------|----------|:--:|
-| สายไฟ > กระแส | วสท. 5.3 | 2.5mm² > 22A | ✅ |
-| VD% < 3% | วสท. 6.2 | 2.1% | ✅ |
-| Breaker rating | NEC 240.4 | 20A/25A | ⚠️ |
-```
+**สิ่งที่แก้:**
+- เพิ่ม formal QC Assumptions Certificate
+- Validation tables with ✓ OK / ⚠️ WARN / ❌ FAIL status
+- Integration in Assumptions tab and PDF
 
 ---
 

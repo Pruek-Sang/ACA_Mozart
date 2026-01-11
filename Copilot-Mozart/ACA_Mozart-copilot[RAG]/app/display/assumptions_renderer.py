@@ -32,48 +32,54 @@ class AssumptionsData(TypedDict):
     total_defaults: int
 
 
+# === Constants ===
+EIT_STANDARD = "วสท. 2564"  # EIT Standard 2564 (Thailand)
+NEC_STANDARD = "NEC 2023"
+IEC_STANDARD = "IEC 60364"
+
+
 # === Default Values Reference ===
 DEFAULT_ASSUMPTIONS: Dict[str, Dict[str, Any]] = {
     "branch_distance": {
         "label": "ระยะเดินสาย (Branch)",
         "default": "15-25m ตามชั้น",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "distance"
     },
     "service_distance": {
         "label": "ระยะจากมิเตอร์ถึงตู้เมน",
         "default": "30m",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "distance"
     },
     "vd_branch_limit": {
         "label": "Voltage Drop Limit (Branch)",
         "default": "≤ 3%",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "electrical"
     },
     "vd_service_limit": {
         "label": "Voltage Drop Limit (Service)",
         "default": "≤ 2%",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "electrical"
     },
     "vd_total_limit": {
         "label": "Voltage Drop Limit (Total)",
         "default": "≤ 5%",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "electrical"
     },
     "power_factor": {
         "label": "Power Factor (ค่าตั้งต้น)",
         "default": "0.85",
-        "standard_ref": "IEC 60364",
+        "standard_ref": IEC_STANDARD,
         "category": "electrical"
     },
     "safety_factor": {
         "label": "Safety Factor",
         "default": "125%",
-        "standard_ref": "NEC 2023",
+        "standard_ref": NEC_STANDARD,
         "category": "protection"
     },
     "continuous_load_factor": {
@@ -85,25 +91,25 @@ DEFAULT_ASSUMPTIONS: Dict[str, Dict[str, Any]] = {
     "ambient_temp": {
         "label": "อุณหภูมิแวดล้อม",
         "default": "30°C",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "electrical"
     },
     "rcbo_wet_location": {
         "label": "RCBO สำหรับพื้นที่เปียก",
         "default": "30mA",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "protection"
     },
     "max_outlets_per_circuit": {
         "label": "จุดปลั๊กสูงสุดต่อวงจร",
         "default": "10 จุด",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "protection"
     },
     "max_lighting_watts": {
         "label": "โหลดไฟสูงสุดต่อวงจร",
         "default": "1,500W",
-        "standard_ref": "วสท. 2564",
+        "standard_ref": EIT_STANDARD,
         "category": "protection"
     },
 }
@@ -173,38 +179,10 @@ def collect_assumptions(
             "standard_ref": "-",
         })
     
-    # 🆕 Add specific circuits using default distance
-    # This ensures Assumption tab shows same info as Audit tab
-    default_circuits = display_data.get("default_distance_circuits", [])
-    if default_circuits:
-        circuit_names = []
-        for ckt_info in default_circuits:
-            if isinstance(ckt_info, dict):
-                name = ckt_info.get("name", "Unknown")
-                dist = ckt_info.get("distance_m", 15.0)
-                circuit_names.append(f"{name} ({dist:.0f}m)")
-            else:
-                circuit_names.append(str(ckt_info))
-        
-        assumptions.append({
-            "key": "circuits_using_default_distance",
-            "label": "วงจรที่ใช้ระยะ Default",
-            "value": ", ".join(circuit_names) if len(circuit_names) <= 3 else f"{len(circuit_names)} วงจร",
-            "source": "default",
-            "category": "distance",
-            "standard_ref": "ควรวัดจริง",
-        })
-        logger.info(f"[ASSUMPTIONS] {len(circuit_names)} circuits using default distance")
-    else:
-        # All circuits have user-specified distance
-        assumptions.append({
-            "key": "circuits_using_default_distance",
-            "label": "วงจรที่ใช้ระยะ Default",
-            "value": "✅ ไม่มี (ทุกวงจรมีค่าที่ระบุ)",
-            "source": "user",
-            "category": "distance",
-            "standard_ref": "-",
-        })
+    # NOTE: default_distance_circuits removed from here
+    # → Belongs in Audit tab only (moved per Option A decision)
+    # → QC Certificate will handle this data via qc_certificate.py
+    
     
     result: AssumptionsData = {
         "project_name": display_data.get("project_name", "โครงการ"),

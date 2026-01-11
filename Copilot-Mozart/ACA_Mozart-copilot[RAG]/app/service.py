@@ -61,6 +61,7 @@ from app.formatters import format_design_report  # Card-style Markdown formatter
 from app.display import compute_display_data, format_audit_for_frontend, render_sld
 from app.display.assumptions_renderer import collect_assumptions, format_assumptions_for_frontend
 from app.display.explainable_qc import convert_legacy_warnings
+from app.display.qc_certificate import generate_qc_certificate  # 🆕 QC Certificate
 from app.display.boq_renderer import generate_boq  # 🆕 BOQ with price_source
 from app.formatters.full_report_builder import build_full_report
 from app.formatters.pdf_formatter import format_pdf_table
@@ -2356,6 +2357,15 @@ Query: "{query}"
                         site_ctx_dict = req.site_context.dict() if hasattr(req.site_context, 'dict') else (req.site_context.__dict__ if hasattr(req.site_context, '__dict__') else req.site_context)
                         assumptions_data = collect_assumptions(display_data_dict, site_ctx_dict)
                         display_data_dict['assumptions'] = format_assumptions_for_frontend(assumptions_data)
+                        
+                        # 1.5 🆕 Generate QC Certificate (reads from display_data ONLY)
+                        try:
+                            qc_data = generate_qc_certificate(display_data_dict)
+                            display_data_dict['qc_certificate'] = qc_data
+                            logger.info(f"[QC-CERT] Generated: {qc_data['summary']}")
+                        except Exception as qc_err:
+                            logger.error(f"[QC-CERT] Failed to generate: {qc_err}", exc_info=True)
+                            display_data_dict['qc_certificate'] = None
                         
                         # 2. Explainable QC
                         warnings_list = display_data_dict.get('warnings', [])
