@@ -1,7 +1,7 @@
 """Main pipeline orchestrator for electrical design."""
 
 from typing import Dict, Any, Optional, List
-from models.contracts import DesignRequest, DesignResult, ElectricalLoad
+from models.contracts import DesignRequest, DesignResult, ElectricalLoad, LoadType
 from core.template_resolver import get_template_resolver
 from core.load_calculator import get_load_calculator
 from core.wire_sizer import get_wire_sizer
@@ -352,6 +352,44 @@ class DesignPipeline:
             wire_result['used_default_distance'] = (distance_source == "default_table")
             
             wire_sizing[load.id] = wire_result
+
+            # ============================================================
+            # [SAFETY-FIX] Enforce 2.5mm² minimum for AC/Receptacles
+            # ============================================================
+            # วสท. Standard: Min 2.5 sq.mm for Power Circuits
+            if load.load_type in [LoadType.HVAC, LoadType.RECEPTACLE, LoadType.MOTOR, LoadType.APPLIANCE]:
+                current_size = wire_result.get('wire_size', '0')
+                safety_min = "2.5"
+                try:
+                    # Simple comparison for small sizes (1.5 < 2.5)
+                    # Note: Larger sizes like 1/0 won't trigger this < 2.5 check anyway
+                    if float(current_size) < float(safety_min):
+                        logger.warning(f"[SAFETY] Forcing {load.name} to {safety_min}mm² (was {current_size}mm²)")
+                        
+                        # Re-calculate VD with new size
+                        vd, vd_pct = self.wire_sizer._calculate_voltage_drop(
+                            current=current,
+                            distance_feet=distance_feet,
+                            wire_size=safety_min,
+                            voltage=voltage,
+                            operating_temp_c=75,
+                            power_factor=pf,
+                            material=ConductorMaterial.COPPER
+                        )
+                        
+                        # Update result
+                        wire_result['wire_size'] = safety_min
+                        wire_result['voltage_drop'] = vd
+                        wire_result['voltage_drop_percent'] = vd_pct
+                        wire_result['ampacity'] = self.wire_sizer.get_wire_properties(safety_min)['copper_ampacity_75C']
+                        
+                        # Add note
+                        notes = wire_result.get('notes', [])
+                        if isinstance(notes, str): notes = [notes]
+                        # Flag for frontend to show warning/info
+                        wire_result['is_min_enforced'] = True
+                except ValueError:
+                    pass  # Non-numeric size (e.g. 1/0), likely large enough
         
         # Add global flag for default distance usage
         if used_default_distance:

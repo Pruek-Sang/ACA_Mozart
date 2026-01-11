@@ -631,7 +631,7 @@ app.add_middleware(
     allow_origins=ALLOWED_ORIGINS,  # Restricted to specified origins
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],  # Only needed methods
-    allow_headers=["Content-Type", "Authorization", "X-Trace-ID", "X-API-Key"],
+    allow_headers=["*"],  # Allow all headers (wildcard) to prevent 400 errors
 )
 
 # =============================================================================
