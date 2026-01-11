@@ -240,6 +240,8 @@ function App() {
               main_feeder_type: displayData.main_feeder_type,
               main_raceway_size: displayData.main_raceway_size,
               main_raceway_type: displayData.main_raceway_type,
+              // 🆕 QC Certificate (for session restore)
+              qc_certificate: displayData.qc_certificate,
             }
           });
         }
