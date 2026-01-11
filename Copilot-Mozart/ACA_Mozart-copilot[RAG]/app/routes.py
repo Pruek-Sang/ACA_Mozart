@@ -274,6 +274,14 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
     else:
         logger.warning(f"⚠️ [AUTO-SAVE] Skipped: Supabase={SUPABASE_AVAILABLE}, Injector={bool(session_injector)}, SessionID={session_id}")
     
+    # 🔍 VERIFY: Log if QC Certificate is present in response
+    if hasattr(response, 'metadata') and response.metadata:
+        disp = response.metadata.get('display_data', {})
+        if disp and 'qc_certificate' in disp:
+            logger.info(f"📤 [API-RESPONSE] Sending QC Certificate to Frontend (Keys: {list(disp['qc_certificate'].keys())})")
+        else:
+            logger.warning("⚠️ [API-RESPONSE] QC Certificate MISSING in display_data")
+
     return response
 
 
