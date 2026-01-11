@@ -103,7 +103,9 @@ class DisplayData(TypedDict):
     
     # Circuits
     circuits: List[CircuitData]
-    default_distance_circuits: List[str]  # 🆕 List of circuit names using default distance
+    # 🔧 Enhanced: Now includes distance value for better warnings
+    # Format: [{"name": "circuit_name", "distance_m": 15.0}, ...]
+    default_distance_circuits: List[Dict[str, Any]]
     circuit_count: int
     
     # Warnings & Errors
@@ -378,16 +380,17 @@ def _process_circuits(
     wire_sizing: Dict[str, Any],
     conduit_sizing: Dict[str, Any],
     floor_distances: Dict[str, float] = None
-) -> tuple[List[CircuitData], List[str]]:
+) -> tuple[List[CircuitData], List[Dict[str, Any]]]:
     """Process grouped_circuits into CircuitData list.
     
     Returns:
-        (circuits_list, default_distance_warnings_list)
+        (circuits_list, default_distance_info_list)
+        default_distance_info_list: [{"name": str, "distance_m": float}, ...]
     """
     if floor_distances is None:
         floor_distances = {}
     circuits: List[CircuitData] = []
-    default_circuits: List[str] = []
+    default_circuits: List[Dict[str, Any]] = []  # Enhanced: now stores dict with distance
     
     for idx, circuit in enumerate(grouped_circuits, start=1):
         try:
@@ -428,7 +431,11 @@ def _process_circuits(
             )
             
             if used_default:
-                default_circuits.append(ckt_name)
+                # 🔧 Enhanced: Store both name and distance for better warnings
+                default_circuits.append({
+                    "name": ckt_name,
+                    "distance_m": branch_distance_m
+                })
 
             # Loads count
             num_loads = circuit.get('loads', 0)
