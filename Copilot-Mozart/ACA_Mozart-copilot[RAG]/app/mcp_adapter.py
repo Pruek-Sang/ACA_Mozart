@@ -167,7 +167,9 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     "IND-3000W": (3000, LoadType.APPLIANCE, False),  # 🆕 Alias for INDUCTION
     "MICROWAVE-1500W": (1500, LoadType.APPLIANCE, False),
     "RICECOOK-800W": (800, LoadType.APPLIANCE, False),
+    "RICE_COOKER-800W": (800, LoadType.APPLIANCE, False),  # 🆕 Match Catalog
     "REFRIG-300W": (300, LoadType.APPLIANCE, True),  # Refrigerator runs continuously
+    "REFRIGERATOR-300W": (300, LoadType.APPLIANCE, True),  # 🆕 Match Catalog
     "DISHWASH-2000W": (2000, LoadType.APPLIANCE, False),
     
     # Water Heaters (Appliance, CONTINUOUS per NEC - requires 125% sizing)
