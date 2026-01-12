@@ -1112,8 +1112,10 @@ Query: "{query}"
             return {"error": f"ไม่สามารถสร้าง spec ได้: {e}"}
         
         # Convert to MCP format and call MCP Core
+        # 🔧 [SSOT-FIX] Pass floor_distances so MCP Core uses correct distances from start
         adapter = McpAdapter()
-        mcp_request = adapter.convert(spec_response.project_input)
+        floor_distances = extracted.get("floor_distances", {})
+        mcp_request = adapter.convert(spec_response.project_input, floor_distances=floor_distances)
         
         mcp_client = McpClient()
         
@@ -2239,12 +2241,14 @@ Query: "{query}"
                 floor_counts[f] = floor_counts.get(f, 0) + 1
             logger.info(f"📊 Loads by floor: {floor_counts}")
             
-            # Convert to MCP format (🆕 now with site_context!)
+            # Convert to MCP format (🆕 now with site_context + floor_distances!)
             adapter = McpAdapter()
             logger.info(f"[DEBUG-SC-4] _build_design_response - req.site_context: {req.site_context}")
             logger.info(f"[DEBUG-SC-4] req.site_context type: {type(req.site_context)}")
             print(f"[DEBUG-SC-4] PRINT: _build_design_response site_context = {req.site_context}")  # Guaranteed
-            mcp_request = adapter.convert(project_input, req.site_context)
+            # 🔧 [SSOT-FIX] Pass floor_distances so MCP Core uses correct distances from start
+            floor_distances = extracted_data.get("floor_distances", {}) if extracted_data else {}
+            mcp_request = adapter.convert(project_input, req.site_context, floor_distances=floor_distances)
             logger.info(f"[DEBUG-SC-5] mcp_request.site_context: {mcp_request.site_context}")
             print(f"[DEBUG-SC-5] PRINT: mcp_request.site_context = {mcp_request.site_context}")  # Guaranteed
             
