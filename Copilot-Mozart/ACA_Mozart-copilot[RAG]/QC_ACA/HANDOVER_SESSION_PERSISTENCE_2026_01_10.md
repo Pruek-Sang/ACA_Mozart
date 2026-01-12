@@ -256,3 +256,76 @@ if default_dist is None:
 2. Test with various input patterns (single floor, multi-floor, outdoor areas)
 3. Consider adding per-device distance override support
 
+
+---
+---
+
+# 📂 Handover: Audit Distance Logic SSOT & HTML Rendering
+**Date:** 2026-01-13 (Early Morning Session)
+**Status:** ✅ Completed
+
+---
+
+## 🎯 Problem Statement
+
+### 1. Audit Distance "Default" Bug (Critical)
+**Issue:** Audit Tab showed "Default 15m" for ALL circuits, even when user explicitly specified distances (e.g., "ชั้น 1 = 15m").
+**Root Cause:** Timing/SSOT Issue. `floor_distances` was injected **AFTER** MCP Core calculation.
+  - MCP Core didn't see distance → Used default → marked `used_default_distance=True`.
+  - Audit Validator read this flag → Showed warning.
+
+### 2. Raw HTML in Chat (UI)
+**Issue:** Audit report displayed raw HTML tags (e.g., `<span style='color:red'>`) in Chat UI.
+**Root Cause:** `react-markdown` strips HTML by default for security.
+
+---
+
+## 🔧 Fixes Applied
+
+### 1. Single Source of Truth (SSOT) for Distance
+**Concept:** Pass `floor_distances` to MCP Adapter **BEFORE** creating `McpDesignRequest`.
+
+**Files Modified:**
+- **`app/service.py`**:
+  - Line 1118: Added `floor_distances` to `adapter.convert()` call.
+  - Line 2251: Added `floor_distances` to session-based `adapter.convert()` call.
+- **`app/routes.py`**:
+  - Line 854: Added `floor_distances` to session-based `adapter.convert()` call.
+- **`app/mcp_adapter.py`**:
+  - Added **Critical Logging** (`[MCP-ADAPTER]`) to track if `floor_distances` is received or empty.
+
+### 2. HTML Rendering in Chat
+**Concept:** Enable `rehype-raw` plugin for Markdown renderer.
+
+**Files Modified:**
+- **`frontend/src/components/ChatBubble.tsx`**:
+  - Imported `rehype-raw`.
+  - Added `rehypePlugins={[rehypeRaw]}` to `<Markdown>` component.
+
+---
+
+## ✅ Commits Summary
+
+| Commit | Description |
+|--------|-------------|
+| `67ab2b7` | fix(vd): pass floor_distances to McpAdapter BEFORE MCP Core calculation |
+| `ddc20a9` | fix(routes): pass floor_distances in session-based design endpoint |
+| `526613c` | chore: add critical logging at adapter.convert for floor_distances |
+| `ebe4f0b` | fix(frontend): enable HTML rendering in chat with rehype-raw |
+
+---
+
+## 📊 Verification Steps
+
+1. **Test Input:** "บ้าน 2 ชั้น ... ระยะเดินสายชั้น 1 = 15m, ชั้น 2 = 25m"
+2. **Check Cloud Logs:**
+   - Look for `[MCP-ADAPTER] 📏 Received floor_distances: {1: 15.0, 2: 25.0}`.
+   - If you see `⚠️ floor_distances is EMPTY`, something is wrong.
+3. **Check Usage:**
+   - Circuits on Floor 1 should use 15m.
+   - Circuits on Floor 2 should use 25m.
+4. **Check Audit Tab:**
+   - **MUST NOT** show "Default 15m" warning for these circuits.
+   - **Status:** Should be ✅ PASS (Green) or ⚠️ WARN (Yellow) based on other factors, but NOT default distance.
+
+---
