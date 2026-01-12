@@ -329,3 +329,35 @@ if default_dist is None:
    - **Status:** Should be ✅ PASS (Green) or ⚠️ WARN (Yellow) based on other factors, but NOT default distance.
 
 ---
+
+# 🛠️ ENGINEERING LOG: Fix Audit Default & Load Discrepancies (2026-01-13)
+
+## 1. 🛑 The Problem (Audit Default Warning)
+**Symptom:** Audit Tab showed "Default 15m" (WARN) even when user specifically input "Floor 1 = 15m".
+**Root Cause:**
+- **Double Truth:** User Input (15m) happened to match System Default (15m).
+- **Conflict:** MPC Core/Wire Sizing logic flagged "15m" as a default value (=True$).
+- **Strict Auditing:** `audit_validator.py` blindly trusted the flag and warned the user, ignoring that the user *intended* to use 15m.
+
+## 2. ✅ The Fix (Smart Override)
+**File:** `app/display/compute.py`
+**Logic Implemented:**
+- In `_get_branch_distance`, we now check if the "Default Distance" matches the "User Floor Spec".
+- `IF (is_default == True) AND (distance == user_floor_map[floor]) THEN Force is_default = False`
+- **Result:** System recognizes that "15m" is a valid User Input, not a fallback key.
+
+## 3. 📉 Load Calculation & Categorization
+**Observation:** Demand Load jumped from 18kVA to 20kVA+ and Receptacle Load appeared high (11,250 VA).
+**Explanation:**
+1.  **Corrected Input:** New input correctly identified appliances (Microwave 1500W, Kettle 2200W) instead of generic sockets.
+2.  **Panel Schedule Grouping:**
+    - Standard Panel Schedules group loads by **Circuit Type**.
+    - If a circuit is a "Receptacle Circuit" (Kitchen Outlets), *all* loads on it (including Microwave/Kettle) are summed under **RECEPTACLE**.
+    - This is **Standard Engineering Practice** (NEC/EIT) and is technically correct.
+    - **Appliance Category:** Reserved for dedicated circuits (e.g., Induction Stove, AC).
+
+## 4. 📝 Verification
+- **Cloud Log:** Verified trace `[CP-VD] Override default flag: 15.0m matches user floor 1 spec`
+- **Outcome:** Audit PASS, Load Calculation ACCURATE.
+
+---
