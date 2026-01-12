@@ -848,9 +848,10 @@ async def design_with_session(session_id: str, req: ProjectRequirements):
     # Store spec in session
     session_store.set_spec(session_id, spec_response.model_dump())
     
-    # Convert to MCP format
+    # Convert to MCP format (🔧 SSOT-FIX: pass floor_distances!)
     adapter = McpAdapter()
-    mcp_request = adapter.convert(spec_response.project_input, req.site_context)
+    floor_distances = getattr(spec_response, 'floor_distances', {}) or {}
+    mcp_request = adapter.convert(spec_response.project_input, req.site_context, floor_distances=floor_distances)
     
     # Call MCP Core
     mcp_client = McpClient()
