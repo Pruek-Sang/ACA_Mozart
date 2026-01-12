@@ -343,7 +343,18 @@ def _get_branch_distance(
     if isinstance(vd_data, dict) and vd_data.get('distance_m'):
         # Respect the flag from Core pipeline
         is_default = vd_data.get('used_default_distance', False)
-        return float(vd_data['distance_m']), is_default
+        dist_val = float(vd_data['distance_m'])
+
+        # 🛡️ FIX: Double check if this "default" matches User Floor Distance
+        # If it matches, it is NOT a system default, it's a User Floor Default (valid)
+        if is_default:
+            # Check string key and int key
+            user_floor_dist = floor_distances.get(str(floor_int)) or floor_distances.get(floor_int)
+            if user_floor_dist and abs(dist_val - float(user_floor_dist)) < 0.1:
+                logger.info(f"[CP-VD] Override default flag: {dist_val}m matches user floor {floor_int} spec")
+                is_default = False
+        
+        return dist_val, is_default
     
     # 2. Source: grouped_circuits (from RAG service)
     dist = circuit.get('branch_distance_m') or circuit.get('distance_m')
