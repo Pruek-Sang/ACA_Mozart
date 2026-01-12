@@ -1,131 +1,452 @@
 """
-Three-Phase Injector - Load Balancing & 3-Phase Calculations
+Three-Phase Engineering Injector - Advanced 3-Phase Calculations
 
-[SKELETON - NOT YET IMPLEMENTED]
+[SKELETON - ENGINEERING ROADMAP]
 
-Use Cases:
-- Commercial buildings (สำนักงาน)
-- Factories (โรงงาน)
-- Large residential with 3-phase supply
-- Buildings with 3-phase motors/HVAC
+📋 PURPOSE:
+-----------
+คำนวณค่าทางวิศวกรรมไฟฟ้า 3 เฟส ที่ phase_balance_injector.py ทำไม่ได้
+(Phase assignment/balancing อยู่ใน phase_balance_injector.py แล้ว)
 
-วสท. 2564 Standard:
-- Phase imbalance should not exceed 10%
-- Neutral current calculation for unbalanced loads
-- 3-phase VD calculation uses different formula
+📊 ENGINEERING FEATURES (Full Roadmap):
+=======================================
 
-Enable Conditions:
-- voltage_system in ["400V_3PH", "TH_3PH_380V", "3PH"] OR
-- total_load > 15kW (typical 3-phase threshold in Thailand)
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: BASIC (Priority: HIGH)                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ✓ 3-Phase VD Formula: VD = √3 × I × L × (R cosθ + X sinθ) / V             │
+│  ✓ Neutral Current (Unbalanced): In = √(Ia² + Ib² + Ic² - IaIb - IbIc - IcIa)│
+│  ✓ Power Calculations: S = √3 × V × I, P = S × cosθ, Q = S × sinθ          │
+│  ✓ Suggest 3-Phase Upgrade: when 1-phase load > 15kW                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 2: INTERMEDIATE (Priority: MEDIUM)                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ○ Power Factor Calculation: PF = P / S                                    │
+│  ○ Capacitor Bank Sizing: kVAR = P × (tan(θ1) - tan(θ2))                   │
+│  ○ Motor Starting Methods: DOL, Star-Delta, Soft Starter, VFD              │
+│  ○ Locked Rotor Current (LRA): For motor protection sizing                 │
+│  ○ Transformer Sizing: kVA = (total_load × 1.25) / efficiency              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 3: ADVANCED (Priority: LOW)                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ○ Short Circuit Analysis: 3-phase fault, L-L, L-G, L-L-G                  │
+│  ○ kA Rating Selection: Based on fault current at panel                    │
+│  ○ Harmonics Analysis: THD%, 3rd/5th/7th harmonics impact                  │
+│  ○ Neutral Oversizing: Due to triplen harmonics (3n)                       │
+│  ○ Diversity Factor: Coincidence factor for demand calculation             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 4: PRO/COMMERCIAL (Priority: FUTURE)                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ○ Symmetrical Components: Positive, Negative, Zero sequence               │
+│  ○ Protection Coordination: Relay settings, Time-current curves            │
+│  ○ Power Quality: Swell, Sag, Flicker, Transients                         │
+│  ○ Transformer Connection: Delta-Star, Star-Star, Vector groups            │
+│  ○ Generator Sizing: Parallel operation, Load sharing, Synchronization     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+📝 RELATIONSHIP WITH OTHER INJECTORS:
+-------------------------------------
+- phase_balance_injector.py: PRE-pipeline (Load assignment L1/L2/L3, Imbalance check)
+- three_phase_injector.py (THIS): POST-pipeline (VD calc, Power calc, Motor, etc.)
+- ka_rating_injector.py: Short circuit / kA rating (may overlap with Phase 3)
+
+Author: Mozart AI
+Date: 2026-01-13
 """
 
 import logging
-from typing import Dict, Any, Optional, List
-from models.contracts import DesignRequest, DesignResult, ElectricalLoad
+import math
+from typing import Dict, Any, Optional, List, Tuple
+from dataclasses import dataclass
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
 
+# =============================================================================
+# CONSTANTS
+# =============================================================================
+
+SQRT3 = math.sqrt(3)  # √3 ≈ 1.732
+
+# Voltage levels (Thai standard)
+VOLTAGE_3PH_380V = 380  # V line-to-line
+VOLTAGE_3PH_400V = 400  # V line-to-line (IEC)
+VOLTAGE_1PH_220V = 220  # V line-to-neutral
+
+# Upgrade thresholds
+SINGLE_PHASE_MAX_KW = 15.0  # Suggest 3-phase above this
+MOTOR_VFD_THRESHOLD_KW = 5.5  # Suggest VFD above this
+
+# Power factor targets
+TARGET_PF_INDUSTRIAL = 0.95
+TARGET_PF_COMMERCIAL = 0.90
+TARGET_PF_RESIDENTIAL = 0.85
+
+
+# =============================================================================
+# DATA CLASSES
+# =============================================================================
+
+class MotorStartingMethod(str, Enum):
+    """Motor starting methods."""
+    DOL = "DOL"  # Direct On Line
+    STAR_DELTA = "STAR_DELTA"  # Y-Δ
+    SOFT_STARTER = "SOFT_STARTER"
+    VFD = "VFD"  # Variable Frequency Drive
+
+
+@dataclass
+class ThreePhasePowerResult:
+    """Result of 3-phase power calculation."""
+    apparent_power_kva: float  # S
+    active_power_kw: float     # P
+    reactive_power_kvar: float  # Q
+    power_factor: float        # cosθ
+    line_current_a: float      # I_line
+    phase_current_a: float     # I_phase (for delta connection)
+
+
+@dataclass
+class NeutralCurrentResult:
+    """Result of neutral current calculation for unbalanced load."""
+    neutral_current_a: float
+    imbalance_percent: float
+    requires_oversized_neutral: bool
+    recommended_neutral_size_mm2: float
+
+
+@dataclass
+class MotorStartingResult:
+    """Result of motor starting analysis."""
+    recommended_method: MotorStartingMethod
+    starting_current_a: float
+    running_current_a: float
+    voltage_dip_percent: float
+    breaker_size_a: int
+
+
+@dataclass
+class CapacitorBankResult:
+    """Result of power factor correction calculation."""
+    required_kvar: float
+    current_pf: float
+    target_pf: float
+    capacitor_per_phase_uf: float
+
+
+# =============================================================================
+# MAIN INJECTOR CLASS
+# =============================================================================
+
 class ThreePhaseInjector:
     """
-    Injects 3-phase load balancing and calculations into design result.
+    Advanced 3-phase engineering calculations.
     
-    Features to implement:
-    - Phase assignment (L1, L2, L3) for balanced loading
-    - Neutral current calculation
-    - 3-phase VD formula (different from 1-phase)
-    - Phase imbalance warning
+    NOTE: Phase assignment/balancing is handled by phase_balance_injector.py
+    This injector focuses on calculations AFTER phase assignment.
     """
     
-    # Voltage systems that indicate 3-phase
-    THREE_PHASE_VOLTAGES = [
-        "400V_3PH", "380V_3PH", "TH_3PH_380V",
-        "415V_3PH", "208V_3PH", "480V_3PH"
-    ]
-    
-    # Load threshold to suggest 3-phase upgrade (Watts)
-    UPGRADE_THRESHOLD_W = 15000  # 15kW
-    
     def __init__(self):
-        """Initialize 3-Phase Injector."""
-        self.enabled = False
+        """Initialize Three-Phase Injector."""
+        logger.info("[3PH-ENG] ThreePhaseInjector initialized")
     
-    def should_inject(self, request: DesignRequest) -> bool:
-        """Determine if 3-phase calculations should be performed.
+    # =========================================================================
+    # PHASE 1: BASIC CALCULATIONS
+    # =========================================================================
+    
+    def calculate_3phase_vd(
+        self,
+        current_a: float,
+        distance_m: float,
+        wire_size_mm2: float,
+        voltage_v: float = VOLTAGE_3PH_380V,
+        power_factor: float = 0.85,
+        conductor_material: str = "copper"
+    ) -> Tuple[float, float]:
+        """Calculate Voltage Drop for 3-phase circuit.
+        
+        Formula: VD = √3 × I × L × (R × cosθ + X × sinθ)
         
         Args:
-            request: Design request with voltage system info
+            current_a: Line current in Amps
+            distance_m: One-way distance in meters
+            wire_size_mm2: Wire cross-section in mm²
+            voltage_v: Line-to-line voltage
+            power_factor: Load power factor
+            conductor_material: "copper" or "aluminum"
             
         Returns:
-            True if 3-phase calculations should be applied
+            Tuple of (voltage_drop_v, voltage_drop_percent)
         """
-        # Check 1: Explicit 3-phase voltage system
-        voltage_system = getattr(request, 'service_voltage', None)
-        if voltage_system:
-            voltage_str = voltage_system.value if hasattr(voltage_system, 'value') else str(voltage_system)
-            if any(v in voltage_str.upper() for v in ['3PH', '3-PHASE', '380', '400']):
-                logger.info(f"[3-PHASE] Enabled: voltage_system = {voltage_str}")
-                return True
-        
-        # Check 2: Total load exceeds 1-phase capacity
-        total_load_w = sum(load.power_watts * load.quantity for load in request.loads)
-        if total_load_w > self.UPGRADE_THRESHOLD_W:
-            logger.info(f"[3-PHASE] Suggested: total_load = {total_load_w/1000:.1f}kW > 15kW threshold")
-            # Don't auto-enable, just suggest
-            return False
-        
-        logger.debug("[3-PHASE] Skipped: 1-phase system")
-        return False
+        # TODO: Implement with proper R and X values from wire tables
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_3phase_vd")
+        raise NotImplementedError("3-Phase VD calculation - TO BE IMPLEMENTED")
     
-    def inject(self, request: DesignRequest, result: DesignResult) -> None:
-        """Inject 3-phase calculations into design result.
+    def calculate_neutral_current(
+        self,
+        i_a: float,
+        i_b: float,
+        i_c: float,
+        angle_a: float = 0,
+        angle_b: float = -120,
+        angle_c: float = 120
+    ) -> NeutralCurrentResult:
+        """Calculate neutral current for unbalanced 3-phase load.
+        
+        For balanced load: In = 0
+        For unbalanced: In = √(Ia² + Ib² + Ic² - Ia×Ib - Ib×Ic - Ic×Ia)
+        Or using phasor: In = |Ia∠0° + Ib∠-120° + Ic∠120°|
+        
+        Args:
+            i_a, i_b, i_c: Phase currents in Amps
+            angle_a, angle_b, angle_c: Phase angles in degrees
+            
+        Returns:
+            NeutralCurrentResult with current and sizing recommendation
+        """
+        # TODO: Implement phasor calculation
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_neutral_current")
+        raise NotImplementedError("Neutral current calculation - TO BE IMPLEMENTED")
+    
+    def calculate_3phase_power(
+        self,
+        line_voltage_v: float,
+        line_current_a: float,
+        power_factor: float
+    ) -> ThreePhasePowerResult:
+        """Calculate 3-phase power values.
+        
+        S = √3 × V_L × I_L (Apparent Power, kVA)
+        P = S × cosθ (Active Power, kW)
+        Q = S × sinθ (Reactive Power, kVAR)
+        
+        Args:
+            line_voltage_v: Line-to-line voltage
+            line_current_a: Line current
+            power_factor: Power factor (cosθ)
+            
+        Returns:
+            ThreePhasePowerResult with all power values
+        """
+        # TODO: Implement power calculations
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_3phase_power")
+        raise NotImplementedError("3-Phase power calculation - TO BE IMPLEMENTED")
+    
+    def suggest_upgrade_to_3phase(self, total_load_kw: float) -> Optional[str]:
+        """Check if 1-phase system should upgrade to 3-phase.
+        
+        Args:
+            total_load_kw: Total load in kW
+            
+        Returns:
+            Warning message if upgrade recommended, None otherwise
+        """
+        if total_load_kw > SINGLE_PHASE_MAX_KW:
+            return (
+                f"ℹ️ โหลดรวม {total_load_kw:.1f}kW เกิน {SINGLE_PHASE_MAX_KW}kW - "
+                "พิจารณาใช้ไฟ 3 เฟส (ประหยัดค่าไฟ, สายเล็กลง)"
+            )
+        return None
+    
+    # =========================================================================
+    # PHASE 2: INTERMEDIATE CALCULATIONS
+    # =========================================================================
+    
+    def calculate_capacitor_bank(
+        self,
+        active_power_kw: float,
+        current_pf: float,
+        target_pf: float = TARGET_PF_INDUSTRIAL,
+        voltage_v: float = VOLTAGE_3PH_380V
+    ) -> CapacitorBankResult:
+        """Calculate capacitor bank size for power factor correction.
+        
+        kVAR = P × (tan(θ1) - tan(θ2))
+        where θ1 = arccos(PF_current), θ2 = arccos(PF_target)
+        
+        Args:
+            active_power_kw: Active power in kW
+            current_pf: Current power factor
+            target_pf: Target power factor (default 0.95)
+            voltage_v: System voltage
+            
+        Returns:
+            CapacitorBankResult with kVAR and capacitor sizing
+        """
+        # TODO: Implement capacitor bank calculation
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_capacitor_bank")
+        raise NotImplementedError("Capacitor bank calculation - TO BE IMPLEMENTED")
+    
+    def analyze_motor_starting(
+        self,
+        motor_power_kw: float,
+        voltage_v: float = VOLTAGE_3PH_380V,
+        transformer_kva: Optional[float] = None,
+        motor_type: str = "induction"
+    ) -> MotorStartingResult:
+        """Analyze motor starting method and requirements.
+        
+        Rules of thumb:
+        - DOL: OK for motors < 5.5kW (or < 5% of transformer kVA)
+        - Star-Delta: Reduces starting current to 33%
+        - Soft Starter: Reduces starting current to 40-60%
+        - VFD: Best for variable speed, lowest starting current
+        
+        Args:
+            motor_power_kw: Motor power in kW
+            voltage_v: System voltage
+            transformer_kva: Transformer capacity (for voltage dip check)
+            motor_type: "induction" or "synchronous"
+            
+        Returns:
+            MotorStartingResult with recommended method and sizing
+        """
+        # TODO: Implement motor starting analysis
+        logger.info("[3PH-ENG] 🚧 SKELETON: analyze_motor_starting")
+        raise NotImplementedError("Motor starting analysis - TO BE IMPLEMENTED")
+    
+    def calculate_transformer_size(
+        self,
+        total_load_kva: float,
+        diversity_factor: float = 0.8,
+        growth_factor: float = 1.25,
+        efficiency: float = 0.98
+    ) -> float:
+        """Calculate transformer sizing.
+        
+        kVA = (total_load × diversity × growth) / efficiency
+        
+        Then round up to standard size: 50, 100, 160, 250, 315, 400, 500, 630, 800, 1000
+        
+        Args:
+            total_load_kva: Total connected load in kVA
+            diversity_factor: Demand factor (0.6-0.9 typical)
+            growth_factor: Future growth allowance
+            efficiency: Transformer efficiency
+            
+        Returns:
+            Recommended transformer size in kVA
+        """
+        # TODO: Implement transformer sizing
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_transformer_size")
+        raise NotImplementedError("Transformer sizing - TO BE IMPLEMENTED")
+    
+    # =========================================================================
+    # PHASE 3: ADVANCED CALCULATIONS
+    # =========================================================================
+    
+    def calculate_short_circuit_current(
+        self,
+        transformer_kva: float,
+        transformer_impedance_percent: float,
+        distance_to_panel_m: float = 0,
+        cable_impedance_ohm_per_m: float = 0
+    ) -> Dict[str, float]:
+        """Calculate short circuit current at panel.
+        
+        Isc = (kVA × 1000) / (√3 × V × Z%)
+        
+        Args:
+            transformer_kva: Transformer capacity
+            transformer_impedance_percent: Transformer Z%
+            distance_to_panel_m: Distance from transformer
+            cable_impedance_ohm_per_m: Cable impedance
+            
+        Returns:
+            Dict with 3-phase fault, L-L fault, L-G fault currents
+        """
+        # TODO: Implement short circuit calculation
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_short_circuit_current")
+        raise NotImplementedError("Short circuit calculation - TO BE IMPLEMENTED")
+    
+    def analyze_harmonics_impact(
+        self,
+        non_linear_load_percent: float,
+        neutral_sizing_ratio: float = 1.0
+    ) -> Dict[str, Any]:
+        """Analyze harmonic impact on neutral and system.
+        
+        Triplen harmonics (3rd, 9th, 15th...) add in neutral.
+        May require neutral upsizing to 200% in severe cases.
+        
+        Args:
+            non_linear_load_percent: % of load that is non-linear (VFDs, LEDs, etc.)
+            neutral_sizing_ratio: Current neutral/phase ratio
+            
+        Returns:
+            Dict with THD estimate, neutral recommendation, warnings
+        """
+        # TODO: Implement harmonics analysis
+        logger.info("[3PH-ENG] 🚧 SKELETON: analyze_harmonics_impact")
+        raise NotImplementedError("Harmonics analysis - TO BE IMPLEMENTED")
+    
+    # =========================================================================
+    # PHASE 4: PRO/COMMERCIAL (FUTURE)
+    # =========================================================================
+    
+    def calculate_symmetrical_components(
+        self,
+        v_a: complex,
+        v_b: complex,
+        v_c: complex
+    ) -> Dict[str, complex]:
+        """Calculate symmetrical components (Fortescue).
+        
+        V0 = (Va + Vb + Vc) / 3  (Zero sequence)
+        V1 = (Va + a×Vb + a²×Vc) / 3  (Positive sequence)
+        V2 = (Va + a²×Vb + a×Vc) / 3  (Negative sequence)
+        where a = 1∠120°
+        
+        Args:
+            v_a, v_b, v_c: Phase voltages as complex numbers
+            
+        Returns:
+            Dict with V0, V1, V2 components
+        """
+        # TODO: Implement symmetrical components
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_symmetrical_components")
+        raise NotImplementedError("Symmetrical components - TO BE IMPLEMENTED")
+    
+    # =========================================================================
+    # MAIN INJECT METHOD
+    # =========================================================================
+    
+    def inject(self, request: Any, result: Any) -> None:
+        """Main injection point for 3-phase calculations.
+        
+        Called POST-pipeline, after phase_balance_injector has assigned loads.
         
         Args:
             request: Original design request
             result: Design result to modify
         """
-        if not self.should_inject(request):
-            # Check if we should suggest upgrade
-            total_load_w = sum(load.power_watts * load.quantity for load in request.loads)
-            if total_load_w > self.UPGRADE_THRESHOLD_W:
-                result.warnings.append(
-                    f"ℹ️ โหลดรวม {total_load_w/1000:.1f}kW เกิน 15kW - พิจารณาใช้ไฟ 3 เฟส (ประหยัดค่าไฟ)"
-                )
-            return
+        logger.info("[3PH-ENG] 🚧 SKELETON - 3-Phase Engineering inject not yet implemented")
         
-        logger.info("[3-PHASE] 🚧 SKELETON - 3-Phase calculations not yet implemented")
-        
-        # TODO: Implement 3-phase features
-        # 1. Balance loads across L1, L2, L3
-        # 2. Calculate neutral current for unbalanced loads
-        # 3. Use 3-phase VD formula: VD = (√3 × I × L × R) / V
-        # 4. Check phase imbalance < 10%
-        # 5. Update circuit grouping for 3-phase breakers
-        
-        result.warnings.append(
-            "ℹ️ [3-PHASE] Feature pending - 3-phase load balancing will be implemented"
-        )
-    
-    def balance_loads(self, loads: List[ElectricalLoad]) -> Dict[str, List[str]]:
-        """Balance loads across three phases.
-        
-        Args:
-            loads: List of electrical loads
-            
-        Returns:
-            Dict mapping phase ("L1", "L2", "L3") to list of load IDs
-        """
-        # TODO: Implement load balancing algorithm
-        # Simple approach: sort by power descending, assign to phase with lowest total
-        return {"L1": [], "L2": [], "L3": []}
+        # TODO: Implement full injection logic
+        # 1. Check if 3-phase system
+        # 2. Calculate VD using 3-phase formula
+        # 3. Calculate neutral current if unbalanced
+        # 4. Analyze motor starting requirements
+        # 5. Check power factor and suggest correction
+        # 6. Add warnings/recommendations to result
 
 
-# Global instance
+# =============================================================================
+# FACTORY FUNCTION
+# =============================================================================
+
 _three_phase_injector: Optional[ThreePhaseInjector] = None
 
 
 def get_three_phase_injector() -> ThreePhaseInjector:
-    """Get the global 3-Phase Injector instance."""
+    """Get the global Three-Phase Injector instance."""
     global _three_phase_injector
     if _three_phase_injector is None:
         _three_phase_injector = ThreePhaseInjector()
