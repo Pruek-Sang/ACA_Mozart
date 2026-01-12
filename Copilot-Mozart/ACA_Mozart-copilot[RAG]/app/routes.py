@@ -276,7 +276,9 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
     
     # 🔍 VERIFY: Log if QC Certificate is present in response
     if hasattr(response, 'metadata') and response.metadata:
-        disp = response.metadata.get('display_data', {})
+        # FIX: Convert Pydantic model to dict before calling .get()
+        meta_dict = response.metadata.model_dump() if hasattr(response.metadata, 'model_dump') else {}
+        disp = meta_dict.get('display_data', {})
         if disp and 'qc_certificate' in disp:
             logger.info(f"📤 [API-RESPONSE] Sending QC Certificate to Frontend (Keys: {list(disp['qc_certificate'].keys())})")
         else:
