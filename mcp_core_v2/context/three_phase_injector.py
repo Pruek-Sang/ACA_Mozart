@@ -415,6 +415,203 @@ class ThreePhaseInjector:
         raise NotImplementedError("Symmetrical components - TO BE IMPLEMENTED")
     
     # =========================================================================
+    # PHASE 2 ADDITIONAL: MOTOR PROTECTION
+    # =========================================================================
+    
+    def calculate_locked_rotor_current(
+        self,
+        motor_power_kw: float,
+        voltage_v: float = VOLTAGE_3PH_380V,
+        efficiency: float = 0.85,
+        power_factor: float = 0.85,
+        lra_multiplier: float = 6.0
+    ) -> Dict[str, float]:
+        """Calculate Locked Rotor Current (LRA) for motor protection sizing.
+        
+        LRA = FLA × LRA_multiplier (typically 6-8x for induction motors)
+        FLA = P / (√3 × V × η × PF)
+        
+        Used for:
+        - Motor breaker sizing (must withstand LRA for starting time)
+        - Contactor selection
+        - Overload relay setting
+        
+        Args:
+            motor_power_kw: Motor rated power in kW
+            voltage_v: Line-to-line voltage
+            efficiency: Motor efficiency (η)
+            power_factor: Motor power factor
+            lra_multiplier: LRA/FLA ratio (6 for NEMA B, 8 for NEMA D)
+            
+        Returns:
+            Dict with FLA, LRA, recommended breaker, contactor size
+        """
+        # TODO: Implement LRA calculation
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_locked_rotor_current")
+        raise NotImplementedError("Locked Rotor Current calculation - TO BE IMPLEMENTED")
+    
+    # =========================================================================
+    # PHASE 3 ADDITIONAL: DEMAND CALCULATION
+    # =========================================================================
+    
+    def calculate_diversity_factor(
+        self,
+        load_groups: List[Dict[str, Any]],
+        building_type: str = "commercial"
+    ) -> Dict[str, float]:
+        """Calculate diversity factor for demand calculation.
+        
+        Diversity Factor = Sum of Individual Max Demands / Max Demand of Combined Load
+        
+        Typical values:
+        - Residential: 0.4 - 0.6
+        - Commercial: 0.5 - 0.7
+        - Industrial: 0.6 - 0.8
+        - Lighting: 0.7 - 0.9
+        - Motors: 0.4 - 0.6
+        
+        Args:
+            load_groups: List of load groups with type and power
+            building_type: "residential", "commercial", "industrial"
+            
+        Returns:
+            Dict with diversity factor, coincidence factor, demand kW
+        """
+        # TODO: Implement diversity factor calculation
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_diversity_factor")
+        raise NotImplementedError("Diversity factor calculation - TO BE IMPLEMENTED")
+    
+    # =========================================================================
+    # PHASE 4 ADDITIONAL: PROTECTION & POWER QUALITY
+    # =========================================================================
+    
+    def analyze_protection_coordination(
+        self,
+        breakers: List[Dict[str, Any]],
+        fault_current_ka: float
+    ) -> Dict[str, Any]:
+        """Analyze protection coordination between breakers.
+        
+        Checks:
+        - Time-current curve selectivity
+        - Backup protection (upstream clears if downstream fails)
+        - Instantaneous trip coordination
+        - Ground fault coordination
+        
+        Args:
+            breakers: List of breakers with ratings and settings
+            fault_current_ka: Maximum fault current at point
+            
+        Returns:
+            Dict with coordination status, selectivity margins, warnings
+        """
+        # TODO: Implement protection coordination analysis
+        logger.info("[3PH-ENG] 🚧 SKELETON: analyze_protection_coordination")
+        raise NotImplementedError("Protection coordination - TO BE IMPLEMENTED")
+    
+    def analyze_power_quality(
+        self,
+        voltage_measurements: List[float] = None,
+        current_measurements: List[float] = None,
+        thd_percent: float = 0
+    ) -> Dict[str, Any]:
+        """Analyze power quality issues.
+        
+        Checks:
+        - Voltage swell (>110% nominal for >0.5 cycle)
+        - Voltage sag (<90% nominal for >0.5 cycle)
+        - Flicker (rapid voltage changes causing visible light flicker)
+        - Transients (spikes from switching, lightning)
+        - Harmonic distortion (THD)
+        
+        IEEE 519 limits for THD:
+        - Voltage THD: ≤5% (≤8% for individual harmonic)
+        - Current THD: depends on Isc/IL ratio
+        
+        Args:
+            voltage_measurements: Time-series voltage data
+            current_measurements: Time-series current data
+            thd_percent: Measured THD if available
+            
+        Returns:
+            Dict with PQ issues detected, severity, recommendations
+        """
+        # TODO: Implement power quality analysis
+        logger.info("[3PH-ENG] 🚧 SKELETON: analyze_power_quality")
+        raise NotImplementedError("Power quality analysis - TO BE IMPLEMENTED")
+    
+    def analyze_transformer_connection(
+        self,
+        primary_voltage_v: float,
+        secondary_voltage_v: float,
+        power_kva: float,
+        connection_type: str = "Dyn11"
+    ) -> Dict[str, Any]:
+        """Analyze transformer connection and vector group.
+        
+        Common vector groups:
+        - Dyn11: Delta primary, Star secondary, 30° lag (most common for distribution)
+        - Yyn0: Star-Star, 0° shift (for balanced loads only)
+        - Dzn0: Delta-Zigzag (for grounding transformers)
+        
+        Provides:
+        - Voltage ratio
+        - Phase shift angle
+        - Neutral grounding recommendations
+        - Parallel operation compatibility
+        
+        Args:
+            primary_voltage_v: Primary line voltage
+            secondary_voltage_v: Secondary line voltage
+            power_kva: Transformer rating
+            connection_type: Vector group (e.g., "Dyn11", "Yyn0")
+            
+        Returns:
+            Dict with voltage ratios, phase shift, grounding, parallel rules
+        """
+        # TODO: Implement transformer connection analysis
+        logger.info("[3PH-ENG] 🚧 SKELETON: analyze_transformer_connection")
+        raise NotImplementedError("Transformer connection analysis - TO BE IMPLEMENTED")
+    
+    def calculate_generator_sizing(
+        self,
+        critical_loads_kw: float,
+        non_critical_loads_kw: float = 0,
+        motor_largest_kw: float = 0,
+        power_factor: float = 0.8,
+        altitude_m: float = 0,
+        ambient_temp_c: float = 40
+    ) -> Dict[str, Any]:
+        """Calculate generator sizing for backup power.
+        
+        Considerations:
+        - Motor starting (largest motor × 3 for DOL)
+        - Continuous load capacity
+        - Derating for altitude (>1000m) and temperature (>40°C)
+        - Fuel consumption estimate
+        - Parallel operation requirements
+        
+        Formula:
+        Base kVA = (Critical kW + Non-critical kW × 0.5) / PF
+        Motor allowance = Largest motor kW × 3
+        Generator kVA = max(Base, Motor allowance) × derating
+        
+        Args:
+            critical_loads_kw: Loads that must run during outage
+            non_critical_loads_kw: Loads that can be shed
+            motor_largest_kw: Largest motor (for starting surge)
+            power_factor: Generator power factor
+            altitude_m: Installation altitude for derating
+            ambient_temp_c: Ambient temperature for derating
+            
+        Returns:
+            Dict with recommended kVA, fuel consumption, runtime, parallel units
+        """
+        # TODO: Implement generator sizing
+        logger.info("[3PH-ENG] 🚧 SKELETON: calculate_generator_sizing")
+        raise NotImplementedError("Generator sizing - TO BE IMPLEMENTED")
+    
+    # =========================================================================
     # MAIN INJECT METHOD
     # =========================================================================
     
