@@ -213,7 +213,7 @@ class ComplianceChecker:
         vd_limit_branch = getattr(self.settings, 'vd_limit_branch_percent', 3.0)
         
         # Collect stats for consolidated warning
-        default_distance_count = 0
+        default_distance_circuits = []  # 🔧 Changed: store names instead of count
         
         # Check for metadata warning (default distance used)
         metadata = wire_sizing.get('_metadata', {})
@@ -254,16 +254,23 @@ class ComplianceChecker:
                     'message': f'⚠️ Voltage Drop {vd_percent:.1f}% ใกล้ถึงขีดจำกัด ({vd_limit_branch}%) ที่ระยะ {distance_m:.1f}m'
                 })
             
-            # Count default distance usage (don't spam per-load warnings)
+            # 🔧 Collect circuit names using default distance
             if used_default:
-                default_distance_count += 1
+                # Try to get a readable name
+                circuit_name = wire_result.get('load_name', load_id)
+                default_distance_circuits.append(circuit_name)
         
-        # Add ONE consolidated warning for default distances
-        if default_distance_count > 0:
+        # Add ONE consolidated warning for default distances with circuit names
+        if default_distance_circuits:
+            # Limit to 5 names to avoid spam
+            examples = ", ".join(default_distance_circuits[:5])
+            more_count = len(default_distance_circuits) - 5
+            more_text = f" และอีก {more_count} วงจร" if more_count > 0 else ""
             self.warnings.append({
                 'code': 'VD_DEFAULT_SUMMARY',
                 'severity': 'info',
-                'message': 'ℹ️ มีการใช้ค่าระยะทาง Default ในการคำนวณบางจุด (ควรระบุระยะจริงเพื่อให้แม่นยำ)'
+                'default_circuits': default_distance_circuits,  # 🆕 Pass full list for frontend
+                'message': f'ℹ️ มี {len(default_distance_circuits)} วงจร ใช้ระยะ Default: {examples}{more_text} (ควรระบุระยะจริง)'
             })
 
     def _has_afci_protection(self, load: ElectricalLoad) -> bool:
