@@ -18,6 +18,7 @@ class EditAction(str, Enum):
     CHANGE = "CHANGE"
     ADD = "ADD"
     REMOVE = "REMOVE"
+    UNDO = "UNDO"
     UNKNOWN = "UNKNOWN"
 
 

@@ -55,6 +55,7 @@ async def parse_edit_command(text: str, use_llm_fallback: bool = True) -> Option
     # =========================================================================
     # STEP 2: REGEX PARSE (Fast path - 90% of cases)
     # =========================================================================
+    print(f"DEBUG: Hybrid calling regex_parse with '{normalized}'")
     result = regex_parse(normalized)
     
     if result and result.is_valid():

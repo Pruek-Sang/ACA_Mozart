@@ -37,11 +37,22 @@ ACTION_WORDS_EN = "|".join([
     for kw in keywords if kw.isascii()
 ])
 
+# Build Undo pattern
+UNDO_WORDS_LIST = ACTION_KEYWORDS.get("UNDO", [])
+UNDO_WORDS = "|".join([re.escape(k) for k in UNDO_WORDS_LIST])
+
 # Build device pattern from aliases
 DEVICE_WORDS = "|".join(DEVICE_ALIASES.keys())
 
 # Main patterns
 PATTERNS = {
+    # Pattern: Undo (standalone keywords)
+    # Pattern: Undo (standalone keywords)
+    "undo_command": re.compile(
+        rf"^\s*({UNDO_WORDS})\b.*$", # Match start, word boundary, allow anything after
+        re.IGNORECASE
+    ),
+
     # Pattern: เปลี่ยน + device + (room?) + เป็น + value + unit
     "change_thai": re.compile(
         rf"({ACTION_WORDS_TH})"  # Action word
@@ -142,8 +153,10 @@ def regex_parse(text: str) -> Optional[EditCommand]:
         if match:
             logger.info(f"[REGEX] Matched pattern: {pattern_name}")
             return _build_command_from_match(match, pattern_name, text)
-    
-    logger.debug(f"[REGEX] No pattern matched for: '{text[:50]}...'")
+            
+    logger.debug(f"[REGEX] No pattern matched for: '{text}'")
+    return None
+        
     return None
 
 
@@ -198,6 +211,23 @@ def _build_command_from_match(match: Match, pattern_name: str, raw_input: str) -
         logger.info(f"[REGEX] Parsed ROOM: {cmd.action.value} {cmd.room_type} (qty={cmd.quantity})")
         return cmd
     
+    # =========================================================================
+    # 🆕 UNDO PATTERN HANDLING
+    # =========================================================================
+    if "undo" in pattern_name:
+        cmd = EditCommand(
+            action=EditAction.UNDO,
+            target_type=TargetType.UNKNOWN, # No specific target
+            device_type=None,
+            room_name=None,
+            confidence=1.0,
+            parse_method="regex",
+            raw_input=raw_input,
+            normalized_input=raw_input.lower(),
+        )
+        logger.info(f"[REGEX] Parsed UNDO: {raw_input}")
+        return cmd
+
     # =========================================================================
     # DEVICE PATTERN HANDLING (Original logic)
     # =========================================================================

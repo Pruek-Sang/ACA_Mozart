@@ -191,6 +191,12 @@ ACTION_KEYWORDS: Dict[str, List[str]] = {
         # English
         "remove", "delete",
     ],
+    "UNDO": [
+        # Thai
+        "ย้อนกลับ", "เลิกทำ", "ไม่เอาแล้ว", "กลับ",
+        # English
+        "undo", "revert", "back", "cancel",
+    ],
 }
 
 

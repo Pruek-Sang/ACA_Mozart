@@ -2113,7 +2113,7 @@ Query: "{query}"
         
         return spec
 
-    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None, session_id: Optional[str] = None) -> StandardResponse:
+    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None, session_id: Optional[str] = None, prefix_message: Optional[str] = None) -> StandardResponse:
         """
         Build design response by chaining to MCP Core.
         
@@ -2349,9 +2349,14 @@ Query: "{query}"
                     # Don't fail the whole response, just skip audit
                 
                 # Combine main report with audit report
+                # Combine main report with audit report
                 final_text = formatted_text
                 if audit_report_text:
                     final_text = formatted_text + audit_report_text
+                
+                # 🆕 FEATURE: Prepend Edit Summary if provided
+                if prefix_message:
+                    final_text = f"{prefix_message}\n\n" + final_text
                 
                 # 🆕 [CP-DISPLAY] Enrich display data for Frontend
                 try:
@@ -2572,17 +2577,36 @@ Query: "{query}"
             logger.info(f"🔧 EDIT mode detected for session {session_id[:8]}... query: '{req.query[:50]}...'")
             
             # [STATEFUL] 1. Merge changes into session
+            # [STATEFUL] 1. Merge changes into session
             merge_result = await merge_design_changes(session_id, req.query)
             
             if merge_result:
+                # 🆕 Feature 1: Handle Not Found
+                status = merge_result.get("status", "success")
+                if status == "not_found":
+                     logger.warning(f"❌ Edit target not found: {merge_result.get('message')}")
+                     return await self._build_simple_response(merge_result.get("message"), session_id=session_id)
+
                 logger.info(f"✅ Merge successful - Recalculating design for session {session_id}")
+                
+                # 🆕 Feature 3: Get Edit Summary Message
+                edit_summary_msg = merge_result.get("message")
                 
                 # [STATEFUL] 2. Convert merged data to ProjectRequirements
                 # Note: merge_result contains raw dicts from DB/Session
-                rooms_data = merge_result.get("rooms", [])
-                loads_data = merge_result.get("loads", [])
-                site_ctx_data = merge_result.get("site_context", {})
+                # New structure: merge_result["data"]["rooms"] etc.
+                merged_data = merge_result.get("data", merge_result) # Fallback for legacy format
                 
+                rooms_data = merged_data.get("rooms", [])
+                loads_data = merged_data.get("loads", [])
+                
+                # Get site_context (try merged data first, then session)
+                site_ctx_data = merged_data.get("site_context", {})
+                if not site_ctx_data and session_id:
+                     session = await session_injector.get_session(session_id)
+                     if session and session.site_context:
+                         site_ctx_data = session.site_context.dict()
+
                 # [STATEFUL] Log Merge Action (Assistant side - implicit)
                 if session_id:
                      try:
@@ -2609,7 +2633,7 @@ Query: "{query}"
                         device=l.get("device"),
                         quantity=l.get("quantity", 1),
                         floor=l.get("floor", 1),
-                        branch_distance_m=l.get("branch_distance_m")
+                        branch_distance_m=l.get("branch_distance_m")  # Allow manual distance override
                     )
                     for l in loads_data
                 ]
@@ -2627,7 +2651,13 @@ Query: "{query}"
                 
                 # [STATEFUL] 3. Recalculate (Call MCP Core)
                 # Re-use _build_design_response to get full formatted report + audit
-                return await self._build_design_response(project_req, req.language, session_id=session_id)
+                # Pass edit_summary_msg as prefix
+                return await self._build_design_response(
+                    project_req, 
+                    req.language, 
+                    session_id=session_id,
+                    prefix_message=edit_summary_msg
+                )
             
             else:
                 logger.warning(f"⚠️ Merge failed or no changes detected - falling back to normal flow")

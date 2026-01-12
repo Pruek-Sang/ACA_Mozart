@@ -22,7 +22,7 @@ NOTE: For more sophisticated typo handling, consider adding
 Created: 2025-12-28
 """
 
-from app.parsers.edit_command import EditCommand, EditAction
+from app.parsers.edit_command import EditCommand, EditAction, TargetType
 from app.parsers.hybrid_parser import parse_edit_command, parse_edit_command_sync
 from app.parsers.device_catalog import (
     DEVICE_TYPES,
