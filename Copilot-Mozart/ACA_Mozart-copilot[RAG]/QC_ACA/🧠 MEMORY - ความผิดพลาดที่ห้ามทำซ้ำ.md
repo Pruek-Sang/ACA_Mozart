@@ -1771,3 +1771,38 @@ for load_id, w in wire_sizing.items():
 53. **Frontend ถูก → Backend ผิด = เช็ค Gateway 100%**
 
 ---
+
+## 🔴 ความผิดพลาดที่ 29: CRUD EDIT ไม่ทำงาน - ลืม Write-through Pattern
+
+> **วันที่เกิด:** 2026-01-13
+> **ผู้ทำผิด:** AI (ไม่ได้เพิ่ม update_design หลัง CREATE)
+
+**อาการ:**
+- User พิมพ์ "เพิ่มแอร์" หลัง CREATE → ระบบสร้าง design ใหม่ทั้งหมด
+- EDIT mode ไม่ merge กับ design เก่า
+- Cloud Log: `[EDIT_INTENT] session has no existing design → Falling back to CREATE mode`
+
+**สาเหตุ:**
+- หลัง CREATE: `routes.py` เรียก `set_mcp_response()` (save ผลคำนวณ) ✅
+- **แต่ไม่ได้เรียก `update_design(loads=...)` (save loads)** ❌
+- ทำให้ `session.loads = []` → EDIT mode เห็นว่าไม่มี design → fallback CREATE
+
+**วิธีแก้:**
+```python
+# หลัง set_mcp_response() เพิ่ม:
+display_data = metadata.get("display_data", {})
+if circuits := display_data.get("circuits"):
+    loads = [{"device": c["circuit_name"], "room_name": c.get("room", "")} for c in circuits]
+    await session_injector.update_design(session_id, loads=loads)
+    logger.info(f"✅ [AUTO-SAVE-DESIGN] Saved {len(loads)} loads")
+```
+
+**🚨 กฎเหล็กใหม่:**
+54. **Write-through Pattern: หลังคำนวณต้อง SAVE ทั้ง result และ source data**
+55. **ถ้า EDIT fallback → ตรวจว่า CREATE save ข้อมูลครบหรือไม่**
+56. **Cloud Log `[AUTO-SAVE-DESIGN]` ต้องเห็นหลังทุก CREATE**
+
+---
+
+*เพิ่มเติมเมื่อ: 2026-01-13 03:50*
+

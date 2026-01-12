@@ -266,6 +266,25 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
                     # Save the entire metadata (display_data, audit_results, sld_data, etc.)
                     await session_injector.set_mcp_response(session_id, metadata)
                     logger.info(f"✅ [AUTO-SAVE] Saved design to session {session_id[:8]}...")
+                    
+                    # 🆕 FIX: Write-through - Save loads for EDIT mode
+                    display_data = metadata.get("display_data", {})
+                    if circuits := display_data.get("circuits"):
+                        loads_to_save = [
+                            {
+                                "device": c.get("circuit_name", ""),
+                                "room_name": c.get("room", "") or c.get("floor", ""),
+                                "floor": int(c.get("floor", 1)) if str(c.get("floor", "")).isdigit() else 1,
+                            }
+                            for c in circuits
+                        ]
+                        rooms_to_save = list({c.get("room", "") or c.get("floor", "") for c in circuits if c.get("room") or c.get("floor")})
+                        await session_injector.update_design(
+                            session_id,
+                            loads=loads_to_save,
+                            rooms=[{"name": r, "floor": 1} for r in rooms_to_save]
+                        )
+                        logger.info(f"✅ [AUTO-SAVE-DESIGN] Saved {len(loads_to_save)} loads, {len(rooms_to_save)} rooms for EDIT mode")
                 else:
                     logger.debug(f"ℹ️ [AUTO-SAVE] Skipped - No display_data/mcp_response in metadata. Keys: {list(metadata.keys()) if metadata else 'None'}")
             except Exception as e:

@@ -1,0 +1,141 @@
+openapi: 3.0.3
+info:
+  title: Mozart RAG API
+  description: Electrical Design Intelligence API
+  version: 1.0.0
+  
+servers:
+  - url: https://mozart-rag-xxx.run.app
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /api/v1/ask:
+    post:
+      summary: Ask a question or design request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AskRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AskResponse'
+  
+  /api/v1/session/start:
+    post:
+      summary: Start new session
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                    format: uuid
+                  project_name:
+                    type: string
+  
+  /api/v1/session/{session_id}/data:
+    get:
+      summary: Get session data
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionData'
+
+components:
+  schemas:
+    AskRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: User query or design request
+        session_id:
+          type: string
+          format: uuid
+        language:
+          type: string
+          enum: [th, en]
+          default: th
+    
+    AskResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: Markdown response
+        sources:
+          type: array
+          items:
+            type: object
+        confidence:
+          type: string
+          enum: [High, Medium, Low]
+        metadata:
+          type: object
+          properties:
+            display_data:
+              $ref: '#/components/schemas/DisplayData'
+    
+    SessionData:
+      type: object
+      properties:
+        rooms:
+          type: array
+          items:
+            type: object
+        loads:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoadEntry'
+        mcp_response:
+          type: object
+    
+    LoadEntry:
+      type: object
+      description: Load entry in session (for EDIT mode)
+      properties:
+        device:
+          type: string
+        room_name:
+          type: string
+        floor:
+          type: integer
+    
+    DisplayData:
+      type: object
+      description: Computed display data from MCP Core
+      properties:
+        circuits:
+          type: array
+          items:
+            type: object
+        total_kw:
+          type: number
+        main_breaker:
+          type: string
+        qc_certificate:
+          type: object
