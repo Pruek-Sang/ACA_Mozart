@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import Markdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';  // 🔧 Enable HTML rendering in Markdown
 import { cn } from '../lib/utils';
 import type { ChatMessage } from '../types';
 
@@ -74,6 +75,7 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({ message }) => {
                         isUser ? "text-white" : "text-slate-300"
                     )}>
                         <Markdown
+                            rehypePlugins={[rehypeRaw]}
                             components={{
                                 p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
                                 ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
