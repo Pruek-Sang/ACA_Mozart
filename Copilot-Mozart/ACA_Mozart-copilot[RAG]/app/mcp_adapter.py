@@ -279,6 +279,12 @@ class McpAdapter:
         """
         self.unknown_devices = []  # Reset
         
+        # 🔍 [TRACE] Log floor_distances at adapter entry - critical for debugging VD issues
+        if floor_distances:
+            logger.info(f"[MCP-ADAPTER] 📏 Received floor_distances: {floor_distances}")
+        else:
+            logger.warning("[MCP-ADAPTER] ⚠️ floor_distances is EMPTY - loads will use MCP Core defaults!")
+        
         # 1. Map voltage
         service_voltage = self._map_voltage(spec.electrical_system.voltage_system)
         
