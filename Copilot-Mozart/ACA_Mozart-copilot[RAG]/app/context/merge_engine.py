@@ -115,6 +115,19 @@ async def merge_design_changes(
         
         logger.info(f"[MERGE] ✅ Successfully merged - {len(updated_loads)} loads, {len(updated_rooms)} rooms")
         
+        # 🆕 Audit Trail: Log EDIT action
+        try:
+            from app.context.audit_logger import log_edit_action
+            await log_edit_action(
+                session_id=session_id,
+                action=cmd.action.value,
+                target=cmd.device_type or cmd.device_code or cmd.room_type or "unknown",
+                before_count=len(session.loads) if session.loads else 0,
+                after_count=len(updated_loads)
+            )
+        except Exception as audit_err:
+            logger.warning(f"[MERGE] Audit log failed (non-blocking): {audit_err}")
+        
         # =====================================================================
         # STEP 5: Return merged design for re-calculation
         # =====================================================================

@@ -53,3 +53,38 @@ async def log_conversation(
         # Never crash main flow - just log and continue
         logger.error(f"[AUDIT] Exception while logging: {e}")
         return False
+
+
+async def log_edit_action(
+    session_id: str,
+    action: str,
+    target: str,
+    before_count: int,
+    after_count: int
+) -> bool:
+    """
+    Log EDIT action to Cloud Logging for audit trail.
+    
+    🆕 Added 2026-01-13 for CRUD tracking.
+    
+    Args:
+        session_id: The current session UUID
+        action: "ADD", "REMOVE", or "CHANGE"
+        target: What was modified (e.g., "AC-12000BTU")
+        before_count: Number of loads before action
+        after_count: Number of loads after action
+        
+    Returns:
+        bool: True if logged successfully
+    """
+    try:
+        logger.info(
+            f"📝 [AUDIT-EDIT] session={session_id[:8]}... "
+            f"action={action} target={target} "
+            f"loads: {before_count} → {after_count}"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"[AUDIT-EDIT] Exception: {e}")
+        return False
+

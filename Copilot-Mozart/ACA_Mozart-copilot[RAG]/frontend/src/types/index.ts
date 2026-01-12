@@ -36,6 +36,17 @@ export interface LoadInput {
 }
 
 /**
+ * 🆕 Load entry in session (matches Supabase session.loads schema)
+ * Used for EDIT mode - stores simplified load info after CREATE
+ */
+export interface LoadEntry {
+    device: string;        // circuit_name from display_data
+    room_name: string;     // room or floor from display_data
+    floor?: number;        // floor number (1 or 2)
+    quantity?: number;     // optional quantity
+}
+
+/**
  * Request สำหรับ /api/v1/ask
  */
 export interface AskRequest {
