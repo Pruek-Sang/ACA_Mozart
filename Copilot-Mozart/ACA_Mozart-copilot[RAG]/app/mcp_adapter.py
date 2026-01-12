@@ -377,13 +377,21 @@ class McpAdapter:
             # Resolve Branch Distance: Specific > Floor Default > None (for tracking)
             # NOTE: Do NOT add final fallback here - let MCP Core track defaults properly
             dist = getattr(load, 'branch_distance_m', None)
+            
+            # 🔍 Debug Log for this load
+            logger.info(f"[TRACE-DIST] Load: {load.device_code} in {room_name} (Floor {floor})")
+            logger.info(f"[TRACE-DIST]   Initial dist: {dist}")
+            logger.info(f"[TRACE-DIST]   Floor map: {floor_map}")
+            
             if dist is None or dist == 0:
                 # Try to find from floor_map (user-specified floor distances)
                 # Handle string/int key differences (JSON keys are strings)
                 default_dist = floor_map.get(str(floor)) or floor_map.get(int(floor) if floor.isdigit() else floor)
                 if default_dist:
                     dist = float(default_dist)
-                # If still None, MCP Core will use default_table and track it
+                    logger.info(f"[TRACE-DIST]   👉 Applied floor default: {dist}m")
+                else:
+                    logger.info(f"[TRACE-DIST]   ⚠️ No floor default found")
             
             # Create MCP load
             mcp_load = McpElectricalLoad(
