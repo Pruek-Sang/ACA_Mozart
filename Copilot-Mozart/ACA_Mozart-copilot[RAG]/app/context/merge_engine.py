@@ -471,16 +471,19 @@ def apply_add_room(rooms: List[Dict], cmd: EditCommand) -> List[Dict]:
 
 async def _save_snapshot(session, session_id: str):
     """
-    Save current loads/rooms to site_context['_undo_stack'].
+    Save current loads/rooms to session.undo_history.
     Max 10 snapshots.
+    
+    🆕 Phase 5: Now uses session.undo_history instead of site_context['_undo_stack']
     """
     try:
         from app.context.session_injector import session_injector
         from datetime import datetime
         
-        # 1. Get current stack
-        site_ctx = session.site_context or {}
-        undo_stack = site_ctx.get("_undo_stack", [])
+        # 1. Get current stack from session field (not site_context!)
+        undo_stack = session.undo_history if hasattr(session, 'undo_history') else []
+        if undo_stack is None:
+            undo_stack = []
         
         # 2. Create snapshot
         snapshot = {
@@ -492,16 +495,10 @@ async def _save_snapshot(session, session_id: str):
         # 3. Push and Limit
         undo_stack.append(snapshot)
         if len(undo_stack) > 10:
-            undo_stack.pop(0) # Remove oldest
+            undo_stack.pop(0)  # Remove oldest
             
-        # 4. Save back to DB
-        # We need to update ONLY site_context to avoid race conditions? 
-        # Actually session_injector.update handles partial updates.
-        site_ctx["_undo_stack"] = undo_stack
-        
-        # We must trigger update. session object is local, need to persist.
-        # But wait, session_injector.update updates specific fields.
-        await session_injector.update(session_id, {"site_context": site_ctx})
+        # 4. Save undo_history to DB (separate field, not in site_context)
+        await session_injector.update(session_id, {"undo_history": undo_stack})
         logger.info(f"[UNDO] Snapshot saved. Stack size: {len(undo_stack)}")
         
     except Exception as e:
@@ -512,13 +509,14 @@ async def _undo_last_action(session, session_id: str) -> Optional[Dict]:
     """
     Pop last snapshot and restore loads/rooms.
     Returns restored {loads, rooms} or None if empty.
+    
+    🆕 Phase 5: Now uses session.undo_history instead of site_context['_undo_stack']
     """
     try:
         from app.context.session_injector import session_injector
         
-        site_ctx = session.site_context or {}
-        undo_stack = site_ctx.get("_undo_stack", [])
-        
+        # Get undo_history from session field (not site_context!)
+        undo_stack = session.undo_history if hasattr(session, 'undo_history') else []
         if not undo_stack:
             logger.info("[UNDO] Stack empty, nothing to undo.")
             return None
@@ -530,16 +528,14 @@ async def _undo_last_action(session, session_id: str) -> Optional[Dict]:
         restored_loads = last_snap.get("loads", [])
         restored_rooms = last_snap.get("rooms", [])
         
-        # 3. Update DB (Restore data + Update Stack)
-        site_ctx["_undo_stack"] = undo_stack
-        
+        # 3. Update DB (Restore data + Update undo_history)
         success = await session_injector.update_design(
             session_id,
             loads=restored_loads,
             rooms=restored_rooms
         )
-        # Also need to update site_context to save the reduced stack
-        await session_injector.update(session_id, {"site_context": site_ctx})
+        # Also save the reduced undo_history
+        await session_injector.update(session_id, {"undo_history": undo_stack})
         
         if success:
             logger.info(f"[UNDO] Restored snapshot. Stack remaining: {len(undo_stack)}")

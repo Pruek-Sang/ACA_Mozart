@@ -629,6 +629,55 @@ async def list_projects(request: Request):
 
 
 # =============================================================================
+# 🆕 Phase 5: UNDO ENDPOINT - Dedicated API for undo functionality
+# Replaces the need to type "undo" in chat - Frontend button integration
+# =============================================================================
+@app.post("/api/v1/undo")
+async def undo_last_action(session_id: str = Query(...)):
+    """
+    Undo the last edit action for a session.
+    
+    🆕 Phase 5: Dedicated endpoint for Frontend Undo Button.
+    Uses session.undo_history instead of site_context['_undo_stack'].
+    
+    Returns:
+    - success: True if undo was successful
+    - data: Restored loads and rooms for frontend to display
+    - message: Human-readable status message
+    """
+    if not SUPABASE_AVAILABLE or not session_injector:
+        raise HTTPException(status_code=503, detail="Session storage not available")
+    
+    try:
+        # 1. Load session
+        session = await session_injector.load(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # 2. Perform undo
+        from app.context.merge_engine import _undo_last_action
+        result = await _undo_last_action(session, session_id)
+        
+        if result:
+            return {
+                "success": True,
+                "message": "✅ ย้อนกลับสำเร็จ",
+                "data": result
+            }
+        else:
+            return {
+                "success": False,
+                "message": "⚠️ ไม่มีประวัติที่สามารถย้อนกลับได้"
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[UNDO] API error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # 🆕 GET SESSION DATA - Load saved design for restoration after refresh
 # [FIX 2026-01-05] Frontend needs to restore saved design on page refresh
 # =============================================================================

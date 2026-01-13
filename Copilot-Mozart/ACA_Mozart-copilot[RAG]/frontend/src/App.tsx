@@ -19,7 +19,7 @@ import { classifyError } from './lib/utils';
 import { supabase, signOut } from './lib/supabase';
 import { askDesign, startSession } from './lib/api';
 import { logger } from './lib/logger';
-import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen, Trash2 } from 'lucide-react';
+import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen, Trash2, Undo2 } from 'lucide-react';
 
 /**
  * App - Main Application Controller
@@ -393,6 +393,53 @@ function App() {
     }
   };
 
+  // === 🆕 PHASE 5: UNDO HANDLER ===
+  const handleUndo = async () => {
+    if (!sessionId) {
+      console.log('[UNDO] No session to undo');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/undo?session_id=${sessionId}`, {
+        method: 'POST',
+        headers: {
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        // Refresh the page with restored data
+        setMessages(prev => [...prev, {
+          role: 'system',
+          content: data.message || '↩️ ย้อนกลับสำเร็จ',
+          timestamp: new Date()
+        }]);
+
+        // TODO: Trigger recalculation with restored loads
+        console.log('[UNDO] Restored:', data.data);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'system',
+          content: data.message || '⚠️ ไม่สามารถย้อนกลับได้',
+          timestamp: new Date()
+        }]);
+      }
+    } catch (e) {
+      console.error('[UNDO] Error:', e);
+      setMessages(prev => [...prev, {
+        role: 'system',
+        content: '❌ เกิดข้อผิดพลาดในการย้อนกลับ',
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // === FEEDBACK HANDLER ===
   const handleFeedbackSubmit = async (feedback: {
     type: string;
@@ -747,6 +794,17 @@ function App() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* 🆕 Phase 5: Undo Button */}
+          <button
+            onClick={handleUndo}
+            disabled={isLoading}
+            className="flex items-center gap-2 text-slate-400 hover:text-blue-400 text-sm transition-colors disabled:opacity-50"
+            title="ย้อนกลับการแก้ไขล่าสุด"
+          >
+            <Undo2 size={16} />
+            <span>ย้อนกลับ</span>
+          </button>
+
           {/* 🆕 Clear Button */}
           <button
             onClick={handleClear}

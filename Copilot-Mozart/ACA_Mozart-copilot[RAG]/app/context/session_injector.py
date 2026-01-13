@@ -78,6 +78,9 @@ class SessionData:
     current_spec: Optional[Dict] = None
     mcp_response: Optional[Dict] = None
     
+    # 🆕 Phase 5: Undo history (separated from site_context)
+    undo_history: List[Dict] = field(default_factory=list)
+    
     # Metadata
     status: str = "active"
     expires_at: Optional[str] = None
@@ -98,6 +101,7 @@ class SessionData:
             "current_spec": self.current_spec,
             "mcp_response": self.mcp_response,
             "status": self.status,
+            "undo_history": self.undo_history,  # 🆕 Phase 5
         }
     
     @classmethod
@@ -115,6 +119,7 @@ class SessionData:
             partial_requirements=data.get("partial_requirements") or {},
             current_spec=data.get("current_spec"),
             mcp_response=data.get("mcp_response"),
+            undo_history=data.get("undo_history") or [],  # 🆕 Phase 5
             status=data.get("status", "active"),
             expires_at=data.get("expires_at"),
             created_at=data.get("created_at"),
