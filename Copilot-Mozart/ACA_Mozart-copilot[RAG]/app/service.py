@@ -2603,7 +2603,7 @@ Query: "{query}"
                 # Get site_context (try merged data first, then session)
                 site_ctx_data = merged_data.get("site_context", {})
                 if not site_ctx_data and session_id:
-                     session = await session_injector.get_session(session_id)
+                     session = await session_injector.load(session_id)
                      if session and session.site_context:
                          site_ctx_data = session.site_context.dict()
 
