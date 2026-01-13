@@ -2113,7 +2113,7 @@ Query: "{query}"
         
         return spec
 
-    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None, session_id: Optional[str] = None, prefix_message: Optional[str] = None) -> StandardResponse:
+    async def _build_design_response(self, req: ProjectRequirements, language: str = "th", extracted_data: Dict[str, Any] = None, session_id: Optional[str] = None, prefix_message: Optional[str] = None, skip_site_context_check: bool = False) -> StandardResponse:
         """
         Build design response by chaining to MCP Core.
         
@@ -2197,7 +2197,8 @@ Query: "{query}"
             
             # 🆕 VALIDATION: Check if site_context is missing
             # This ensures Context Injectors (Derating, kA, N-G Link) work properly
-            if not req.site_context:
+            # 🔧 FIX Bug #9: Skip this check for EDIT mode (uses session site_context instead)
+            if not req.site_context and not skip_site_context_check:
                 logger.warning("⚠️ Missing site_context in design request")
                 return StandardResponse(
                     answer="""⚠️ กรุณาตอบคำถามเกี่ยวกับสถานที่ติดตั้ง
@@ -2679,11 +2680,13 @@ Query: "{query}"
                 # [STATEFUL] 3. Recalculate (Call MCP Core)
                 # Re-use _build_design_response to get full formatted report + audit
                 # Pass edit_summary_msg as prefix
+                # 🔧 FIX Bug #9: Skip site_context check for EDIT mode (uses session data)
                 design_response = await self._build_design_response(
                     project_req, 
                     req.language, 
                     session_id=session_id,
-                    prefix_message=edit_summary_msg
+                    prefix_message=edit_summary_msg,
+                    skip_site_context_check=True  # EDIT mode doesn't need frontend dropdown
                 )
                 
                 # [CP-5] Final Response Checkpoint
