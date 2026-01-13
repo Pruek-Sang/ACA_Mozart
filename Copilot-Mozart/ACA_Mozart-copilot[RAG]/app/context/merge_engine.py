@@ -114,10 +114,13 @@ async def merge_design_changes(
         
         if cmd.target_type == TargetType.ROOM:
             # ROOM operations
+            changes_log = []  # Initialize for ROOM operations
             if cmd.action == EditAction.ADD:
                 updated_rooms = apply_add_room(updated_rooms, cmd)
+                changes_log.append(f"เพิ่มห้อง '{cmd.room_type}' เรียบร้อย")
             elif cmd.action == EditAction.REMOVE:
                 updated_rooms = apply_remove_room(updated_rooms, updated_loads, cmd)
+                changes_log.append(f"ลบห้อง '{cmd.room_type}' เรียบร้อย")
             else:
                 logger.warning(f"[MERGE] CHANGE action not supported for rooms")
                 return None
