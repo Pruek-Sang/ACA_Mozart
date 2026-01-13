@@ -2656,7 +2656,19 @@ Query: "{query}"
                 # Apply site_context if present
                 if site_ctx_data:
                     from app.models import SiteContext
-                    project_req.site_context = SiteContext(**site_ctx_data)
+                    # 🔧 FIX: Filter out internal keys (like _undo_stack) before Pydantic validation
+                    # site_context may contain internal state that's not part of SiteContext model
+                    valid_site_keys = {'distance_to_transformer', 'installation_area', 'panel_type', 
+                                       'conduit_grouping', 'service_distance_m'}
+                    filtered_site_ctx = {k: v for k, v in site_ctx_data.items() if k in valid_site_keys}
+                    
+                    # Only apply if we have valid site context fields
+                    if filtered_site_ctx:
+                        try:
+                            project_req.site_context = SiteContext(**filtered_site_ctx)
+                        except Exception as e:
+                            logger.warning(f"[EDIT] SiteContext parse failed: {e}, using defaults")
+                            # Fallback: create with defaults
                 
                 # [CP-4] Recalculation Checkpoint - Log input data summary
                 rooms_cnt = len(project_req.rooms) if project_req.rooms else 0
