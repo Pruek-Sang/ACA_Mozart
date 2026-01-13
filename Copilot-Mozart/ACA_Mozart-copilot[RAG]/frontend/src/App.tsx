@@ -655,9 +655,81 @@ function App() {
               <ProjectSelector
                 currentSessionId={sessionId}
                 currentProjectName={projectName}
-                onSessionChange={(newSessionId, newProjectName) => {
+                onSessionChange={async (newSessionId, newProjectName) => {
+                  console.log('[SESSION-SWITCH] Changing from', sessionId?.slice(0, 8), 'to', newSessionId.slice(0, 8));
+
+                  // 1. Clear old data immediately to prevent overlap
+                  setResultData(null);
+                  setSldData(null);
+                  setMessages([{
+                    role: 'system',
+                    content: `📂 โหลดโปรเจค "${newProjectName}"...`,
+                    timestamp: new Date()
+                  }]);
+
+                  // 2. Update state and localStorage
                   setSessionId(newSessionId);
                   setProjectName(newProjectName);
+                  localStorage.setItem('mozart_session_id', newSessionId);
+                  localStorage.setItem('mozart_project_name', newProjectName);
+
+                  // 3. Actually load the new session's data!
+                  try {
+                    const token = session?.access_token;
+                    const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/session/${newSessionId}/data`, {
+                      headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+                    });
+
+                    if (res.ok) {
+                      const data = await res.json();
+                      console.log('[SESSION-SWITCH] Loaded data:', data.project_name);
+
+                      // Restore result data if exists
+                      if (data.mcp_response?.display_data) {
+                        const displayData = data.mcp_response.display_data;
+                        setResultData({
+                          success: true,
+                          message: 'Design restored',
+                          data: {
+                            loads: (displayData.circuits || []).map((ckt: Record<string, unknown>) => ({
+                              room_name: ckt.room || ckt.floor || '',
+                              device_name: ckt.circuit_name,
+                              power_kw: ckt.total_kw,
+                              current_a: ckt.total_current,
+                              breaker_size: ckt.breaker_rating,
+                              wire_size: `${ckt.wire_size} mm²`,
+                              conduit_size: ckt.conduit_size,
+                              voltage_drop_percent: ckt.vd_percent,
+                              total_va: ckt.total_va || 0,
+                            })),
+                            warnings: displayData.warnings || [],
+                            total_power_kw: displayData.total_kw,
+                            main_breaker: Number.parseInt(displayData.main_breaker) || 0,
+                            audit_table: data.mcp_response?.audit_results,
+                          }
+                        });
+                      }
+
+                      // Restore messages
+                      if (data.messages?.length > 0) {
+                        setMessages(data.messages.map((msg: Record<string, unknown>) => ({
+                          role: msg.role as 'user' | 'assistant' | 'system',
+                          content: msg.content as string,
+                          timestamp: msg.timestamp ? new Date(msg.timestamp as string) : new Date()
+                        })));
+                      } else {
+                        setMessages([{
+                          role: 'system',
+                          content: `✅ โหลดโปรเจค "${newProjectName}" สำเร็จ!`,
+                          timestamp: new Date()
+                        }]);
+                      }
+                    } else {
+                      console.warn('[SESSION-SWITCH] Failed to load data, status:', res.status);
+                    }
+                  } catch (e) {
+                    console.error('[SESSION-SWITCH] Error loading session:', e);
+                  }
                 }}
                 onNewProject={() => {
                   // Clear chat and results for new project
