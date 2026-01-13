@@ -2576,6 +2576,9 @@ Query: "{query}"
         if is_edit_mode and session_id and has_existing_design:
             logger.info(f"🔧 EDIT mode detected for session {session_id[:8]}... query: '{req.query[:50]}...'")
             
+            # [CP-2] EDIT Mode Detection Checkpoint
+            logger.info(f"[CP-2] EDIT mode: session={session_id[:8]}, query_len={len(req.query)}")
+            
             # [STATEFUL] 1. Merge changes into session
             # [STATEFUL] 1. Merge changes into session
             merge_result = await merge_design_changes(session_id, req.query)
@@ -2655,15 +2658,26 @@ Query: "{query}"
                     from app.models import SiteContext
                     project_req.site_context = SiteContext(**site_ctx_data)
                 
+                # [CP-4] Recalculation Checkpoint - Log input data summary
+                rooms_cnt = len(project_req.rooms) if project_req.rooms else 0
+                loads_cnt = len(project_req.loads) if project_req.loads else 0
+                has_site = bool(project_req.site_context)
+                logger.info(f"[CP-4] Recalc start: rooms={rooms_cnt}, loads={loads_cnt}, site_ctx={has_site}")
+                
                 # [STATEFUL] 3. Recalculate (Call MCP Core)
                 # Re-use _build_design_response to get full formatted report + audit
                 # Pass edit_summary_msg as prefix
-                return await self._build_design_response(
+                design_response = await self._build_design_response(
                     project_req, 
                     req.language, 
                     session_id=session_id,
                     prefix_message=edit_summary_msg
                 )
+                
+                # [CP-5] Final Response Checkpoint
+                logger.info(f"[CP-5] Response: status={'success' if design_response else 'failed'}, session={session_id[:8] if session_id else 'None'}")
+                
+                return design_response
             
             else:
                 logger.warning(f"⚠️ Merge failed or no changes detected - falling back to normal flow")

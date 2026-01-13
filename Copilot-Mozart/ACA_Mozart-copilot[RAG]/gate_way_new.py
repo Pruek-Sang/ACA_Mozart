@@ -705,6 +705,11 @@ async def proxy_ask(request: Request):
         
         # 🆕 FIX: Forward session_id from query params
         session_id = request.query_params.get("session_id")
+        
+        # [CP-0] Gateway Entry Checkpoint
+        query_preview = str(body.get("query", ""))[:50] if body else ""
+        logger.info(f"[CP-0] Gateway: session={session_id[:8] if session_id else 'None'}, query=\"{query_preview}\"")
+        
         url = f"{MOZART_ENDPOINT}/api/v1/ask"
         if session_id:
             url += f"?session_id={session_id}"

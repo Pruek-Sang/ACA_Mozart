@@ -64,6 +64,11 @@ async def merge_design_changes(
             logger.warning(f"[MERGE] Session {session_id[:8]}... not found - cannot merge")
             return None
         
+        # [CP-3] Merge Start Checkpoint - Log input state
+        loads_count = len(session.loads) if session.loads else 0
+        rooms_count = len(session.rooms) if session.rooms else 0
+        logger.info(f"[CP-3] Merge start: session={session_id[:8]}, loads={loads_count}, rooms={rooms_count}, cmd=\"{edit_request[:50]}\"")
+        
         logger.info(f"[MERGE] Loaded session with {len(session.loads)} loads, {len(session.rooms)} rooms")
         
         # =====================================================================
