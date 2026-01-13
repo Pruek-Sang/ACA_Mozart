@@ -11,7 +11,7 @@ Philosophy: The Gateway of Wisdom
 
 import os
 import logging
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Depends
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Depends, Query
 from fastapi.responses import JSONResponse
 import uuid
 
