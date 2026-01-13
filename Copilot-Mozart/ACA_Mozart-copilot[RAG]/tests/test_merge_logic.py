@@ -62,7 +62,7 @@ class TestMergeLogic(unittest.TestCase):
             unit="BTU"
         )
         # Apply to index 0 (Bedroom 1)
-        updated = apply_change(self.loads.copy(), [0], cmd)
+        updated, changes_log = apply_change(self.loads.copy(), [0], cmd)
         self.assertEqual(updated[0]["device"], "AC-18000BTU")
         # Ensure others untouched
         self.assertEqual(updated[1]["device"], "AC-9000BTU")
@@ -76,7 +76,7 @@ class TestMergeLogic(unittest.TestCase):
             unit="W",
             room_name="โรงรถ"
         )
-        updated = apply_add(self.loads.copy(), cmd, self.rooms)
+        updated, changes_log = apply_add(self.loads.copy(), cmd, self.rooms)
         
         # Should be 4 loads now
         self.assertEqual(len(updated), 4)
@@ -87,7 +87,7 @@ class TestMergeLogic(unittest.TestCase):
     def test_05_apply_remove(self):
         """Test removing a load"""
         # Remove index 1 (Bedroom 2 AC)
-        updated = apply_remove(self.loads.copy(), [1])
+        updated, changes_log = apply_remove(self.loads.copy(), [1])
         
         self.assertEqual(len(updated), 2)
         # Check remaining
