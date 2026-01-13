@@ -505,26 +505,26 @@ async def delete_doc(req: DeleteRequest):
 # =============================================================================
 
 @app.post("/api/v1/session/start")
-async def start_session(request: Request):
+async def start_session(
+    request: Request,
+    project_name: Optional[str] = Query(None, description="Optional project name")
+):
     """
     Start a new conversation session.
     
-    Body (optional):
+    Query Params:
         project_name: Optional name for the project (default: บ้านนายสมหญิง)
     
     Returns session_id for subsequent calls.
     Session remembers user's answers across turns.
+    
+    🔧 FIX Bug #11: Now reads project_name from Query param (not body)
     """
     import re
     import uuid
     
-    # Parse body if present
-    project_name = None
-    try:
-        body = await request.json()
-        project_name = body.get("project_name") if isinstance(body, dict) else None
-    except Exception:
-        pass  # No body or invalid JSON - use default
+    # 🔧 FIX: project_name now comes from Query param directly (line 510)
+    # No need to parse body - FastAPI handles Query params automatically
     
     # Get user_id, validate it's a proper UUID for Supabase
     raw_user_id = getattr(request.state, "user_id", None)
