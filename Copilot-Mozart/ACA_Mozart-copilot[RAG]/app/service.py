@@ -2605,7 +2605,11 @@ Query: "{query}"
                 if not site_ctx_data and session_id:
                      session = await session_injector.load(session_id)
                      if session and session.site_context:
-                         site_ctx_data = session.site_context.dict()
+                         # site_context may be dict (from Supabase) or Pydantic model
+                         if isinstance(session.site_context, dict):
+                             site_ctx_data = session.site_context
+                         else:
+                             site_ctx_data = session.site_context.dict()
 
                 # [STATEFUL] Log Merge Action (Assistant side - implicit)
                 if session_id:
