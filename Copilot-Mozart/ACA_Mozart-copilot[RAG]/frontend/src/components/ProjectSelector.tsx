@@ -117,6 +117,17 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
         setIsDeleting(true);
         try {
             await deleteProject(sessionId, 'CONFIRM');
+
+            // 🆕 FIX: If deleting the currently active project, clear localStorage
+            // This prevents the deleted session from reappearing on refresh
+            if (sessionId === currentSessionId) {
+                localStorage.removeItem('mozart_session_id');
+                localStorage.removeItem('mozart_project_name');
+                console.log('[DELETE] Cleared localStorage for deleted current project');
+                // Trigger new project creation
+                onNewProject();
+            }
+
             setDeleteTarget(null);
             setDeleteConfirm('');
             fetchProjects(); // Refresh list
