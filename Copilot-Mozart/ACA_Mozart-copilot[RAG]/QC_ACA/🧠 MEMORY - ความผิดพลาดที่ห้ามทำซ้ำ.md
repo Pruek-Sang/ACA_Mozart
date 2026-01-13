@@ -1804,5 +1804,44 @@ if circuits := display_data.get("circuits"):
 
 ---
 
-*เพิ่มเติมเมื่อ: 2026-01-13 03:50*
+
+---
+
+## 🟡 2026-01-14: สรุป Bug Hunt 1-11 (Session Fixes)
+
+> **ภารกิจ:** แก้ไข Session Persistence, Undo, และ RAG Integration
+> **ผลลัพธ์:** แก้ไขครบ 11 รายการ (Backend 8, Frontend 2, Enhancement 1)
+
+### 🐛 รายละเอียด Bug 1-11
+
+| # | Bug | อาการ | สาเหตุ | วิธีแก้ |
+|---|-----|-------|--------|---------|
+| **1** | `get_session()` mismatch | 500 Error ตอนโหลด | `session_store` ไม่มี method `get_session` (มีแต่ `load`) | เปลี่ยนเรียก `session_injector.load()` |
+| **2** | `site_context.dict()` error | 500 Error | เรียก `.dict()` บน object ที่เป็น `dict` อยู่แล้ว | ลบ `.dict()` ออก |
+| **3** | `changes_log` Unbound | 500 Error | ตัวแปร `changes_log` ประกาศใน `try` แต่เรียกใช้ใน `except` | ย้ายประกาศตัวแปรก่อน `try` |
+| **4** | Model missing fields | Validation Error | `ProjectRequirements` ขาด field `loads`, `rooms` ในบาง case | เพิ่ม Optional fields ใน Pydantic model |
+| **5** | Frontend Session Ghost | ลบโปรเจกต์แล้วข้อมูลยังอยู่ | `localStorage` ไม่ถูก clear เมื่อกดลบใน UI | เพิ่ม `removeItem` ใน `handleDeleteProject` |
+| **6** | Project Switch UI | เปลี่ยนโปรเจกต์แล้วหน้าจอไม่ refresh | State `sessionId` เปลี่ยนแต่ไม่ได้ trigger data fetch ใหม่ | แก้ `useEffect` ให้ dependency ครบถ้วน |
+| **7** | **[Enhancement]** Logging | Debug ยาก | ขาด Logs ระบุจุด Checkpoint หลัก | เพิ่ม `[CP-0]` ถึง `[CP-5]` ใน critical path |
+| **8** | `_undo_stack` pollution | Pydantic Validation Error | ยัด `_undo_stack` ลงใน `site_context` model โดยตรง | **Refactor Phase 5:** แยก `undo_history` field ออกมาต่างหาก |
+| **9** | **EDIT bypass check** | EDIT Mode ถาม Site Context ซ้ำ | Logic check `req.site_context` ผิดพลาดใน EDIT mode | เพิ่ม `skip_site_context_check` flag สำหรับ EDIT operation |
+| **10** | **Undo Architecture** | Undo ไม่เสถียร / ช้า | เก็บ Undo stack รวมกับ Data หลัก ทำให้บวมและ validate ยาก | แยก Endpoint `/api/v1/undo` และ field `undo_history` (Option B) |
+| **11** | **New Project Overwrite** | สร้างใหม่ทับอันเก่า | Frontend ส่ง Query Param แต่ Backend อ่าน Body (ได้ None → Default) | แก้ Backend ให้รับ `Query()` parameter ให้ตรงกัน |
+
+### 💀 บทเรียนสำคัญจาก Bug 9 & 11
+
+57. **Frontend ส่งอะไร Backend ต้องรับแบบนั้น:**
+    - ส่ง `?param=` (Query) → รับ `Query()`
+    - ส่ง JSON Body → รับ Pydantic/Dict Body
+    - **ห้ามเดา!** ต้องเช็ค Network Tab / Curl
+
+58. **Logic Check มีข้อยกเว้นเสมอ:**
+    - `site_context` จำเป็นสำหรับ CREATE
+    - แต่ **ห้ามเช็ค** สำหรับ EDIT/UNDO (เพราะมี session อยู่แล้ว)
+    - ต้องมี bypass flag หรือ condition ที่ชัดเจน
+
+---
+
+*Verified by: Cloud Logs & User Testing*
+*Date: 2026-01-14*
 
