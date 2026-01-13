@@ -2644,6 +2644,8 @@ Query: "{query}"
                 
                 project_req = ProjectRequirements(
                     project_name="Stateful Edit",
+                    building_type="residential",  # Default for edit mode
+                    voltage_system="TH_1PH_230V",  # Default Thai single-phase
                     rooms=current_rooms,
                     loads=current_loads
                 )

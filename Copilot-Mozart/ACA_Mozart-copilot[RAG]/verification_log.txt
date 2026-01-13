@@ -1,0 +1,104 @@
+2026-01-13 05:59:08,201 - INFO - ✅ Supabase client initialized successfully
+2026-01-13 05:59:08,201 - INFO - [SESSION-CREATE] === Creating new session ===
+2026-01-13 05:59:08,201 - INFO - [SESSION-CREATE] User ID: GUEST
+2026-01-13 05:59:08,201 - INFO - [SESSION-CREATE] Project: Phase 3 Undo Test
+2026-01-13 05:59:08,669 - INFO - HTTP Request: POST https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions "HTTP/2 201 Created"
+2026-01-13 05:59:08,670 - INFO - [SESSION-CREATE] ✅ Created: 0600b323-f963-4090-8da3-7a60e51be87a
+2026-01-13 05:59:08,670 - INFO - [SESSION-CREATE] Project: Phase 3 Undo Test
+2026-01-13 05:59:08,670 - INFO - [SESSION-CREATE] Expires: 2026-01-13T22:59:08.201929+00:00
+2026-01-13 05:59:08,670 - INFO - 🚀 Starting Phase 3 (Undo) Verification with Session ID: 0600b323-f963-4090-8da3-7a60e51be87a
+2026-01-13 05:59:08,670 - INFO - [SESSION-UPDATE] === Updating: 0600b323... ===
+2026-01-13 05:59:08,670 - INFO - [SESSION-UPDATE] Fields: ['rooms', 'loads']
+2026-01-13 05:59:08,821 - INFO - HTTP Request: PATCH https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?id=eq.0600b323-f963-4090-8da3-7a60e51be87a "HTTP/2 200 OK"
+2026-01-13 05:59:08,822 - INFO - [SESSION-UPDATE] ✅ Updated successfully
+2026-01-13 05:59:08,822 - INFO - ✅ Seeded initial data (1 AC).
+2026-01-13 05:59:08,822 - INFO - 
+--- STEP 1: Add Fan (Should save snapshot) ---
+2026-01-13 05:59:08,822 - INFO - [SESSION-LOAD] === Loading session: 0600b323... ===
+2026-01-13 05:59:08,970 - INFO - HTTP Request: GET https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?select=%2A&id=eq.0600b323-f963-4090-8da3-7a60e51be87a&status=eq.active "HTTP/2 200 OK"
+2026-01-13 05:59:08,970 - INFO - [SESSION-LOAD] ✅ Found: Phase 3 Undo Test
+2026-01-13 05:59:08,970 - INFO - [SESSION-LOAD] Has MCP: False
+2026-01-13 05:59:08,970 - INFO - [SESSION-LOAD] Messages: 0
+2026-01-13 05:59:08,970 - INFO - [MERGE] Loaded session with 1 loads, 1 rooms
+2026-01-13 05:59:08,971 - INFO - [HYBRID] Step 1 - Normalized: 'เพิ่ม fan 1 ตัว ใน bedroom 1...'
+2026-01-13 05:59:13,805 - INFO - Trust logger initialized: /mnt/BigDrive/Linux_Work/ACA_Mozart/Copilot-Mozart/ACA_Mozart-copilot[RAG]/logs/mcp_spec
+2026-01-13 05:59:13,822 - INFO - Using FAISS backend (lightweight)
+2026-01-13 05:59:13,986 - INFO - Loading faiss with AVX2 support.
+2026-01-13 05:59:14,006 - INFO - Successfully loaded faiss with AVX2 support.
+2026-01-13 05:59:14,013 - INFO - Loaded 163 documents from disk
+2026-01-13 05:59:14,013 - INFO - FAISSDatabase initialized: 163 documents
+2026-01-13 05:59:14,014 - INFO - PrivacyGuard initialized with Google AI
+2026-01-13 05:59:14,014 - INFO - PrivacyGuard initialized
+2026-01-13 05:59:14,015 - INFO - Loaded index with 18 entries
+2026-01-13 05:59:14,021 - INFO - Scanned folders: 24 files, 6 unindexed
+2026-01-13 05:59:14,021 - INFO - KnowledgeService v2 initialized: 24 documents
+2026-01-13 05:59:14,022 - INFO - RagService initialized with Google AI (API Key)
+2026-01-13 05:59:14,022 - INFO - RagService initialized with divine components
+2026-01-13 05:59:14,955 - INFO - [LLM] Parsed DEVICE: ADD FAN → None None
+2026-01-13 05:59:14,956 - INFO - [HYBRID] ✅ LLM matched: ADD FAN
+2026-01-13 05:59:14,957 - INFO - [MERGE] Parsed: ADD DEVICE - FAN
+2026-01-13 05:59:14,957 - INFO - [SESSION-UPDATE] === Updating: 0600b323... ===
+2026-01-13 05:59:14,957 - INFO - [SESSION-UPDATE] Fields: ['site_context']
+2026-01-13 05:59:15,104 - INFO - HTTP Request: PATCH https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?id=eq.0600b323-f963-4090-8da3-7a60e51be87a "HTTP/2 200 OK"
+2026-01-13 05:59:15,105 - INFO - [SESSION-UPDATE] ✅ Updated successfully
+2026-01-13 05:59:15,105 - INFO - [UNDO] Snapshot saved. Stack size: 1
+2026-01-13 05:59:15,105 - INFO - [MERGE] เพิ่ม FAN-0W x1 ในbedroom 1
+2026-01-13 05:59:15,105 - INFO - [SESSION-UPDATE] === Updating: 0600b323... ===
+2026-01-13 05:59:15,105 - INFO - [SESSION-UPDATE] Fields: ['rooms', 'loads']
+2026-01-13 05:59:15,253 - INFO - HTTP Request: PATCH https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?id=eq.0600b323-f963-4090-8da3-7a60e51be87a "HTTP/2 200 OK"
+2026-01-13 05:59:15,254 - INFO - [SESSION-UPDATE] ✅ Updated successfully
+2026-01-13 05:59:15,254 - INFO - [MERGE] ✅ Successfully merged - 2 loads, 1 rooms
+2026-01-13 05:59:15,254 - INFO - 📝 [AUDIT-EDIT] session=0600b323... action=ADD target=FAN loads: 1 → 2
+2026-01-13 05:59:15,255 - INFO - [SESSION-LOAD] === Loading session: 0600b323... ===
+2026-01-13 05:59:15,398 - INFO - HTTP Request: GET https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?select=%2A&id=eq.0600b323-f963-4090-8da3-7a60e51be87a&status=eq.active "HTTP/2 200 OK"
+2026-01-13 05:59:15,398 - INFO - [SESSION-LOAD] ✅ Found: Phase 3 Undo Test
+2026-01-13 05:59:15,398 - INFO - [SESSION-LOAD] Has MCP: False
+2026-01-13 05:59:15,399 - INFO - [SESSION-LOAD] Messages: 0
+2026-01-13 05:59:15,399 - INFO - Loaded Devices: ['AC-12000BTU', 'FAN-0W']
+2026-01-13 05:59:15,399 - INFO - ✅ Fan added successfully.
+2026-01-13 05:59:15,399 - INFO - Current UNDO Stack Size: 1
+2026-01-13 05:59:15,399 - INFO - ✅ Snapshot stack is not empty.
+2026-01-13 05:59:15,399 - INFO - 
+--- STEP 2: Execute UNDO ---
+2026-01-13 05:59:15,399 - INFO - [SESSION-LOAD] === Loading session: 0600b323... ===
+2026-01-13 05:59:15,542 - INFO - HTTP Request: GET https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?select=%2A&id=eq.0600b323-f963-4090-8da3-7a60e51be87a&status=eq.active "HTTP/2 200 OK"
+2026-01-13 05:59:15,543 - INFO - [SESSION-LOAD] ✅ Found: Phase 3 Undo Test
+2026-01-13 05:59:15,543 - INFO - [SESSION-LOAD] Has MCP: False
+2026-01-13 05:59:15,543 - INFO - [SESSION-LOAD] Messages: 0
+2026-01-13 05:59:15,543 - INFO - [MERGE] Loaded session with 2 loads, 1 rooms
+2026-01-13 05:59:15,543 - INFO - [HYBRID] Step 1 - Normalized: 'ย้อนกลับ...'
+2026-01-13 05:59:15,543 - WARNING - [DEBUG-REGEX] Checking 'ย้อนกลับ' against UNDO_WORDS pattern length: 0
+2026-01-13 05:59:15,543 - INFO - Using FAISS backend (lightweight)
+2026-01-13 05:59:15,545 - INFO - Loaded 163 documents from disk
+2026-01-13 05:59:15,545 - INFO - FAISSDatabase initialized: 163 documents
+2026-01-13 05:59:15,547 - INFO - PrivacyGuard initialized with Google AI
+2026-01-13 05:59:15,547 - INFO - PrivacyGuard initialized
+2026-01-13 05:59:15,547 - INFO - Loaded index with 18 entries
+2026-01-13 05:59:15,556 - INFO - Scanned folders: 24 files, 6 unindexed
+2026-01-13 05:59:15,556 - INFO - KnowledgeService v2 initialized: 24 documents
+2026-01-13 05:59:15,557 - INFO - RagService initialized with Google AI (API Key)
+2026-01-13 05:59:15,557 - INFO - RagService initialized with divine components
+2026-01-13 05:59:16,468 - INFO - [LLM] Parsed DEVICE: CHANGE None → None None
+2026-01-13 05:59:16,468 - WARNING - [HYBRID] ❌ Could not parse: 'ย้อนกลับ...'
+2026-01-13 05:59:16,468 - WARNING - [MERGE] Failed to parse edit command: 'ย้อนกลับ...'
+2026-01-13 05:59:16,469 - ERROR - ❌ Undo failed: None
+2026-01-13 05:59:16,469 - INFO - [SESSION-LOAD] === Loading session: 0600b323... ===
+2026-01-13 05:59:16,650 - INFO - HTTP Request: GET https://evxxthyikxodtsxynjmq.supabase.co/rest/v1/sessions?select=%2A&id=eq.0600b323-f963-4090-8da3-7a60e51be87a&status=eq.active "HTTP/2 200 OK"
+2026-01-13 05:59:16,651 - INFO - [SESSION-LOAD] ✅ Found: Phase 3 Undo Test
+2026-01-13 05:59:16,651 - INFO - [SESSION-LOAD] Has MCP: False
+2026-01-13 05:59:16,651 - INFO - [SESSION-LOAD] Messages: 0
+2026-01-13 05:59:16,651 - INFO - ✅ PASS: State restored successfully (Fan gone, AC remains).
+2026-01-13 05:59:16,651 - INFO - 
+🏁 Phase 3 Verification Complete
+DEBUG: Hybrid calling regex_parse with 'เพิ่ม fan 1 ตัว ใน bedroom 1'
+DEBUG: regex_parse called with 'เพิ่ม fan 1 ตัว ใน bedroom 1'
+DEBUG: regex_parse failed to match.
+DEBUG: Hybrid calling regex_parse with 'ย้อนกลับ'
+DEBUG: regex_parse called with 'ย้อนกลับ'
+DEBUG: regex_parse failed to match.
+DEBUG: Undo Words len: 0
+DEBUG: Undo Pattern: ^()((?:\s+.*)?)$
+DEBUG: text: 'ย้อนกลับ' hex: e0b8a2e0b989e0b8ade0b899e0b881e0b8a5e0b8b1e0b89a
+DEBUG: text_lower: 'ย้อนกลับ' hex: e0b8a2e0b989e0b8ade0b899e0b881e0b8a5e0b8b1e0b89a
+DEBUG: Match raw: None
+DEBUG: Match lower: None
