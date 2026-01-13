@@ -245,6 +245,11 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
         rate_limiter.check(user_id, "ask")
         logger.debug(f"⏱️ Rate check passed for {user_id} on /ask")
     
+    # [CP-1] Routes Entry Checkpoint - safe with fallbacks
+    session_short = session_id[:8] if session_id else "None"
+    query_len = len(req.query) if req and hasattr(req, 'query') else 0
+    logger.info(f"[CP-1] /ask: session_id={session_short}, query_len={query_len}")
+    
     # 🆕 Pass session_id to enable Stateful Intelligence
     logger.info(f"🚀 [ASK] Received request from session_id: {session_id}")
     response = await rag_service.process_ask(req, session_id=session_id)
