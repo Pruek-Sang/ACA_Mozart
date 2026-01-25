@@ -639,7 +639,10 @@ def _process_circuits(
 
             # Loads count
             num_loads = circuit.get('loads', 0)
+            total_quantity = 1  # 🆕 FIX: Track total quantity for CRUD
             if isinstance(num_loads, list):
+                # 🆕 FIX 2026-01-25: Sum up quantity from all loads
+                total_quantity = sum(load.get('quantity', 1) for load in num_loads)
                 num_loads = len(num_loads)
             
             # Notes
@@ -665,6 +668,7 @@ def _process_circuits(
                 'branch_distance_m': branch_distance_m,  # 🆕 From MCP Core wire_result
                 'requires_rcbo': requires_rcbo,
                 'num_loads': num_loads,
+                'quantity': total_quantity,  # 🆕 FIX 2026-01-25: For CRUD edit mode
                 'notes': notes,
                 
                 # === NEW FIELDS (Professional Load Table) ===
