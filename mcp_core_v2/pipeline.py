@@ -226,7 +226,7 @@ class DesignPipeline:
                 'imbalance_percent': phase_balance_dict.get('imbalance_percent', 0) if phase_balance_dict else 0
             }
             # [CP-3PH-TRACE] Cloud logging for full data flow tracing
-            logger.info(f"[CP-3PH-INJECT] ✅ Injected three_phase into calculations:")
+            logger.info("[CP-3PH-INJECT] Injected three_phase into calculations")
             logger.info(f"[CP-3PH-INJECT]   is_three_phase={is_three_phase}")
             logger.info(f"[CP-3PH-INJECT]   connected_load_kw={three_phase_check['connected_load_kw']:.2f}")
             logger.info(f"[CP-3PH-INJECT]   phase_balance={phase_balance_dict}")

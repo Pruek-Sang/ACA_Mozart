@@ -627,7 +627,7 @@ class CircuitGrouper:
         for load in loads:
             circuit.add_load(load)
         
-        circuit.notes.append(f"ใช้ switch ธรรมดา (ไม่มี breaker แยก)")
+        circuit.notes.append("ใช้ switch ธรรมดา (ไม่มี breaker แยก)")
         circuit.notes.append(f"รวม {len(loads)} อุปกรณ์")
         self.circuits[circuit_id] = circuit
 
@@ -660,8 +660,8 @@ class CircuitGrouper:
                     if load_phase in phase_counts:
                         phase_counts[load_phase] += 1
                 
-                # Find most common phase
-                max_phase = max(phase_counts, key=phase_counts.get)
+                # Find most common phase (use default param to capture current value)
+                max_phase = max(phase_counts.keys(), key=lambda k, pc=phase_counts: pc[k])
                 if phase_counts[max_phase] > 0:
                     circuit.assigned_phase = max_phase
             

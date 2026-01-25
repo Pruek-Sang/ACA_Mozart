@@ -257,8 +257,8 @@ class PhaseBalanceInjector:
             qty = getattr(load, 'quantity', 1) or 1
             total_power = power * qty
             
-            # Find phase with minimum total (greedy)
-            min_phase = min(phase_totals, key=phase_totals.get)
+            # Find phase with minimum total (use default param to capture current value)
+            min_phase = min(phase_totals.keys(), key=lambda k, pt=phase_totals: pt[k])
             
             # Assign load to that phase
             phase_assignments[min_phase].append(load_id)
@@ -334,9 +334,9 @@ class PhaseBalanceInjector:
                 logger.info(f"[CP-3PH-BALANCE] Rebalance successful after {iteration} iterations")
                 break
             
-            # Find heaviest and lightest phases
-            heaviest = max(phase_totals, key=phase_totals.get)
-            lightest = min(phase_totals, key=phase_totals.get)
+            # Find heaviest and lightest phases (use default param to capture current value)
+            heaviest = max(phase_totals.keys(), key=lambda k, pt=phase_totals: pt[k])
+            lightest = min(phase_totals.keys(), key=lambda k, pt=phase_totals: pt[k])
             
             # Find smallest load in heaviest phase that helps balance
             candidate_load_id = None
@@ -346,7 +346,6 @@ class PhaseBalanceInjector:
                 power = load_lookup.get(load_id, 0)
                 if power < candidate_power and power > 0:
                     # Check if moving this load improves balance
-                    new_heavy = phase_totals[heaviest] - power
                     new_light = phase_totals[lightest] + power
                     
                     # Only move if it doesn't make lightest become heaviest
