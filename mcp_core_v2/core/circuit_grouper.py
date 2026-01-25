@@ -53,6 +53,8 @@ class GroupedCircuit:
     requires_rcbo: bool = False
     requires_gfci: bool = False
     notes: List[str] = field(default_factory=list)
+    # [3-PHASE] Sprint 2: Phase assignment for 3-phase systems
+    assigned_phase: Optional[str] = None  # "L1", "L2", "L3", or None for 1-phase
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization.
@@ -75,6 +77,8 @@ class GroupedCircuit:
             'requires_rcbo': self.requires_rcbo,
             'requires_gfci': self.requires_gfci,
             'notes': self.notes,
+            # [3-PHASE] Include phase assignment in output
+            'assigned_phase': self.assigned_phase,
         }
     
     def _load_to_dict(self, load: ElectricalLoad) -> Dict[str, Any]:
@@ -822,6 +826,112 @@ class CircuitGrouper:
             })
         
         return summary
+
+
+# ============================================================================
+# 3-Phase Support Functions (Sprint 1 - Threshold Detection)
+# ============================================================================
+
+# Default threshold for 3-phase requirement (วสท. 2564)
+THREE_PHASE_THRESHOLD_KW = 25.0
+
+def calculate_connected_load(loads: List[ElectricalLoad]) -> float:
+    """
+    Calculate total connected load in kW.
+    
+    [CP-3PH-DETECT] Cloud logging checkpoint for threshold detection.
+    
+    This is used to determine if 3-phase system is required:
+    - Connected load > 25 kW → 3-Phase required (วสท. 2564)
+    
+    Args:
+        loads: List of ElectricalLoad objects
+        
+    Returns:
+        Total connected load in kW
+        
+    Example:
+        >>> loads = [ElectricalLoad(power_watts=5000, quantity=3), ...]
+        >>> total_kw = calculate_connected_load(loads)
+        >>> if total_kw > 25.0:
+        ...     raise ThreePhaseRequiredError(total_kw)
+    """
+    total_watts = 0.0
+    
+    for load in loads:
+        quantity = getattr(load, 'quantity', 1) or 1
+        power_watts = getattr(load, 'power_watts', 0) or 0
+        total_watts += power_watts * quantity
+    
+    total_kw = total_watts / 1000.0
+    
+    logger.info(f"[CP-3PH-DETECT] Connected load calculated: {total_kw:.2f} kW from {len(loads)} loads")
+    
+    return total_kw
+
+
+def check_three_phase_required(
+    loads: List[ElectricalLoad],
+    service_voltage: 'VoltageType',
+    threshold_kw: float = THREE_PHASE_THRESHOLD_KW
+) -> tuple:
+    """
+    Check if 3-phase system is required based on connected load.
+    
+    [CP-3PH-DETECT] Cloud logging checkpoint.
+    
+    Thai EIT Standard (วสท. 2564):
+    - Connected load > 25 kW → Must use 3-phase system
+    - 1-Phase max load = 25 kW (approx. 108A @ 230V)
+    
+    Args:
+        loads: List of ElectricalLoad objects
+        service_voltage: Current voltage system type
+        threshold_kw: Threshold in kW (default: 25.0)
+        
+    Returns:
+        Tuple of (is_three_phase_required: bool, connected_load_kw: float, warnings: list)
+        
+    Raises:
+        ThreePhaseRequiredError: If load exceeds threshold but 1-phase specified
+    """
+    from exceptions import ThreePhaseRequiredError
+    
+    connected_kw = calculate_connected_load(loads)
+    is_three_phase_required = connected_kw > threshold_kw
+    warnings = []
+    
+    # Check if current system is 1-phase
+    voltage_str = service_voltage.value if hasattr(service_voltage, 'value') else str(service_voltage)
+    is_current_1phase = '3PH' not in voltage_str.upper() and 'THREE' not in voltage_str.upper()
+    
+    logger.info(
+        f"[CP-3PH-DETECT] Threshold check: {connected_kw:.2f} kW vs {threshold_kw} kW, "
+        f"current_system={'1-Phase' if is_current_1phase else '3-Phase'}, "
+        f"requires_3phase={is_three_phase_required}"
+    )
+    
+    # If 3-phase required but user specified 1-phase → Error
+    if is_three_phase_required and is_current_1phase:
+        logger.error(
+            f"[CP-3PH-DETECT] ERROR: 3PH-001 - Load {connected_kw:.2f} kW exceeds "
+            f"1-phase limit {threshold_kw} kW"
+        )
+        raise ThreePhaseRequiredError(
+            connected_load_kw=connected_kw,
+            threshold_kw=threshold_kw
+        )
+    
+    # Warning if close to threshold (within 20%)
+    if connected_kw > threshold_kw * 0.8 and is_current_1phase:
+        warning_msg = (
+            f"⚠️ โหลดรวม {connected_kw:.2f} kW ใกล้ถึงขีดจำกัด 1 เฟส ({threshold_kw} kW) "
+            f"แนะนำพิจารณาระบบ 3 เฟส"
+        )
+        warnings.append(warning_msg)
+        logger.warning(f"[CP-3PH-DETECT] {warning_msg}")
+    
+    return (is_three_phase_required, connected_kw, warnings)
 
 
 # Factory function

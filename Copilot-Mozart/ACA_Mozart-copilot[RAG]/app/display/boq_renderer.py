@@ -123,6 +123,35 @@ PRICE_CATALOG: Dict[str, Dict[str, Any]] = {
     'MCB-2P-10AT': {'material': 156.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
     'MCB-2P-100AT': {'material': 2884.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
     
+    # [CP-3PH-BOQ] 3-Phase MCB/MCCB - For 3-phase main breakers (Sprint 6)
+    'MCB-3P-20AT': {'material': 234.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-3P-32AT': {'material': 234.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-3P-40AT': {'material': 280.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-3P-50AT': {'material': 380.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCB-3P-63AT': {'material': 480.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'MCCB-3P-100AT': {'material': 3200.00, 'labor': 500.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MCCB-3P-125AT': {'material': 3800.00, 'labor': 500.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MCCB-3P-160AT': {'material': 4500.00, 'labor': 600.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MCCB-3P-200AT': {'material': 5200.00, 'labor': 700.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MCCB-3P-250AT': {'material': 6500.00, 'labor': 800.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    
+    # [CP-3PH-BOQ] 3-Phase RCD/RCCB - For 3-phase ground fault protection
+    'RCCB-4P-40AT-30mA': {'material': 2800.00, 'labor': 300.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'RCCB-4P-63AT-30mA': {'material': 3200.00, 'labor': 300.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    'RCCB-4P-100AT-30mA': {'material': 4500.00, 'labor': 400.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
+    
+    # [CP-3PH-BOQ] 3-Phase Load Center / MDB
+    'MDB-3PH-8W': {'material': 8500.00, 'labor': 4000.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MDB-3PH-12W': {'material': 12000.00, 'labor': 5000.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MDB-3PH-18W': {'material': 16000.00, 'labor': 6000.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    'MDB-3PH-24W': {'material': 22000.00, 'labor': 7000.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Siemens']},
+    
+    # [CP-3PH-BOQ] CT Meter Components (for >30kW)
+    'CT-METER-5A': {'material': 3500.00, 'labor': 1500.00, 'unit': 'ชุด', 'brand': 'MEA', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': []},
+    'CT-100-5A': {'material': 800.00, 'labor': 200.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB']},
+    'CT-200-5A': {'material': 1200.00, 'labor': 250.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB']},
+    'CT-400-5A': {'material': 1800.00, 'labor': 300.00, 'unit': 'ชุด', 'brand': 'Schneider', 'pack_unit': 'ชุด', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB']},
+    
     # RCBO - Sold individually
     'RCBO-1P-10AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
     'RCBO-1P-16AT-30mA': {'material': 1133.00, 'labor': 0.00, 'unit': 'ตัว', 'brand': 'Schneider', 'pack_unit': 'ตัว', 'pack_size': 1, 'wastage': 0.0, 'alt_brands': ['ABB', 'Hager']},
@@ -248,23 +277,38 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         total_labor = 0.0
         
         circuits = display_data.get('circuits', [])
+        is_three_phase = display_data.get('is_three_phase', False)
+        
         logger.info(f"[BOQ-GEN] Input circuits: {len(circuits)}")
         logger.info(f"[BOQ-GEN] Main wire: {display_data.get('main_feeder_size', 'N/A')}")
         logger.info(f"[BOQ-GEN] Main breaker: {display_data.get('main_cb_type', 'N/A')}")
+        logger.info(f"[CP-3PH-BOQ] is_three_phase: {is_three_phase}")
         
         # === E.1: Main Cable Section ===
+        # [CP-3PH-BOQ] Updated for 3-phase (4 wires instead of 2)
         e1_items: List[BOQItem] = []
         main_wire = display_data.get('main_feeder_size', '10')
         main_wire_key = f"IEC01-{main_wire.replace(' mm²', '').replace('Sq.mm', '').strip()}"
         price = get_price(main_wire_key)
         
         # Main cable (estimate 50m for residential)
-        main_qty = 50.0
+        # [CP-3PH-BOQ] 3-phase needs 4 wires (3 phases + neutral), single-phase needs 2
+        base_length = 50.0
+        if is_three_phase:
+            # 3-phase: 4 wires × length
+            wire_count = 4
+            cable_desc_suffix = '(L1,L2,L3,N)'
+        else:
+            # Single-phase: 2 wires × length
+            wire_count = 2
+            cable_desc_suffix = '(Phase+Neutral)'
+        
+        main_qty = base_length * wire_count
         main_brand = price.get('brand', 'Yazaki')
         main_wire_mm = main_wire.replace(' mm²', '').replace('Sq.mm', '').strip()
         e1_items.append({
             'item_no': '1',
-            'description': f'สาย IEC01 (THW) {main_wire_mm} mm² ({main_brand}) - สายเมนหลัก',
+            'description': f'สาย IEC01 (THW) {main_wire_mm} mm² ({main_brand}) - สายเมนหลัก {cable_desc_suffix}',
             'quantity': main_qty,
             'unit': price['unit'],
             'material_unit_price': price['material'],
@@ -272,7 +316,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': price['labor'],
             'labor_total': round(price['labor'] * main_qty, 2),
             'total_price': round((price['material'] + price['labor']) * main_qty, 2),
-            'remark': main_brand,
+            'remark': f"{main_brand} ({wire_count} เส้น)",
         })
         
         # Ground cable
@@ -335,17 +379,50 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         })
         
         # === E.2: Load Center Section ===
+        # [CP-3PH-BOQ] Updated for 3-phase MDB (Sprint 6)
         e2_items: List[BOQItem] = []
+        is_three_phase = display_data.get('is_three_phase', False)
         
-        # Load Center
+        # Load Center / MDB
         circuit_count = len(circuits)
-        lc_size = 'LC-30' if circuit_count > 18 else ('LC-24' if circuit_count > 12 else 'LC-18')
-        lc_price = get_price(lc_size)
+        
+        if is_three_phase:
+            # 3-Phase: Use Main Distribution Board (MDB)
+            # Size selection based on circuit count (ways)
+            if circuit_count > 18:
+                panel_key = 'MDB-3PH-24W'
+                panel_slots = '24'
+            elif circuit_count > 12:
+                panel_key = 'MDB-3PH-18W'
+                panel_slots = '18'
+            elif circuit_count > 6:
+                panel_key = 'MDB-3PH-12W'
+                panel_slots = '12'
+            else:
+                panel_key = 'MDB-3PH-8W'
+                panel_slots = '8'
+            
+            panel_desc = f'ตู้ MDB 3-Phase {panel_slots} วงจร'
+            logger.info(f"[CP-3PH-BOQ] 3-Phase MDB selected: {panel_key}")
+        else:
+            # Single-Phase: Use Load Center
+            if circuit_count > 18:
+                panel_key = 'LC-30'
+                panel_slots = '30'
+            elif circuit_count > 12:
+                panel_key = 'LC-24'
+                panel_slots = '24'
+            else:
+                panel_key = 'LC-18'
+                panel_slots = '18'
+            
+            panel_desc = f'ตู้ไฟฟ้า Load Center {panel_slots} ช่อง'
+        
+        lc_price = get_price(panel_key)
         lc_brand = lc_price.get('brand', 'Schneider')
-        lc_slots = lc_size.split("-")[1]
         e2_items.append({
             'item_no': '1',
-            'description': f'ตู้ไฟฟ้า Load Center {lc_slots} ช่อง ({lc_brand})',
+            'description': f'{panel_desc} ({lc_brand})',
             'quantity': 1.0,
             'unit': 'ชุด',
             'material_unit_price': lc_price['material'],
@@ -356,14 +433,36 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'remark': lc_brand,
         })
         
-        # Main Breaker
+        # [CP-3PH-BOQ] Main Breaker - Updated for 3-phase systems (Sprint 6)
+        is_three_phase = display_data.get('is_three_phase', False)
         main_breaker = display_data.get('main_breaker', 100)
-        main_breaker_key = f"MCB-2P-{main_breaker}AT"
+        
+        # Extract numeric rating (handle "100A" or "100" formats)
+        if isinstance(main_breaker, str):
+            main_breaker_val = int(''.join(filter(str.isdigit, main_breaker)) or 100)
+        else:
+            main_breaker_val = int(main_breaker)
+        
+        if is_three_phase:
+            # 3-phase: Use 3P MCCB for ratings ≥100A, else 3P MCB
+            if main_breaker_val >= 100:
+                main_breaker_key = f"MCCB-3P-{main_breaker_val}AT"
+                breaker_type_label = f'MCCB 3P {main_breaker_val}AT 25kA'
+            else:
+                main_breaker_key = f"MCB-3P-{main_breaker_val}AT"
+                breaker_type_label = f'MCB 3P {main_breaker_val}AT 10kA'
+            
+            logger.info(f"[CP-3PH-BOQ] 3-Phase main breaker: {main_breaker_key}")
+        else:
+            # Single-phase: Use 2P MCB/MCCB
+            main_breaker_key = f"MCB-2P-{main_breaker_val}AT"
+            breaker_type_label = f'MCCB 2P {main_breaker_val}AT 10kA'
+        
         mb_price = get_price(main_breaker_key)
         mb_brand = mb_price.get('brand', 'Schneider')
         e2_items.append({
             'item_no': '2',
-            'description': f'MCCB 2P {main_breaker}AT 10kA ({mb_brand}) - เมนเบรกเกอร์',
+            'description': f'{breaker_type_label} ({mb_brand}) - เมนเบรกเกอร์',
             'quantity': 1.0,
             'unit': 'ตัว',
             'material_unit_price': mb_price['material'],
@@ -371,7 +470,7 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'labor_unit_price': mb_price['labor'],
             'labor_total': mb_price['labor'],
             'total_price': mb_price['material'] + mb_price['labor'],
-            'remark': mb_brand,
+            'remark': f"{mb_brand} {'(3-Phase)' if is_three_phase else ''}".strip(),
         })
         
         # Branch breakers - Group by rating

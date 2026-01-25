@@ -378,6 +378,147 @@ class WireSizer:
             logger.info("Neutral could potentially be reduced, but using full size for safety")
             return phase_wire_size
 
+    # =========================================================================
+    # [CP-3PH-WIRE] 3-Phase Grounding & MDB Sizing (Sprint 7)
+    # =========================================================================
+
+    def size_3phase_ground_wire(
+        self,
+        phase_wire_size: str,
+        overcurrent_device_rating: int
+    ) -> Dict[str, str]:
+        """
+        [CP-3PH-WIRE] Size grounding conductors for 3-phase systems.
+        
+        Per NEC 250.122 (Equipment Grounding Conductor) and
+        NEC 250.66 (Grounding Electrode Conductor).
+        
+        Args:
+            phase_wire_size: Main phase conductor size (e.g., "4/0", "250")
+            overcurrent_device_rating: Main breaker rating (A)
+            
+        Returns:
+            Dict with equipment_ground, electrode_ground, and neutral_ground sizes
+        """
+        logger.info(f"[CP-3PH-WIRE] Sizing 3-phase ground: phase={phase_wire_size}, OCPD={overcurrent_device_rating}A")
+        
+        # Equipment Grounding Conductor (EGC) per NEC Table 250.122
+        egc_size = self.size_ground_wire(overcurrent_device_rating)
+        
+        # Grounding Electrode Conductor (GEC) per NEC Table 250.66
+        # Based on largest phase conductor size
+        gec_table = {
+            # Phase wire (AWG/kcmil): GEC size
+            "14": "8", "12": "8", "10": "8", "8": "8", "6": "8",
+            "4": "6", "3": "6", "2": "6", "1": "4", "1/0": "4",
+            "2/0": "4", "3/0": "2", "4/0": "2",
+            "250": "2", "300": "1/0", "350": "1/0", "400": "1/0",
+            "500": "2/0", "600": "2/0", "750": "2/0",
+            "1000": "3/0", "1250": "3/0"
+        }
+        gec_size = gec_table.get(phase_wire_size, "2")
+        
+        # Main Bonding Jumper (MBJ) - same size as EGC per NEC 250.28
+        mbj_size = egc_size
+        
+        logger.info(f"[CP-3PH-WIRE] Ground sizes: EGC={egc_size}, GEC={gec_size}, MBJ={mbj_size}")
+        
+        return {
+            'equipment_ground': egc_size,
+            'electrode_ground': gec_size,
+            'main_bonding_jumper': mbj_size,
+            'overcurrent_device': f"{overcurrent_device_rating}AT"
+        }
+
+    def size_mdb_panel(
+        self,
+        total_load_kw: float,
+        circuit_count: int,
+        is_three_phase: bool = True,
+        voltage_ll: float = 400.0
+    ) -> Dict[str, Any]:
+        """
+        [CP-3PH-WIRE] Size Main Distribution Board (MDB) for 3-phase systems.
+        
+        Per Thai EIT standard วสท. 2564 and IEC 60364.
+        
+        Args:
+            total_load_kw: Total connected load (kW)
+            circuit_count: Number of branch circuits
+            is_three_phase: True for 3-phase, False for single-phase
+            voltage_ll: Line-to-line voltage (V)
+            
+        Returns:
+            Dict with MDB specifications
+        """
+        import math
+        
+        logger.info(f"[CP-3PH-WIRE] Sizing MDB: {total_load_kw}kW, {circuit_count} circuits, 3ph={is_three_phase}")
+        
+        # Calculate required amperage
+        if is_three_phase:
+            # I = P / (√3 × V × pf)
+            pf = 0.85  # Assume 0.85 power factor
+            current_a = (total_load_kw * 1000) / (math.sqrt(3) * voltage_ll * pf)
+        else:
+            # Single-phase
+            pf = 0.90
+            current_a = (total_load_kw * 1000) / (230 * pf)
+        
+        # Select main breaker rating (125% of calculated current, rounded to standard)
+        design_current = current_a * 1.25
+        standard_ratings = [20, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630]
+        main_breaker_rating = next(
+            (r for r in standard_ratings if r >= design_current),
+            standard_ratings[-1]
+        )
+        
+        # Determine panel type based on capacity
+        if main_breaker_rating <= 63:
+            panel_type = "MDB-Small"
+            enclosure = "Steel wall-mount 12-18 way"
+        elif main_breaker_rating <= 125:
+            panel_type = "MDB-Medium"
+            enclosure = "Steel wall-mount 24-36 way"
+        elif main_breaker_rating <= 250:
+            panel_type = "MDB-Large"
+            enclosure = "Steel floor-standing 48 way"
+        else:
+            panel_type = "MDB-Industrial"
+            enclosure = "Steel floor-standing cubicle"
+        
+        # Busbar sizing (125% of main breaker rating)
+        busbar_rating = main_breaker_rating * 1.25
+        
+        # Number of ways (minimum 1.5x circuit count for expansion)
+        min_ways = int(circuit_count * 1.5)
+        standard_ways = [8, 12, 18, 24, 30, 36, 48, 72]
+        panel_ways = next((w for w in standard_ways if w >= min_ways), standard_ways[-1])
+        
+        # Short circuit rating based on load
+        if total_load_kw <= 30:
+            short_circuit_ka = 10
+        elif total_load_kw <= 100:
+            short_circuit_ka = 25
+        else:
+            short_circuit_ka = 50
+        
+        result = {
+            'panel_type': panel_type,
+            'main_breaker_rating': main_breaker_rating,
+            'busbar_rating': int(busbar_rating),
+            'panel_ways': panel_ways,
+            'enclosure': enclosure,
+            'short_circuit_rating_ka': short_circuit_ka,
+            'calculated_current_a': round(current_a, 1),
+            'design_current_a': round(design_current, 1),
+            'is_three_phase': is_three_phase,
+            'voltage_ll': voltage_ll
+        }
+        
+        logger.info(f"[CP-3PH-WIRE] MDB result: {panel_type}, {main_breaker_rating}AT, {panel_ways}W")
+        return result
+
 
 # Global instance
 _wire_sizer: Optional[WireSizer] = None

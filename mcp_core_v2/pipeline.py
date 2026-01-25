@@ -10,15 +10,17 @@ from core.conduit_sizer import get_conduit_sizer
 from core.compliance_checker import get_compliance_checker
 from core.autolisp_generator import get_autolisp_generator
 from core.result_builder import get_result_builder
-from core.circuit_grouper import get_circuit_grouper, GroupedCircuit
+from core.circuit_grouper import get_circuit_grouper, GroupedCircuit, check_three_phase_required, calculate_connected_load
 from core.lighting_calculator import get_lighting_calculator
 from core.room_defaults import get_room_defaults_manager
 from models.catalog_models import BreakerPoles, ConductorMaterial, BreakerType
 from config import get_settings, get_branch_distance_feet, METERS_TO_FEET
-from exceptions import InvalidSpecError, UnsupportedProjectError
+from exceptions import InvalidSpecError, UnsupportedProjectError, ThreePhaseRequiredError
 # [NEXIA EXTENSION] Import Context Injectors
 from context import DeratingInjector, KaRatingInjector, NgLinkInjector
 from context.input_sanitizer_injector import InputSanitizerInjector
+# [3-PHASE EXTENSION] Import Phase Balance Injector
+from context.phase_balance_injector import get_phase_balance_injector
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,58 @@ class DesignPipeline:
         self.ka_rating_injector = KaRatingInjector()
         self.ng_link_injector = NgLinkInjector()
         self.input_sanitizer = InputSanitizerInjector()  # 🆕 PRE-validation
+        
+        # [3-PHASE EXTENSION] Initialize Phase Balance Injector
+        self.phase_balance_injector = get_phase_balance_injector(max_imbalance=15.0)
+        
+        # [3-PHASE] Configuration
+        self.three_phase_threshold_kw = 25.0  # วสท. 2564
+    
+    def _check_three_phase_threshold(self, request: DesignRequest) -> Dict[str, Any]:
+        """
+        [CP-3PH-DETECT] Check if 3-phase system is required based on load.
+        
+        Sprint 1: Threshold Detection
+        - Calculate connected load
+        - Check against 25kW threshold
+        - Raise ThreePhaseRequiredError if load exceeds threshold but 1-phase specified
+        
+        Returns:
+            Dict with keys:
+            - is_three_phase: bool
+            - connected_load_kw: float  
+            - warnings: list
+        """
+        logger.info("[CP-3PH-DETECT] Checking 3-phase threshold...")
+        
+        try:
+            is_required, connected_kw, warnings = check_three_phase_required(
+                loads=request.loads,
+                service_voltage=request.service_voltage,
+                threshold_kw=self.three_phase_threshold_kw
+            )
+            
+            # Determine if current system is 3-phase
+            voltage_str = request.service_voltage.value if hasattr(request.service_voltage, 'value') else str(request.service_voltage)
+            is_three_phase = '3PH' in voltage_str.upper() or 'THREE' in voltage_str.upper()
+            
+            result = {
+                'is_three_phase': is_three_phase,
+                'connected_load_kw': connected_kw,
+                'three_phase_required': is_required,
+                'warnings': warnings
+            }
+            
+            logger.info(
+                f"[CP-3PH-DETECT] Result: is_3phase={is_three_phase}, "
+                f"connected={connected_kw:.2f}kW, required={is_required}"
+            )
+            
+            return result
+            
+        except ThreePhaseRequiredError:
+            # Re-raise to be caught by execute()
+            raise
     
     def _validate_request(self, request: DesignRequest):
         """Validate design request before processing.
@@ -108,6 +162,39 @@ class DesignPipeline:
             
             # Validate input
             self._validate_request(request)
+            
+            # ============================================================
+            # [3-PHASE] Step 0: Check 3-phase threshold (Sprint 1)
+            # ============================================================
+            logger.info("[CP-3PH-DETECT] Step 0: Checking 3-phase threshold")
+            three_phase_check = self._check_three_phase_threshold(request)
+            is_three_phase = three_phase_check['is_three_phase']
+            three_phase_warnings = three_phase_check.get('warnings', [])
+            
+            # Add 3-phase warnings to sanitize warnings
+            sanitize_warnings.extend(three_phase_warnings)
+            
+            logger.info(
+                f"[CP-3PH-DETECT] System: {'3-Phase' if is_three_phase else '1-Phase'}, "
+                f"Connected: {three_phase_check['connected_load_kw']:.2f} kW"
+            )
+            
+            # ============================================================
+            # [3-PHASE] Step 0.5: Apply Phase Balance (if 3-phase) - Sprint 2
+            # ============================================================
+            phase_balance_result = None
+            if is_three_phase:
+                logger.info("[CP-3PH-BALANCE] Step 0.5: Applying phase balance")
+                try:
+                    # This will assign loads to L1/L2/L3
+                    phase_balance_result = self.phase_balance_injector.inject(request)
+                    logger.info(f"[CP-3PH-BALANCE] Phase balance applied successfully")
+                except NotImplementedError:
+                    # Phase balance not yet implemented - continue with warning
+                    logger.warning("[CP-3PH-BALANCE] Phase balance injector not yet implemented, skipping")
+                    three_phase_warnings.append(
+                        "⚠️ Phase balance injector ยังไม่ implement - โหลดยังไม่ถูกแบ่งใน L1/L2/L3"
+                    )
             
             # Step 1: Resolve templates
             logger.info("Step 1: Resolving design templates")

@@ -84,6 +84,7 @@ class DisplayData(TypedDict):
     """Complete display data - Source of Truth for all renderers.
     
     Updated: Added summary section fields for professional load table.
+    Updated: Added 3-phase support fields (Sprint 4).
     IMPORTANT: Keep all existing fields for backward compatibility!
     """
     # === EXISTING FIELDS (DO NOT REMOVE!) ===
@@ -138,6 +139,17 @@ class DisplayData(TypedDict):
     # Audit Summary
     rcbo_count: int                   # Count of RCBO circuits
     mcb_count: int                    # Count of MCB circuits
+    
+    # === 3-PHASE FIELDS (Sprint 4) ===
+    is_three_phase: bool              # True if 3-phase system
+    voltage_system: str               # "1PH-230V" or "3PH-400V"
+    line_voltage_v: int               # 230 or 400
+    phase_voltage_v: int              # 230 (1PH or 3PH line-to-neutral)
+    # Phase balance info (only for 3-phase)
+    phase_balance_l1_kw: Optional[float]  # L1 total kW
+    phase_balance_l2_kw: Optional[float]  # L2 total kW
+    phase_balance_l3_kw: Optional[float]  # L3 total kW
+    phase_imbalance_percent: Optional[float]  # Imbalance %
 
 
 # =============================================================================
@@ -152,12 +164,62 @@ def round_up(value: float, decimals: int = 0) -> float:
     return math.ceil(value * multiplier) / multiplier
 
 
-def _get_meter_sizing(demand_current: float) -> tuple:
+def _get_meter_sizing(demand_current: float, is_three_phase: bool = False, total_kw: float = 0) -> tuple:
     """
-    Get meter, main wire, and main breaker based on Thai MEA standards.
+    [CP-3PH-DISPLAY] Get meter, main wire, and main breaker based on Thai MEA standards.
     
-    Logic moved from markdown_formatter.py lines 129-145.
+    Updated for 3-phase CT meter support (Sprint 8):
+    - Single-phase: Direct meter up to 100A
+    - 3-Phase >30kW: CT Meter required (per MEA regulation)
+    
+    Args:
+        demand_current: Calculated demand current (A)
+        is_three_phase: True if 3-phase system
+        total_kw: Total connected load (kW) - used for CT determination
+        
+    Returns:
+        Tuple of (meter_size, main_wire, main_breaker)
     """
+    logger.info(f"[CP-3PH-DISPLAY] Meter sizing: I={demand_current:.1f}A, 3ph={is_three_phase}, kW={total_kw}")
+    
+    # [CP-3PH-DISPLAY] 3-Phase CT Meter threshold: >30kW requires CT
+    if is_three_phase and total_kw > 30:
+        # CT Meter required for 3-phase loads >30kW
+        # CT ratio selection based on demand current
+        if demand_current <= 100:
+            ct_ratio = "100/5A"
+            main_wire = "35 mm²"
+            main_breaker = "100A/3P"
+        elif demand_current <= 200:
+            ct_ratio = "200/5A"
+            main_wire = "70 mm²"
+            main_breaker = "200A/3P"
+        elif demand_current <= 400:
+            ct_ratio = "400/5A"
+            main_wire = "120 mm²"
+            main_breaker = "400A/3P"
+        else:
+            ct_ratio = "600/5A"
+            main_wire = "185 mm²"
+            main_breaker = "630A/3P"
+        
+        logger.info(f"[CP-3PH-DISPLAY] CT Meter selected: CT={ct_ratio}")
+        return f"CT Meter ({ct_ratio})", main_wire, main_breaker
+    
+    # 3-Phase direct meter (≤30kW)
+    if is_three_phase:
+        if demand_current <= 30:
+            return "15(45)A 3PH", "10 mm²", "40A/3P"
+        elif demand_current <= 50:
+            return "30(100)A 3PH", "16 mm²", "63A/3P"
+        elif demand_current <= 100:
+            return "50(150)A 3PH", "25 mm²", "100A/3P"
+        else:
+            # Exceeds direct meter range → CT Meter
+            logger.info("[CP-3PH-DISPLAY] Current exceeds 3PH direct meter, switching to CT")
+            return f"CT Meter (200/5A)", "35 mm²", "125A/3P"
+    
+    # Single-phase meter sizing (existing logic)
     if demand_current <= 15:
         return "5(15)A", "4 mm²", "16A/1P"
     elif demand_current <= 45:
@@ -227,16 +289,40 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         
         design_current = round_up(demand_current * 1.25, 1)
         
-        # Get main equipment sizing
-        meter_size, main_wire, main_breaker = _get_meter_sizing(demand_current)
+        # [3-PHASE] Extract phase system info from mcp_result (early detection for meter sizing)
+        three_phase_data = mcp_result.get('three_phase_data') or mcp_result.get('calculations', {}).get('three_phase', {})
+        is_three_phase = three_phase_data.get('is_three_phase', False)
+        
+        # [CP-3PH-DISPLAY] Get main equipment sizing with 3-phase parameters (Sprint 8)
+        meter_size, main_wire, main_breaker = _get_meter_sizing(
+            demand_current,
+            is_three_phase=is_three_phase,
+            total_kw=total_kw
+        )
         
         # Process circuits
         circuits, default_distance_circuits = _process_circuits(
             grouped_circuits, wire_sizing, conduit_sizing, floor_distances
         )
         
-        # Calculate summary fields
-        summary_fields = _get_summary_fields(circuits, demand_current, main_breaker, main_wire)
+        # Determine voltage system
+        if is_three_phase:
+            voltage_system = "3PH-400V"
+            line_voltage = 400
+            phase_voltage = 230
+        else:
+            voltage_system = "1PH-230V"
+            line_voltage = 230
+            phase_voltage = 230
+        
+        logger.info(f"[CP-3PH-DISPLAY] System: {voltage_system}, is_3phase={is_three_phase}")
+        
+        # Calculate summary fields (pass is_three_phase)
+        summary_fields = _get_summary_fields(
+            circuits, demand_current, main_breaker, main_wire,
+            is_three_phase=is_three_phase,
+            grouped_circuits=grouped_circuits
+        )
         
         display_data: DisplayData = {
             # === EXISTING FIELDS ===
@@ -256,7 +342,17 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
             'phase_balance': None,
             
             # === NEW FIELDS (Summary Section) ===
-            **summary_fields
+            **summary_fields,
+            
+            # === 3-PHASE FIELDS (Sprint 4) ===
+            'is_three_phase': is_three_phase,
+            'voltage_system': voltage_system,
+            'line_voltage_v': line_voltage,
+            'phase_voltage_v': phase_voltage,
+            'phase_balance_l1_kw': summary_fields.get('phase_balance_l1_kw'),
+            'phase_balance_l2_kw': summary_fields.get('phase_balance_l2_kw'),
+            'phase_balance_l3_kw': summary_fields.get('phase_balance_l3_kw'),
+            'phase_imbalance_percent': summary_fields.get('phase_imbalance_percent'),
         }
         
         rcbo_count = summary_fields.get('rcbo_count', 0)
@@ -274,14 +370,82 @@ def _get_summary_fields(
     circuits: List[CircuitData], 
     demand_current: float, 
     main_breaker: str, 
-    main_wire: str
+    main_wire: str,
+    is_three_phase: bool = False,
+    grouped_circuits: List[Dict] = None
 ) -> Dict[str, Any]:
-    """Calculate summary fields for professional load table."""
-    # Total load by phase (1-phase: all in L1)
+    """Calculate summary fields for professional load table.
+    
+    [CP-3PH-DISPLAY] Cloud logging checkpoint for 3-phase display integration.
+    
+    Args:
+        circuits: Processed circuit data
+        demand_current: Calculated demand current
+        main_breaker: Main breaker string
+        main_wire: Main wire size string
+        is_three_phase: True if 3-phase system
+        grouped_circuits: Original grouped circuits (for phase balance data)
+    """
+    # Total load by phase
     total_load_va = sum(c.get('total_va', 0) for c in circuits)
-    total_load_va_l1 = sum(c.get('load_va_l1', 0) for c in circuits)
-    total_load_va_l2 = 0  # 0 for 1-phase
-    total_load_va_l3 = 0  # 0 for 1-phase
+    
+    # [3-PHASE] Calculate phase totals from grouped_circuits
+    phase_balance_l1_kw = None
+    phase_balance_l2_kw = None
+    phase_balance_l3_kw = None
+    phase_imbalance_percent = None
+    
+    if is_three_phase and grouped_circuits:
+        logger.info("[CP-3PH-DISPLAY] Calculating 3-phase load distribution...")
+        
+        # Sum watts by assigned_phase
+        l1_watts = 0.0
+        l2_watts = 0.0
+        l3_watts = 0.0
+        
+        for circuit in grouped_circuits:
+            assigned_phase = circuit.get('assigned_phase')
+            circuit_watts = circuit.get('total_watts', 0) or circuit.get('watts', 0)
+            
+            if assigned_phase == 'L1':
+                l1_watts += circuit_watts
+            elif assigned_phase == 'L2':
+                l2_watts += circuit_watts
+            elif assigned_phase == 'L3':
+                l3_watts += circuit_watts
+            else:
+                # Unassigned - distribute equally (fallback)
+                l1_watts += circuit_watts / 3
+                l2_watts += circuit_watts / 3
+                l3_watts += circuit_watts / 3
+        
+        phase_balance_l1_kw = round(l1_watts / 1000, 2)
+        phase_balance_l2_kw = round(l2_watts / 1000, 2)
+        phase_balance_l3_kw = round(l3_watts / 1000, 2)
+        
+        # Calculate imbalance
+        values = [l1_watts, l2_watts, l3_watts]
+        if sum(values) > 0:
+            avg_watts = sum(values) / 3
+            max_watts = max(values)
+            min_watts = min(values)
+            phase_imbalance_percent = round(((max_watts - min_watts) / avg_watts) * 100, 1) if avg_watts > 0 else 0.0
+        
+        logger.info(
+            f"[CP-3PH-DISPLAY] Phase balance: L1={phase_balance_l1_kw}kW, "
+            f"L2={phase_balance_l2_kw}kW, L3={phase_balance_l3_kw}kW, "
+            f"imbalance={phase_imbalance_percent}%"
+        )
+        
+        # Set phase totals for 3-phase
+        total_load_va_l1 = round(l1_watts)
+        total_load_va_l2 = round(l2_watts)
+        total_load_va_l3 = round(l3_watts)
+    else:
+        # 1-phase: all in L1
+        total_load_va_l1 = sum(c.get('load_va_l1', 0) for c in circuits)
+        total_load_va_l2 = 0
+        total_load_va_l3 = 0
     
     # Demand calculation
     demand_factor = 0.78  # Standard for residential
@@ -291,9 +455,14 @@ def _get_summary_fields(
     rcbo_count = sum(1 for c in circuits if c.get('requires_rcbo', False))
     mcb_count = len(circuits) - rcbo_count
     
-    # Main equipment details
-    main_cb_type = f"MCCB 2P {main_breaker}"
-    main_cb_ic_ka = 10  # 10kA at 230V
+    # Main equipment details (adjust for 3-phase)
+    if is_three_phase:
+        main_cb_type = f"MCCB 3P {main_breaker}"
+        main_cb_ic_ka = 10  # 10kA at 400V
+    else:
+        main_cb_type = f"MCCB 2P {main_breaker}"
+        main_cb_ic_ka = 10  # 10kA at 230V
+    
     main_feeder_size = main_wire.replace(' mm²', '')
     main_feeder_type = 'IEC01 (THW)'
     main_feeder_grd = f"G-{main_feeder_size} Sq.mm"
@@ -316,6 +485,11 @@ def _get_summary_fields(
         'main_raceway_size': main_raceway_size,
         'rcbo_count': rcbo_count,
         'mcb_count': mcb_count,
+        # [3-PHASE] Phase balance fields
+        'phase_balance_l1_kw': phase_balance_l1_kw,
+        'phase_balance_l2_kw': phase_balance_l2_kw,
+        'phase_balance_l3_kw': phase_balance_l3_kw,
+        'phase_imbalance_percent': phase_imbalance_percent,
     }
 
 

@@ -89,12 +89,15 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
     """
     [CP-SLD] Render SLD data from DisplayData.
     
+    [CP-3PH-SLD] Cloud logging prefix for 3-phase SLD (Sprint 5).
+    
     Layout: แนวตั้ง (Vertical)
     Power → kWh Meter → Main MCB → RCD → Branch MCBs → Loads
     
     Features:
     - Switch สำหรับ Lighting circuits
     - Cable Label (ขนาดสาย+ท่อ)
+    - 3-Phase support with phase indicators (L1/L2/L3)
     
     Args:
         display_data: DisplayData from compute.py
@@ -107,20 +110,41 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
     nodes: List[SLDNode] = []
     edges: List[SLDEdge] = []
     
+    # [3-PHASE] Determine if 3-phase system
+    is_three_phase = display_data.get('is_three_phase', False)
+    voltage_system = display_data.get('voltage_system', '1PH-230V')
+    
+    logger.info(f"[CP-3PH-SLD] System: {voltage_system}, is_3phase={is_three_phase}")
+    
     # Calculate center X
     center_x = CANVAS_WIDTH / 2
     current_y = 40
     
-    # 1. Power Source Node (Top)
+    # 1. Power Source Node (Top) - Updated for 3-phase
+    main_wire = display_data.get('main_wire', '25')
+    if is_three_phase:
+        # 3-phase: 4 wires (3 phase + 1 neutral)
+        cable_label = f"4 × {main_wire}mm² Cu"
+        power_label = 'Power from MEA (3-Phase)'
+    else:
+        # 1-phase: 2 wires (1 phase + 1 neutral)
+        cable_label = f"2 × {main_wire}mm² Cu"
+        power_label = 'Power from MEA'
+    
     power_node: SLDNode = {
         'id': 'power',
         'type': 'power_source',
-        'label': 'Power from MEA',
+        'label': power_label,
         'x': center_x - NODE_WIDTH / 2,
         'y': current_y,
         'width': NODE_WIDTH,
         'height': 40,
-        'data': {'icon': '⚡', 'cable_label': f"2 × {display_data.get('main_wire', '25')}mm² Cu"}
+        'data': {
+            'icon': '⚡',
+            'cable_label': cable_label,
+            'is_three_phase': is_three_phase,
+            'voltage_system': voltage_system
+        }
     }
     nodes.append(power_node)
     current_y += 60
@@ -136,7 +160,7 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
     })
     current_y += VERTICAL_GAP
     
-    # 3. Main Breaker Node (MCCB/MCB)
+    # 3. Main Breaker Node (MCCB/MCB) - Updated for 3-phase
     main_breaker_node = _create_main_breaker_node(display_data, center_x, current_y)
     nodes.append(main_breaker_node)
     edges.append({
@@ -228,7 +252,7 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
     if num_circuits > 0:
         canvas_height = max(canvas_height, branch_y + NODE_HEIGHT + 80)
     
-    # Metadata
+    # [CP-3PH-SLD] Metadata with 3-phase info
     metadata = {
         'project_name': display_data.get('project_name', 'Unknown'),
         'total_kw': display_data.get('total_kw', 0),
@@ -236,8 +260,20 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
         'circuit_count': num_circuits,
         'canvas_width': CANVAS_WIDTH,
         'canvas_height': canvas_height,
-        'layout': 'vertical',  # 🆕 Indicate layout type
-        'has_switches': any(_is_lighting_circuit(c) for c in circuits),  # 🆕
+        'layout': 'vertical',
+        'has_switches': any(_is_lighting_circuit(c) for c in circuits),
+        # 3-Phase additions
+        'is_three_phase': is_three_phase,
+        'voltage_system': voltage_system,
+        'line_voltage_v': display_data.get('line_voltage_v', 230),
+        'phase_voltage_v': display_data.get('phase_voltage_v', 230),
+        # Phase balance info (if 3-phase)
+        'phase_balance': {
+            'l1_kw': display_data.get('phase_balance_l1_kw', 0),
+            'l2_kw': display_data.get('phase_balance_l2_kw', 0),
+            'l3_kw': display_data.get('phase_balance_l3_kw', 0),
+            'imbalance_percent': display_data.get('phase_imbalance_percent', 0),
+        } if is_three_phase else None,
     }
     
     sld_data: SLDData = {
@@ -257,7 +293,13 @@ def _is_lighting_circuit(circuit: Dict[str, Any]) -> bool:
 
 
 def _create_circuit_node_vertical(circuit: Dict[str, Any], index: int, x: float, y: float) -> SLDNode:
-    """Create branch circuit node with Cable Label."""
+    """
+    Create branch circuit node with Cable Label.
+    
+    [CP-3PH-SLD] 3-phase support:
+    - assigned_phase for 3-phase systems (L1/L2/L3)
+    - Phase indicator in label
+    """
     name = circuit.get('circuit_name', f'Circuit {index + 1}')
     # 🆕 Allow 2-line wrap instead of truncation
     if len(name) > 18:
@@ -277,13 +319,22 @@ def _create_circuit_node_vertical(circuit: Dict[str, Any], index: int, x: float,
     rcbo = circuit.get('requires_rcbo', False)
     is_lighting = _is_lighting_circuit(circuit)
     
+    # [CP-3PH-SLD] Phase assignment
+    assigned_phase = circuit.get('assigned_phase')  # L1, L2, L3 or None
+    
     # 🆕 Cable Label (สาย + ท่อ)
     cable_label = f"{wire}mm²/{conduit}"
+    
+    # [CP-3PH-SLD] Include phase in label if assigned
+    if assigned_phase:
+        phase_label = f"[{assigned_phase}] {name}\n{breaker}A/{poles}P"
+    else:
+        phase_label = f"{name}\n{breaker}A/{poles}P"
     
     return {
         'id': f'circuit_{index}',
         'type': 'rcbo' if rcbo else 'branch_breaker',
-        'label': f"{name}\n{breaker}A/{poles}P",
+        'label': phase_label,
         'x': x - NODE_WIDTH / 2,
         'y': y,
         'width': NODE_WIDTH,
@@ -293,13 +344,15 @@ def _create_circuit_node_vertical(circuit: Dict[str, Any], index: int, x: float,
             'breaker': f"{breaker}A/{poles}P",
             'wire': f"{wire}mm²",
             'conduit': conduit,
-            'cable_label': cable_label,  # 🆕
+            'cable_label': cable_label,
             'kw': circuit.get('total_kw', 0),
             'current': circuit.get('total_current', 0),
             'rcbo': rcbo,
-            'is_lighting': is_lighting,  # 🆕
+            'is_lighting': is_lighting,
             'vd_percent': circuit.get('vd_percent', 0),
             'icon': '💡' if is_lighting else ('🛡️' if rcbo else '⚡'),
+            # [CP-3PH-SLD] Phase info
+            'assigned_phase': assigned_phase,
         }
     }
 
@@ -309,37 +362,82 @@ def _create_circuit_node_vertical(circuit: Dict[str, Any], index: int, x: float,
 # =============================================================================
 
 def _create_meter_node(data: Dict[str, Any], x: float, y: float) -> SLDNode:
-    """Create meter node."""
+    """
+    [CP-3PH-SLD] Create meter node with CT Meter support (Sprint 8).
+    
+    Handles:
+    - Direct meters (5A-100A)
+    - CT meters for loads >30kW (3-phase)
+    """
+    meter_size = data.get('meter_size', '-')
+    is_ct_meter = 'CT' in str(meter_size).upper()
+    
+    if is_ct_meter:
+        # CT Meter: Show CT ratio
+        icon = '🔄'  # Different icon for CT meter
+        meter_type = 'ct_meter'
+        label = f"CT Meter\n{meter_size}"
+    else:
+        icon = '📊'
+        meter_type = 'direct_meter'
+        label = f"มิเตอร์ {meter_size}"
+    
     return {
         'id': 'meter',
-        'type': 'meter',
-        'label': f"มิเตอร์ {data.get('meter_size', '-')}",
+        'type': meter_type,
+        'label': label,
         'x': x - NODE_WIDTH / 2,
         'y': y,
         'width': NODE_WIDTH,
         'height': NODE_HEIGHT,
         'data': {
-            'meter_size': data.get('meter_size', '-'),
-            'icon': '📊',
+            'meter_size': meter_size,
+            'icon': icon,
+            'is_ct_meter': is_ct_meter,
         }
     }
 
 
 def _create_main_breaker_node(data: Dict[str, Any], x: float, y: float) -> SLDNode:
-    """Create main breaker node."""
+    """
+    Create main breaker node.
+    
+    [CP-3PH-SLD] 3-phase support:
+    - 3P breaker for 3-phase system
+    - 2P/1P breaker for single-phase
+    - Display phase information
+    """
+    is_three_phase = data.get('is_three_phase', False)
+    main_breaker = data.get('main_breaker', '-')
+    
+    # Determine poles based on system type
+    if is_three_phase:
+        # 3-phase: 3P or 4P breaker
+        poles = '3P'
+        breaker_label = f"Main MCCB {main_breaker}/{poles}"
+        icon = '🔌⚡'  # Special icon for 3-phase
+    else:
+        # Single-phase: 2P breaker
+        poles = '2P'
+        breaker_label = f"Main CB {main_breaker}/{poles}"
+        icon = '🔌'
+    
     return {
         'id': 'main_breaker',
         'type': 'main_breaker',
-        'label': f"Main CB {data.get('main_breaker', '-')}",
+        'label': breaker_label,
         'x': x - NODE_WIDTH / 2,
         'y': y,
         'width': NODE_WIDTH,
         'height': NODE_HEIGHT,
         'data': {
-            'breaker': data.get('main_breaker', '-'),
+            'breaker': main_breaker,
+            'poles': poles,
             'wire': data.get('main_wire', '-'),
             'current': f"{data.get('design_current', 0):.1f}A",
-            'icon': '🔌',
+            'icon': icon,
+            'is_three_phase': is_three_phase,
+            'voltage_system': data.get('voltage_system', '1PH-230V'),
         }
     }
 
