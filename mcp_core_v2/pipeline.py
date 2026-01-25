@@ -182,13 +182,12 @@ class DesignPipeline:
             # ============================================================
             # [3-PHASE] Step 0.5: Apply Phase Balance (if 3-phase) - Sprint 2
             # ============================================================
-            phase_balance_result = None
             if is_three_phase:
                 logger.info("[CP-3PH-BALANCE] Step 0.5: Applying phase balance")
                 try:
                     # This will assign loads to L1/L2/L3
-                    phase_balance_result = self.phase_balance_injector.inject(request)
-                    logger.info(f"[CP-3PH-BALANCE] Phase balance applied successfully")
+                    self.phase_balance_injector.inject(request)
+                    logger.info("[CP-3PH-BALANCE] Phase balance applied successfully")
                 except NotImplementedError:
                     # Phase balance not yet implemented - continue with warning
                     logger.warning("[CP-3PH-BALANCE] Phase balance injector not yet implemented, skipping")
