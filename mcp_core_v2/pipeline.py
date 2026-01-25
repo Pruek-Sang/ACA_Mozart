@@ -707,7 +707,7 @@ class DesignPipeline:
     def _check_compliance(
         self,
         request: DesignRequest,
-        wire_sizing: Dict[str, Any] = None
+        wire_sizing: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Check design for NEC/EIT/วสท. compliance including VD limits."""
         return self.compliance_checker.check_design(request, wire_sizing)

@@ -31,6 +31,7 @@ class CircuitData(TypedDict):
     """Single circuit data for display.
     
     Updated: Added professional load table fields.
+    Updated: Added quantity for CRUD edit mode (2026-01-25).
     IMPORTANT: Keep all existing fields for backward compatibility!
     """
     # === EXISTING FIELDS (DO NOT REMOVE!) ===
@@ -38,6 +39,7 @@ class CircuitData(TypedDict):
     circuit_id: str
     floor: str
     room: str
+    quantity: int  # 🆕 For CRUD edit mode - number of devices
     total_watts: float
     total_kw: float
     total_current: float
@@ -372,7 +374,7 @@ def _get_summary_fields(
     main_breaker: str, 
     main_wire: str,
     is_three_phase: bool = False,
-    grouped_circuits: List[Dict] = None
+    grouped_circuits: Optional[List[Dict]] = None
 ) -> Dict[str, Any]:
     """Calculate summary fields for professional load table.
     
@@ -566,7 +568,7 @@ def _process_circuits(
     grouped_circuits: List[Dict],
     wire_sizing: Dict[str, Any],
     conduit_sizing: Dict[str, Any],
-    floor_distances: Dict[str, float] = None
+    floor_distances: Optional[Dict[str, float]] = None
 ) -> tuple[List[CircuitData], List[Dict[str, Any]]]:
     """Process grouped_circuits into CircuitData list.
     
