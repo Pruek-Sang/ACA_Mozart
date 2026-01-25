@@ -182,11 +182,12 @@ class DesignPipeline:
             # ============================================================
             # [3-PHASE] Step 0.5: Apply Phase Balance (if 3-phase) - Sprint 2
             # ============================================================
+            phase_balance_result = None  # Store for later injection into calculations
             if is_three_phase:
                 logger.info("[CP-3PH-BALANCE] Step 0.5: Applying phase balance")
                 try:
-                    # This will assign loads to L1/L2/L3
-                    self.phase_balance_injector.inject(request)
+                    # This will assign loads to L1/L2/L3 and return balance result
+                    phase_balance_result = self.phase_balance_injector.inject(request)
                     logger.info("[CP-3PH-BALANCE] Phase balance applied successfully")
                 except NotImplementedError:
                     # Phase balance not yet implemented - continue with warning
@@ -207,6 +208,28 @@ class DesignPipeline:
             # Step 2: Calculate loads
             logger.info("Step 2: Calculating electrical loads")
             calculations = self._calculate_loads(request)
+            
+            # [3-PHASE] Inject three_phase_data into calculations for downstream display
+            # This ensures compute.py can extract phase info from mcp_result['calculations']['three_phase']
+            phase_balance_dict = None
+            if phase_balance_result:
+                phase_balance_dict = phase_balance_result.to_dict() if hasattr(phase_balance_result, 'to_dict') else None
+            
+            calculations['three_phase'] = {
+                'is_three_phase': is_three_phase,
+                'connected_load_kw': three_phase_check['connected_load_kw'],
+                'three_phase_required': three_phase_check.get('three_phase_required', False),
+                'warnings': three_phase_warnings,
+                # Phase balance data (L1/L2/L3 totals)
+                'phase_balance': phase_balance_dict,
+                'phase_totals': phase_balance_dict.get('phase_totals', {}) if phase_balance_dict else {},
+                'imbalance_percent': phase_balance_dict.get('imbalance_percent', 0) if phase_balance_dict else 0
+            }
+            # [CP-3PH-TRACE] Cloud logging for full data flow tracing
+            logger.info(f"[CP-3PH-INJECT] ✅ Injected three_phase into calculations:")
+            logger.info(f"[CP-3PH-INJECT]   is_three_phase={is_three_phase}")
+            logger.info(f"[CP-3PH-INJECT]   connected_load_kw={three_phase_check['connected_load_kw']:.2f}")
+            logger.info(f"[CP-3PH-INJECT]   phase_balance={phase_balance_dict}")
             
             # [NEXIA EXTENSION] Inject Derating Factors (Pre-Wire Sizing)
             # Get site_context directly from request (sent by RAG via Adapter)

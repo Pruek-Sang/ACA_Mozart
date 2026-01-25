@@ -25,7 +25,7 @@ import { listProjects, deleteProject, startSessionWithName, type ProjectSummary 
 interface ProjectSelectorProps {
     currentSessionId: string | null;
     currentProjectName: string;
-    onSessionChange: (sessionId: string, projectName: string) => void;
+    onSessionChange: (sessionId: string, projectName: string) => Promise<void> | void;
     onNewProject: () => void;
     className?: string;
 }
@@ -91,7 +91,9 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
         setIsCreating(true);
         try {
             const result = await startSessionWithName(newProjectName || undefined);
-            onSessionChange(result.session_id, result.project_name);
+            // 🔧 FIX 2026-01-25: Must await onSessionChange to prevent race condition
+            // Otherwise sessionId state may still be OLD when user types next command
+            await onSessionChange(result.session_id, result.project_name);
             setShowNewModal(false);
             setNewProjectName('');
             setIsOpen(false);
@@ -104,8 +106,9 @@ export const ProjectSelector: React.FC<ProjectSelectorProps> = ({
         }
     };
 
-    const handleLoadProject = (project: ProjectSummary) => {
-        onSessionChange(project.session_id, project.project_name);
+    const handleLoadProject = async (project: ProjectSummary) => {
+        // 🔧 FIX 2026-01-25: Must await to ensure state is updated before closing
+        await onSessionChange(project.session_id, project.project_name);
         setIsOpen(false);
     };
 

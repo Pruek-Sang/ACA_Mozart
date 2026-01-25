@@ -650,6 +650,21 @@ class CircuitGrouper:
     def _finalize_circuits(self):
         """Calculate final parameters for all circuits."""
         for circuit in self.circuits.values():
+            # [3-PHASE] Inherit assigned_phase from loads (Sprint 2)
+            # If any load has assigned_phase, use it for the circuit
+            # Priority: Most common phase among loads (majority voting)
+            if circuit.assigned_phase is None and circuit.loads:
+                phase_counts = {"L1": 0, "L2": 0, "L3": 0}
+                for load in circuit.loads:
+                    load_phase = getattr(load, 'assigned_phase', None)
+                    if load_phase in phase_counts:
+                        phase_counts[load_phase] += 1
+                
+                # Find most common phase
+                max_phase = max(phase_counts, key=phase_counts.get)
+                if phase_counts[max_phase] > 0:
+                    circuit.assigned_phase = max_phase
+            
             # Calculate current (Thai 230V standard)
             # Apply diversity factor only for high-rise buildings (≥10 floors)
             circuit.calculate_current(

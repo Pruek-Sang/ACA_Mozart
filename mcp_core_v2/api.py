@@ -335,6 +335,13 @@ def _convert_to_internal(request: DesignRequestInput):
 
 def _convert_to_output(result) -> DesignResultOutput:
     """Convert internal result to API output format"""
+    # [CP-3PH-TRACE] Log three_phase data before conversion
+    three_phase_in_calc = result.calculations.get('three_phase', {}) if result.calculations else {}
+    logger.info(f"[CP-3PH-API] Converting result to output:")
+    logger.info(f"[CP-3PH-API]   calculations has three_phase: {'three_phase' in (result.calculations or {})}")
+    logger.info(f"[CP-3PH-API]   three_phase data: {three_phase_in_calc}")
+    logger.info(f"[CP-3PH-API]   grouped_circuits count: {len(result.grouped_circuits) if hasattr(result, 'grouped_circuits') and result.grouped_circuits else 0}")
+    
     # Generate reports
     from core.result_builder import ResultBuilder
     builder = ResultBuilder()

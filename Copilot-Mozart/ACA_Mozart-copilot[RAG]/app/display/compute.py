@@ -292,8 +292,17 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
         design_current = round_up(demand_current * 1.25, 1)
         
         # [3-PHASE] Extract phase system info from mcp_result (early detection for meter sizing)
+        # [CP-3PH-TRACE] Log what we receive for debugging
+        logger.info(f"[CP-3PH-COMPUTE] Extracting 3-phase data from mcp_result:")
+        logger.info(f"[CP-3PH-COMPUTE]   mcp_result keys: {list(mcp_result.keys())}")
+        logger.info(f"[CP-3PH-COMPUTE]   has 'calculations': {'calculations' in mcp_result}")
+        if 'calculations' in mcp_result:
+            logger.info(f"[CP-3PH-COMPUTE]   calculations keys: {list(mcp_result['calculations'].keys()) if mcp_result['calculations'] else 'None'}")
+            logger.info(f"[CP-3PH-COMPUTE]   calculations.three_phase: {mcp_result['calculations'].get('three_phase', 'NOT FOUND')}")
+        
         three_phase_data = mcp_result.get('three_phase_data') or mcp_result.get('calculations', {}).get('three_phase', {})
         is_three_phase = three_phase_data.get('is_three_phase', False)
+        logger.info(f"[CP-3PH-COMPUTE]   ✅ Extracted: is_three_phase={is_three_phase}, three_phase_data={three_phase_data}")
         
         # [CP-3PH-DISPLAY] Get main equipment sizing with 3-phase parameters (Sprint 8)
         meter_size, main_wire, main_breaker = _get_meter_sizing(

@@ -168,6 +168,15 @@ class McpClient:
                     
                     if response.status_code == 200:
                         data = response.json()
+                        # [CP-3PH-TRACE] Log what we receive from MCP API
+                        logger.info(f"[CP-3PH-CLIENT] Received from MCP Core API:")
+                        logger.info(f"[CP-3PH-CLIENT]   data keys: {list(data.keys())}")
+                        if data.get('calculations'):
+                            logger.info(f"[CP-3PH-CLIENT]   calculations.three_phase: {data['calculations'].get('three_phase', 'NOT FOUND')}")
+                        if data.get('grouped_circuits'):
+                            sample = data['grouped_circuits'][0] if data['grouped_circuits'] else {}
+                            logger.info(f"[CP-3PH-CLIENT]   grouped_circuits[0].assigned_phase: {sample.get('assigned_phase', 'NOT FOUND')}")
+                        
                         return McpDesignResponse(
                             success=True,
                             session_id=data.get("session_id"),

@@ -118,12 +118,13 @@ class DesignResult(BaseModel):
     """Design result contract."""
     session_id: str
     request: DesignRequest
-    calculations: Dict[str, Any]
+    calculations: Dict[str, Any]  # Includes 'three_phase' key with phase balance data
     wire_sizing: Dict[str, Any]
     breaker_selections: Dict[str, Any]
     conduit_sizing: Dict[str, Any]
     compliance_report: Dict[str, Any]
     grouped_circuits: List[Dict[str, Any]] = Field(default_factory=list)  # Circuit grouping data
+    three_phase_data: Optional[Dict[str, Any]] = None  # Sprint 4: 3-phase balance & system info
     autolisp_code: Optional[str] = None
     completed_at: datetime = Field(default_factory=_utc_now)
     errors: List[str] = Field(default_factory=list)

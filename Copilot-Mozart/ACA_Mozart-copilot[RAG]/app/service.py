@@ -2276,6 +2276,16 @@ Query: "{query}"
                 # Format using new Card-style Markdown formatter
                 result = mcp_response.to_dict()
                 
+                # [CP-3PH-TRACE] Log what we received from MCP Core
+                logger.info(f"[CP-3PH-SERVICE] Received MCP response:")
+                logger.info(f"[CP-3PH-SERVICE]   result keys: {list(result.keys())}")
+                logger.info(f"[CP-3PH-SERVICE]   has 'calculations': {'calculations' in result}")
+                if result.get('calculations'):
+                    logger.info(f"[CP-3PH-SERVICE]   calculations.three_phase: {result['calculations'].get('three_phase', 'NOT FOUND')}")
+                if result.get('grouped_circuits'):
+                    sample_circuit = result['grouped_circuits'][0] if result['grouped_circuits'] else {}
+                    logger.info(f"[CP-3PH-SERVICE]   grouped_circuits[0].assigned_phase: {sample_circuit.get('assigned_phase', 'NOT FOUND')}")
+                
                 # 🆕 [VD-FIX] Inject floor_distances from RAG extraction (Chat UI Path)
                 # This connects the missing link between Chat UI -> RAG -> Compute
                 # This fixes the "Default 35" error where defaults were used despite extraction success

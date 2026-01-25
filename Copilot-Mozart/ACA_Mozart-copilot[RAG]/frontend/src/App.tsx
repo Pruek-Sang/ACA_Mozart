@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { ChatPanel } from './components/ChatPanel';
 import { ContextPanel } from './components/ContextPanel';
@@ -67,6 +67,13 @@ function App() {
     const saved = localStorage.getItem('mozart_session_id');
     return saved || null;
   });
+  // 🔧 FIX 2026-01-25: Use ref to ensure handleSubmit always has latest sessionId
+  // React useState is async, so we need ref for immediate reads
+  const sessionIdRef = useRef<string | null>(sessionId);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+  
   const [projectName, setProjectName] = useState(() => {
     const saved = localStorage.getItem('mozart_project_name');
     return saved || 'บ้านนายสมหญิง';
@@ -490,14 +497,17 @@ function App() {
     setIsDirty(false);
 
     try {
-      // 🔧 DEBUG: Log session state before API call
+      // 🔧 FIX 2026-01-25: Use ref for immediate access to latest sessionId
+      // React state might be stale in callbacks due to batched updates
+      const currentSessionId = sessionIdRef.current;
+      console.log('[SESSION-DEBUG] handleSubmit - sessionId ref:', currentSessionId);
       console.log('[SESSION-DEBUG] handleSubmit - sessionId state:', sessionId);
       console.log('[SESSION-DEBUG] handleSubmit - localStorage:', localStorage.getItem('mozart_session_id'));
 
       // 🩺 Track API Request
       healthTracker.trackApiRequest('/api/v1/ask', {
         method: 'POST',
-        sessionId: sessionId,
+        sessionId: currentSessionId,
         body: { query: userPrompt }
       });
 
@@ -506,7 +516,7 @@ function App() {
         query: userPrompt,
         language: 'th',
         site_context: context
-      }, sessionId || undefined);
+      }, currentSessionId || undefined);
 
       // 🩺 Track API Response
       healthTracker.trackApiResponse(200, data, '/api/v1/ask');
@@ -704,6 +714,10 @@ function App() {
                 currentProjectName={projectName}
                 onSessionChange={async (newSessionId, newProjectName) => {
                   console.log('[SESSION-SWITCH] Changing from', sessionId?.slice(0, 8), 'to', newSessionId.slice(0, 8));
+
+                  // 🔧 FIX 2026-01-25: Update ref IMMEDIATELY (sync) before anything else!
+                  // This ensures handleSubmit reads the correct sessionId even before re-render
+                  sessionIdRef.current = newSessionId;
 
                   // 1. Clear old data immediately to prevent overlap
                   setResultData(null);
