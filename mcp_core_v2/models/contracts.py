@@ -65,6 +65,13 @@ class ElectricalLoad(BaseModel):
         None,
         description="Distance from distribution board to load in meters. If None, uses default based on building type and floor."
     )
+    # ============================================================
+    # 3-Phase Support Fields (Sprint 2)
+    # ============================================================
+    assigned_phase: Optional[str] = Field(
+        None,
+        description="Assigned phase for 3-phase systems: 'L1', 'L2', or 'L3'. None for 1-phase."
+    )
 
 
 class PanelSpecification(BaseModel):

@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# Import pipeline (use mock if dependencies missing)
+# Import pipeline (fail fast if dependencies missing)
 try:
     from pipeline import get_design_pipeline
     from models.contracts import (
@@ -25,7 +25,7 @@ try:
     )
     PIPELINE_AVAILABLE = True
 except ImportError as e:
-    logging.warning(f"Pipeline import failed: {e}. Using mock mode.")
+    logging.error(f"Pipeline import failed: {e}. MCP Core will reject design requests.")
     PIPELINE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
@@ -137,17 +137,10 @@ async def design(request: DesignRequestInput) -> DesignResultOutput:
     logger.info(f"Design request: {request.project_name} ({len(request.loads)} loads)")
     
     if not PIPELINE_AVAILABLE:
-        # Return mock result for testing
-        mock_result = _mock_design_result(request)
-        # Cache for SLD/BOQ generation
-        _cache_session_result(request.session_id, {
-            "calculations": mock_result.calculations,
-            "breaker_selections": mock_result.breaker_selections,
-            "wire_sizing": mock_result.wire_sizing,
-            "loads": [l.model_dump() if hasattr(l, 'model_dump') else l.dict() for l in request.loads],
-            "project_name": request.project_name
-        })
-        return mock_result
+        raise HTTPException(
+            status_code=503,
+            detail="MCP Core pipeline unavailable. Install required dependencies and retry."
+        )
     
     try:
         # Convert input to internal format
