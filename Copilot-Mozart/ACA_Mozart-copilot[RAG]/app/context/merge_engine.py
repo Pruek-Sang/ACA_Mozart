@@ -216,15 +216,34 @@ async def merge_design_changes(
         return None
 
 
+def _normalize_device_code(device: str) -> str:
+    """
+    Normalize device string to device_code format.
+    
+    Handles:
+    - "AC-12000BTU" → "AC-12000BTU" (already normalized)
+    - "AC-12000BTU in ห้องนอนใหญ่" → "AC-12000BTU" (legacy format)
+    - "แอร์ห้องนอน" → "แอร์ห้องนอน" (Thai name - pass through)
+    
+    🔧 FIX 2026-01-25: Support both old and new formats for backwards compat
+    """
+    if " in " in device:
+        return device.split(" in ")[0].strip()
+    return device
+
+
 def find_target_loads(loads: List[Dict], cmd: EditCommand) -> List[int]:
     """
     Find indices of loads that match the edit command target.
     Supports matching by device_type, device_code, room_name, and floor.
+    
+    🔧 FIX 2026-01-25: Handle both "AC-12000BTU" and "AC-12000BTU in ห้องนอน" formats
     """
     matches = []
     
     for i, load in enumerate(loads):
-        device = load.get("device", "")
+        # 🔧 FIX: Normalize device code from both old and new formats
+        device = _normalize_device_code(load.get("device", ""))
         room = load.get("room_name", "")
         
         # Check device match

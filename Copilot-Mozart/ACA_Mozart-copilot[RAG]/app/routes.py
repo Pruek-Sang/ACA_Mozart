@@ -274,13 +274,26 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
                     logger.info(f"✅ [AUTO-SAVE] Saved design to session {session_id[:8]}...")
                     
                     # 🆕 FIX: Write-through - Save loads for EDIT mode
+                    # 🔧 FIX 2026-01-25: Extract device_code from circuit_name
+                    # Format: "AC-12000BTU in ห้องนอนใหญ่" → device: "AC-12000BTU"
                     display_data = metadata.get("display_data", {})
                     if circuits := display_data.get("circuits"):
+                        def extract_device_code(circuit_name: str) -> str:
+                            """Extract device code from circuit_name.
+                            
+                            Format: "{device_code} in {room_name}" → "{device_code}"
+                            Example: "AC-12000BTU in ห้องนอนใหญ่" → "AC-12000BTU"
+                            """
+                            if " in " in circuit_name:
+                                return circuit_name.split(" in ")[0].strip()
+                            return circuit_name
+                        
                         loads_to_save = [
                             {
-                                "device": c.get("circuit_name", ""),
+                                "device": extract_device_code(c.get("circuit_name", "")),
                                 "room_name": c.get("room", "") or c.get("floor", ""),
                                 "floor": int(c.get("floor", 1)) if str(c.get("floor", "")).isdigit() else 1,
+                                "quantity": c.get("quantity", 1),  # 🆕 Preserve quantity
                             }
                             for c in circuits
                         ]
