@@ -64,6 +64,10 @@ def render_audit_document(
     if warnings:
         lines.extend(_render_warnings(warnings))
     
+    # [CP-SOLAR-AUDIT] Solar PV Section (if present)
+    if display_data.get('has_solar', False):
+        lines.extend(_render_solar_section(display_data))
+    
     # Summary
     lines.extend(_render_summary(display_data, audit_results))
     
@@ -152,6 +156,128 @@ def _render_warnings(warnings: List[str]) -> List[str]:
         lines.append(f"_...และอีก {len(warnings) - 10} รายการ_")
     
     lines.append("")
+    return lines
+
+
+def _render_solar_section(data: Dict[str, Any]) -> List[str]:
+    """
+    [CP-SOLAR-AUDIT] Render Solar PV system section in audit document.
+    
+    Includes:
+    - System overview (capacity, type)
+    - Inverter specifications
+    - DC & AC circuit details
+    - Net metering status
+    - Protection requirements checklist
+    - Energy production estimate
+    """
+    lines = [
+        "## ☀️ ระบบโซลาร์เซลล์ (Solar PV)",
+        "",
+    ]
+    
+    # System Overview
+    capacity_kw = data.get('solar_capacity_kw', 0)
+    system_type = data.get('solar_system_type', 'On-Grid')
+    inverter = data.get('solar_inverter', {})
+    dc_circuit = data.get('solar_dc_circuit', {})
+    ac_circuit = data.get('solar_ac_circuit', {})
+    net_metering = data.get('solar_net_metering', {})
+    energy_est = data.get('solar_energy_estimate', {})
+    solar_warnings = data.get('solar_warnings', [])
+    
+    lines.extend([
+        "### ข้อมูลระบบ",
+        "",
+        "| รายการ | รายละเอียด |",
+        "|--------|------------|",
+        f"| ขนาดแผงโซลาร์ | {capacity_kw:.1f} kW (DC) |",
+        f"| ประเภทระบบ | {system_type} |",
+        f"| อินเวอร์เตอร์ | {inverter.get('rated_kw', 0):.0f} kW ({inverter.get('phase_type', '1-Phase')}) |",
+        f"| ประสิทธิภาพ | {inverter.get('efficiency', 0.97) * 100:.0f}% |",
+        "",
+    ])
+    
+    # DC Circuit
+    lines.extend([
+        "### วงจร DC (แผง → อินเวอร์เตอร์)",
+        "",
+        "| รายการ | ค่า |",
+        "|--------|-----|",
+        f"| กระแสออกแบบ | {dc_circuit.get('design_current_a', 0):.1f} A |",
+        f"| ขนาดสาย | {dc_circuit.get('wire_size_mm2', 4.0)} mm² PV1-F |",
+        f"| DC Breaker | {dc_circuit.get('dc_breaker_a', 20)} A |",
+        f"| DC Disconnect | {'✅ Required' if dc_circuit.get('dc_disconnect', True) else '❌ Not Required'} |",
+        "",
+    ])
+    
+    # AC Circuit
+    lines.extend([
+        "### วงจร AC (อินเวอร์เตอร์ → ตู้ MDB)",
+        "",
+        "| รายการ | ค่า |",
+        "|--------|-----|",
+        f"| กระแส AC | {ac_circuit.get('ac_current_a', 0):.1f} A |",
+        f"| ขนาดสาย | {ac_circuit.get('wire_size_mm2', 4.0)} mm² THW |",
+        f"| AC Breaker | {ac_circuit.get('ac_breaker_a', 20)} A ({ac_circuit.get('breaker_type', 'RCBO')}) |",
+        "",
+    ])
+    
+    # Net Metering Status
+    eligible = net_metering.get('eligible_residential', True)
+    requires_ct = net_metering.get('requires_ct_meter', False)
+    program = net_metering.get('program', 'residential')
+    
+    lines.extend([
+        "### Net Metering (ขายไฟคืน)",
+        "",
+        f"| สถานะ | {'✅ เข้าเกณฑ์โครงการบ้านพักอาศัย' if eligible else '⚠️ เกินโควต้าบ้านพักอาศัย (≤10kW)'} |",
+        "|--------|-----|",
+        f"| โปรแกรม | {program.upper()} |",
+        f"| CT Meter | {'✅ ต้องติดตั้ง' if requires_ct else '❌ ไม่จำเป็น'} |",
+        f"| ขนาดระบบ | {capacity_kw:.1f} kW / {net_metering.get('limit_kw', 10):.0f} kW limit |",
+        "",
+    ])
+    
+    # Energy Production Estimate
+    if energy_est:
+        lines.extend([
+            "### ประมาณการผลิตไฟฟ้า",
+            "",
+            "| ช่วงเวลา | ประมาณการ |",
+            "|----------|-----------|",
+            f"| รายวัน | {energy_est.get('daily_kwh', 0):.1f} kWh |",
+            f"| รายเดือน | {energy_est.get('monthly_kwh', 0):.0f} kWh |",
+            f"| รายปี | {energy_est.get('annual_kwh', 0):,.0f} kWh |",
+            f"| Peak Sun Hours | {energy_est.get('peak_sun_hours', 4.5)} ชม./วัน |",
+            "",
+        ])
+    
+    # Solar-specific warnings
+    if solar_warnings:
+        lines.extend([
+            "### ⚠️ คำเตือนเฉพาะระบบโซลาร์",
+            "",
+        ])
+        for i, warn in enumerate(solar_warnings, 1):
+            lines.append(f"{i}. {warn}")
+        lines.append("")
+    
+    # Protection checklist
+    protection = data.get('solar_protection', [])
+    if protection:
+        lines.extend([
+            "### รายการอุปกรณ์ป้องกัน (ตรวจสอบก่อนใช้งาน)",
+            "",
+        ])
+        for item in protection:
+            mandatory = '✅' if item.get('mandatory', True) else '◻️'
+            lines.append(f"- {mandatory} {item.get('item', 'Unknown')}: {item.get('spec', '-')}")
+        lines.append("")
+    
+    lines.append("---")
+    lines.append("")
+    
     return lines
 
 

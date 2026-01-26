@@ -437,8 +437,14 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
         is_three_phase = display_data.get('is_three_phase', False)
         main_breaker = display_data.get('main_breaker', 100)
         
-        # Extract numeric rating (handle "100A" or "100" formats)
-        if isinstance(main_breaker, str):
+        # Extract numeric rating (handle dict, "100A", or 100 formats)
+        if isinstance(main_breaker, dict):
+            # Handle dict format: {'rating': 100, 'poles': 3}
+            main_breaker_val = int(main_breaker.get('rating', 100))
+            # Override is_three_phase if poles is specified
+            if main_breaker.get('poles', 2) == 3:
+                is_three_phase = True
+        elif isinstance(main_breaker, str):
             main_breaker_val = int(''.join(filter(str.isdigit, main_breaker)) or 100)
         else:
             main_breaker_val = int(main_breaker)
@@ -630,6 +636,163 @@ def generate_boq(display_data: Dict[str, Any], project_name: str = "โครง
             'items': e3_items,
             'section_total': e3_total,
         })
+        
+        # === E.4: [CP-SOLAR-BOQ] Solar PV System (if present) ===
+        has_solar = display_data.get('has_solar', False)
+        if has_solar:
+            e4_items: List[BOQItem] = []
+            solar_capacity_kw = display_data.get('solar_capacity_kw', 0)
+            solar_inverter = display_data.get('solar_inverter', {})
+            solar_dc_circuit = display_data.get('solar_dc_circuit', {})
+            solar_ac_circuit = display_data.get('solar_ac_circuit', {})
+            solar_protection = display_data.get('solar_protection', [])
+            
+            logger.info(f"[CP-SOLAR-BOQ] Generating Solar section: {solar_capacity_kw:.1f}kW")
+            
+            item_no = 1
+            
+            # 1. Solar Panels (estimate ~3,000-4,000 THB per panel, 450W per panel)
+            num_panels = math.ceil(solar_capacity_kw * 1000 / 450)
+            panel_price = 3500.0  # Per panel (450W)
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': f'แผงโซลาร์ 450W Mono PERC (Tier 1) - {solar_capacity_kw:.1f}kW system',
+                'quantity': num_panels,
+                'unit': 'แผง',
+                'material_unit_price': panel_price,
+                'material_total': round(panel_price * num_panels, 2),
+                'labor_unit_price': 500.0,  # Installation per panel
+                'labor_total': round(500.0 * num_panels, 2),
+                'total_price': round((panel_price + 500.0) * num_panels, 2),
+                'remark': 'Longi, JA Solar, Trina',
+            })
+            item_no += 1
+            
+            # 2. Grid-Tie Inverter
+            inverter_kw = solar_inverter.get('rated_kw', solar_capacity_kw * 0.9)
+            inverter_price_per_kw = 3500.0  # THB per kW for string inverter
+            inverter_total = round(inverter_kw * inverter_price_per_kw, 2)
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': f'อินเวอร์เตอร์ Grid-Tie {inverter_kw:.0f}kW ({solar_inverter.get("phase_type", "1-Phase")})',
+                'quantity': 1,
+                'unit': 'ตัว',
+                'material_unit_price': inverter_total,
+                'material_total': inverter_total,
+                'labor_unit_price': 2000.0,  # Inverter installation
+                'labor_total': 2000.0,
+                'total_price': round(inverter_total + 2000.0, 2),
+                'remark': 'Huawei, SMA, GoodWe',
+            })
+            item_no += 1
+            
+            # 3. DC Solar Cable (PV1-F)
+            dc_wire_size = solar_dc_circuit.get('wire_size_mm2', 4.0)
+            dc_cable_length = 50.0  # Estimate 50m for rooftop
+            dc_cable_price = 25.0 if dc_wire_size <= 4 else 35.0  # Per meter
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': f'สาย DC PV1-F {dc_wire_size}mm² (UV resistant, double insulated)',
+                'quantity': dc_cable_length,
+                'unit': 'ม.',
+                'material_unit_price': dc_cable_price,
+                'material_total': round(dc_cable_price * dc_cable_length, 2),
+                'labor_unit_price': 8.0,
+                'labor_total': round(8.0 * dc_cable_length, 2),
+                'total_price': round((dc_cable_price + 8.0) * dc_cable_length, 2),
+                'remark': 'TUV certified',
+            })
+            item_no += 1
+            
+            # 4. DC Disconnect Switch
+            dc_breaker_a = solar_dc_circuit.get('dc_breaker_a', 20)
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': f'DC Disconnect Switch 600V {dc_breaker_a}A',
+                'quantity': 1,
+                'unit': 'ตัว',
+                'material_unit_price': 1500.0,
+                'material_total': 1500.0,
+                'labor_unit_price': 300.0,
+                'labor_total': 300.0,
+                'total_price': 1800.0,
+                'remark': 'NEC 690.15 required',
+            })
+            item_no += 1
+            
+            # 5. AC Breaker for Solar
+            ac_breaker_a = solar_ac_circuit.get('ac_breaker_a', 20)
+            ac_breaker_type = solar_ac_circuit.get('breaker_type', 'RCBO 30mA')
+            ac_breaker_price = 1200.0 if 'RCBO' in ac_breaker_type else 250.0
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': f'{ac_breaker_type} {ac_breaker_a}A (Solar AC)',
+                'quantity': 1,
+                'unit': 'ตัว',
+                'material_unit_price': ac_breaker_price,
+                'material_total': ac_breaker_price,
+                'labor_unit_price': 0.0,
+                'labor_total': 0.0,
+                'total_price': ac_breaker_price,
+                'remark': 'Schneider/ABB',
+            })
+            item_no += 1
+            
+            # 6. Surge Protectors (DC + AC)
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': 'DC Surge Protector Type 2 (600V DC)',
+                'quantity': 1,
+                'unit': 'ตัว',
+                'material_unit_price': 2500.0,
+                'material_total': 2500.0,
+                'labor_unit_price': 200.0,
+                'labor_total': 200.0,
+                'total_price': 2700.0,
+                'remark': 'Required for lightning protection',
+            })
+            item_no += 1
+            
+            # 7. Mounting Structure (rooftop)
+            structure_per_panel = 800.0  # Aluminum racking per panel
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': 'โครงรางอลูมิเนียม + ขาติดตั้ง (Roof mounting)',
+                'quantity': num_panels,
+                'unit': 'ชุด',
+                'material_unit_price': structure_per_panel,
+                'material_total': round(structure_per_panel * num_panels, 2),
+                'labor_unit_price': 400.0,  # Installation per panel
+                'labor_total': round(400.0 * num_panels, 2),
+                'total_price': round((structure_per_panel + 400.0) * num_panels, 2),
+                'remark': 'Anodized aluminum',
+            })
+            item_no += 1
+            
+            # 8. Installation & Commissioning
+            installation_fee = round(solar_capacity_kw * 1500.0, 2)  # 1,500 THB per kW
+            e4_items.append({
+                'item_no': str(item_no),
+                'description': 'ค่าติดตั้ง ทดสอบ และ Commissioning',
+                'quantity': 1,
+                'unit': 'เหมา',
+                'material_unit_price': 0.0,
+                'material_total': 0.0,
+                'labor_unit_price': installation_fee,
+                'labor_total': installation_fee,
+                'total_price': installation_fee,
+                'remark': f'{solar_capacity_kw:.1f}kW × 1,500 THB/kW',
+            })
+            
+            e4_total = sum(item['total_price'] for item in e4_items)
+            sections.append({
+                'section_id': 'E.4',
+                'section_name': f'ระบบโซลาร์เซลล์ {solar_capacity_kw:.1f}kW (On-Grid)',
+                'items': e4_items,
+                'section_total': e4_total,
+            })
+            
+            logger.info(f"[CP-SOLAR-BOQ] Solar section total: {e4_total:,.2f} THB")
         
         # === Calculate Totals ===
         for section in sections:

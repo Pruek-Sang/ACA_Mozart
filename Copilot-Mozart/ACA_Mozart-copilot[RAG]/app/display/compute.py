@@ -152,6 +152,20 @@ class DisplayData(TypedDict):
     phase_balance_l2_kw: Optional[float]  # L2 total kW
     phase_balance_l3_kw: Optional[float]  # L3 total kW
     phase_imbalance_percent: Optional[float]  # Imbalance %
+    
+    # === SOLAR PV FIELDS (On-Grid Integration) ===
+    # [CP-SOLAR-DISPLAY] Solar system data from MCP Core injector
+    has_solar: bool                       # True if solar system present
+    solar_capacity_kw: Optional[float]    # Panel DC capacity in kW
+    solar_system_type: Optional[str]      # 'On-Grid (Net Metering)'
+    solar_inverter: Optional[Dict[str, Any]]  # Inverter specs
+    solar_dc_circuit: Optional[Dict[str, Any]]  # DC circuit specs
+    solar_ac_circuit: Optional[Dict[str, Any]]  # AC circuit specs
+    solar_net_metering: Optional[Dict[str, Any]]  # Net metering status
+    solar_protection: Optional[List[Dict[str, str]]]  # Protection requirements
+    solar_energy_estimate: Optional[Dict[str, float]]  # Energy production estimate
+    solar_net_impact: Optional[Dict[str, Any]]  # Load reduction info
+    solar_warnings: Optional[List[str]]  # Solar-specific warnings
 
 
 # =============================================================================
@@ -364,10 +378,17 @@ def compute_display_data(mcp_result: Dict[str, Any]) -> DisplayData:
             'phase_balance_l2_kw': summary_fields.get('phase_balance_l2_kw'),
             'phase_balance_l3_kw': summary_fields.get('phase_balance_l3_kw'),
             'phase_imbalance_percent': summary_fields.get('phase_imbalance_percent'),
+            
+            # === SOLAR PV FIELDS (On-Grid Integration) ===
+            **_extract_solar_fields(mcp_result),
         }
         
         rcbo_count = summary_fields.get('rcbo_count', 0)
         mcb_count = summary_fields.get('mcb_count', 0)
+        
+        # [CP-SOLAR-DISPLAY] Log if solar present
+        if display_data.get('has_solar'):
+            logger.info(f"[CP-SOLAR-DISPLAY] Solar system: {display_data.get('solar_capacity_kw', 0):.1f}kW")
         
         logger.info(f"[CP-COMPUTE] Computed: {total_kw}kW, {demand_current}A, {len(circuits)} circuits ({rcbo_count} RCBO, {mcb_count} MCB)")
         return display_data
@@ -717,6 +738,60 @@ def _process_circuits(
             
     return circuits, default_circuits
 
+
+def _extract_solar_fields(mcp_result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    [CP-SOLAR-DISPLAY] Extract solar PV data from MCP result.
+    
+    Solar data is injected by SolarCellInjector in pipeline.py Step 7.5
+    and stored in calculations['solar'].
+    
+    Args:
+        mcp_result: Full MCP result dict
+        
+    Returns:
+        Dict with all solar fields (has_solar=False if no solar)
+    """
+    # Default: no solar
+    no_solar = {
+        'has_solar': False,
+        'solar_capacity_kw': None,
+        'solar_system_type': None,
+        'solar_inverter': None,
+        'solar_dc_circuit': None,
+        'solar_ac_circuit': None,
+        'solar_net_metering': None,
+        'solar_protection': None,
+        'solar_energy_estimate': None,
+        'solar_net_impact': None,
+        'solar_warnings': None,
+    }
+    
+    # Try to extract from calculations['solar']
+    calculations = mcp_result.get('calculations', {})
+    solar_data = calculations.get('solar')
+    
+    if not solar_data:
+        logger.debug("[CP-SOLAR-DISPLAY] No solar data in mcp_result")
+        return no_solar
+    
+    logger.info(f"[CP-SOLAR-DISPLAY] Extracting solar data: {solar_data.get('panel_capacity_kw', 0):.1f}kW")
+    
+    return {
+        'has_solar': True,
+        'solar_capacity_kw': solar_data.get('panel_capacity_kw'),
+        'solar_system_type': solar_data.get('system_type'),
+        'solar_inverter': solar_data.get('inverter'),
+        'solar_dc_circuit': solar_data.get('dc_circuit'),
+        'solar_ac_circuit': solar_data.get('ac_circuit'),
+        'solar_net_metering': solar_data.get('net_metering'),
+        'solar_protection': solar_data.get('protection'),
+        'solar_energy_estimate': solar_data.get('energy_estimate'),
+        'solar_net_impact': solar_data.get('net_impact'),
+        'solar_warnings': solar_data.get('warnings', []),
+    }
+
+
 def _empty_display_data() -> DisplayData:
     """Return empty DisplayData for fallback.
     
@@ -737,6 +812,7 @@ def _empty_display_data() -> DisplayData:
         'warnings': [],
         'errors': ['No data available'],
         'phase_balance': None,
+        'default_distance_circuits': [],  # 🆕 Added for completeness
         
         # === NEW FIELDS (with fallback defaults) ===
         'total_load_va': 0,
@@ -754,4 +830,27 @@ def _empty_display_data() -> DisplayData:
         'main_raceway_size': '-',
         'rcbo_count': 0,
         'mcb_count': 0,
+        
+        # === 3-PHASE FIELDS ===
+        'is_three_phase': False,
+        'voltage_system': '1PH-230V',
+        'line_voltage_v': 230,
+        'phase_voltage_v': 230,
+        'phase_balance_l1_kw': None,
+        'phase_balance_l2_kw': None,
+        'phase_balance_l3_kw': None,
+        'phase_imbalance_percent': None,
+        
+        # === SOLAR PV FIELDS ===
+        'has_solar': False,
+        'solar_capacity_kw': None,
+        'solar_system_type': None,
+        'solar_inverter': None,
+        'solar_dc_circuit': None,
+        'solar_ac_circuit': None,
+        'solar_net_metering': None,
+        'solar_protection': None,
+        'solar_energy_estimate': None,
+        'solar_net_impact': None,
+        'solar_warnings': None,
     }

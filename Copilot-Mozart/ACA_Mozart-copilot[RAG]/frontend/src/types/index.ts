@@ -147,6 +147,29 @@ export interface DisplayData {
     rcbo_count?: number;            // Count of RCBO circuits
     mcb_count?: number;             // Count of MCB circuits
 
+    // === 3-PHASE FIELDS ===
+    is_three_phase?: boolean;       // True if 3-phase system
+    voltage_system?: string;        // "1PH-230V" or "3PH-400V"
+    line_voltage_v?: number;        // 230 or 400
+    phase_voltage_v?: number;       // 230 (1PH or 3PH line-to-neutral)
+    phase_balance_l1_kw?: number;   // L1 total kW
+    phase_balance_l2_kw?: number;   // L2 total kW
+    phase_balance_l3_kw?: number;   // L3 total kW
+    phase_imbalance_percent?: number; // Imbalance %
+
+    // === SOLAR PV FIELDS ===
+    has_solar?: boolean;            // True if solar system present
+    solar_capacity_kw?: number;     // Panel DC capacity in kW
+    solar_system_type?: string;     // 'On-Grid (Net Metering)'
+    solar_inverter?: SolarInverterData;     // Inverter specs
+    solar_dc_circuit?: SolarCircuitData;    // DC circuit specs
+    solar_ac_circuit?: SolarCircuitData;    // AC circuit specs
+    solar_net_metering?: SolarNetMeteringData; // Net metering status
+    solar_protection?: SolarProtectionItem[]; // Protection requirements
+    solar_energy_estimate?: SolarEnergyEstimate; // Energy production estimate
+    solar_net_impact?: SolarNetImpact;      // Load reduction info
+    solar_warnings?: string[];      // Solar-specific warnings
+
     // 🆕 QC Certificate Data
     qc_certificate?: QCCertificateData;
 }
@@ -518,6 +541,80 @@ export interface ErrorResponse {
     error: string;
     missing_fields?: string[];
     retry_after?: number;
+}
+
+// === SOLAR PV TYPES ===
+
+/**
+ * Solar inverter specifications
+ */
+export interface SolarInverterData {
+    rated_kw: number;
+    panel_capacity_kw: number;
+    efficiency: number;
+    phase_type: string;        // '1-Phase' | '3-Phase'
+    num_phases: number;
+    ac_voltage: number;
+    ac_current_a: number;
+    type: string;              // 'Grid-Tie String Inverter'
+}
+
+/**
+ * Solar DC/AC circuit specifications
+ */
+export interface SolarCircuitData {
+    string_isc_a?: number;     // DC only
+    design_current_a: number;
+    wire_size_mm2: number;
+    wire_type: string;
+    dc_breaker_a?: number;     // DC only
+    ac_breaker_a?: number;     // AC only
+    breaker_type?: string;     // AC only
+    dc_disconnect?: boolean;   // DC only
+    ac_disconnect?: boolean;   // AC only
+    num_strings?: number;      // DC only
+    ac_current_a?: number;     // AC only
+}
+
+/**
+ * Net metering eligibility info
+ */
+export interface SolarNetMeteringData {
+    eligible_residential: boolean;
+    requires_ct_meter: boolean;
+    program: string;           // 'residential' | 'residential_ct' | 'commercial'
+    capacity_kw: number;
+    limit_kw: number;
+    notes: string[];
+}
+
+/**
+ * Solar protection requirement item
+ */
+export interface SolarProtectionItem {
+    item: string;
+    spec: string;
+    location: string;
+    mandatory: boolean;
+}
+
+/**
+ * Solar energy production estimate
+ */
+export interface SolarEnergyEstimate {
+    daily_kwh: number;
+    monthly_kwh: number;
+    annual_kwh: number;
+    peak_sun_hours: number;
+    system_efficiency: number;
+}
+
+/**
+ * Solar load reduction impact
+ */
+export interface SolarNetImpact {
+    load_reduction_watts: number;
+    description: string;
 }
 
 // === DEVICE CODES (ตัวอย่าง) ===

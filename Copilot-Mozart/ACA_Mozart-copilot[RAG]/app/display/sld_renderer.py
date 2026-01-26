@@ -247,6 +247,34 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
                     'style': 'solid'
                 })
     
+    # 6. [CP-SOLAR-SLD] Solar PV System (if present) - Add as separate branch
+    has_solar = display_data.get('has_solar', False)
+    solar_node = None
+    if has_solar:
+        solar_data = {
+            'capacity_kw': display_data.get('solar_capacity_kw', 0),
+            'inverter': display_data.get('solar_inverter', {}),
+            'dc_circuit': display_data.get('solar_dc_circuit', {}),
+            'ac_circuit': display_data.get('solar_ac_circuit', {}),
+        }
+        
+        # Position solar on the right side (separate from load circuits)
+        solar_x = center_x + total_width / 2 + NODE_WIDTH + HORIZONTAL_GAP * 2 if num_circuits > 0 else center_x + NODE_WIDTH + HORIZONTAL_GAP
+        solar_y = current_y
+        
+        solar_node = _create_solar_node(solar_data, solar_x, solar_y)
+        nodes.append(solar_node)
+        
+        # Edge: Main Breaker -> Solar (grid-tie connection point)
+        edges.append({
+            'id': 'edge-main-solar',
+            'source': 'main_breaker',
+            'target': 'solar_inverter',
+            'style': 'dashed'  # Dashed to indicate bidirectional flow
+        })
+        
+        logger.info(f"[CP-SOLAR-SLD] Added solar node: {solar_data['capacity_kw']:.1f}kW")
+    
     # Calculate canvas height based on content
     canvas_height = max(CANVAS_HEIGHT, current_y + NODE_HEIGHT + 100)
     if num_circuits > 0:
@@ -274,6 +302,9 @@ def render_sld(display_data: Dict[str, Any]) -> SLDData:
             'l3_kw': display_data.get('phase_balance_l3_kw', 0),
             'imbalance_percent': display_data.get('phase_imbalance_percent', 0),
         } if is_three_phase else None,
+        # [CP-SOLAR-SLD] Solar metadata
+        'has_solar': has_solar,
+        'solar_capacity_kw': display_data.get('solar_capacity_kw') if has_solar else None,
     }
     
     sld_data: SLDData = {
@@ -438,6 +469,66 @@ def _create_main_breaker_node(data: Dict[str, Any], x: float, y: float) -> SLDNo
             'icon': icon,
             'is_three_phase': is_three_phase,
             'voltage_system': data.get('voltage_system', '1PH-230V'),
+        }
+    }
+
+
+def _create_solar_node(solar_data: Optional[Dict[str, Any]], x: float, y: float) -> Optional[SLDNode]:
+    """
+    [CP-SOLAR-SLD] Create Solar PV system node for SLD.
+    
+    Solar node includes:
+    - PV Array (DC side)
+    - Grid-tie Inverter
+    - AC connection point
+    
+    Args:
+        solar_data: Solar system data from display_data (None if no solar)
+        x, y: Position coordinates
+        
+    Returns:
+        SLDNode for solar inverter (represents entire system), or None if no solar
+    """
+    if not solar_data:
+        return None
+    
+    capacity_kw = solar_data.get('capacity_kw', 0)
+    inverter = solar_data.get('inverter', {})
+    dc_circuit = solar_data.get('dc_circuit', {})
+    ac_circuit = solar_data.get('ac_circuit', {})
+    
+    inverter_kw = inverter.get('rated_kw', capacity_kw * 0.9)
+    phase_type = inverter.get('phase_type', '1-Phase')
+    ac_breaker = ac_circuit.get('ac_breaker_a', 20)
+    ac_wire = ac_circuit.get('wire_size_mm2', 4.0)
+    
+    # Label shows key info
+    label = f"☀️ Solar PV\n{capacity_kw:.1f}kW"
+    
+    return {
+        'id': 'solar_inverter',
+        'type': 'solar_pv',
+        'label': label,
+        'x': x - NODE_WIDTH / 2,
+        'y': y,
+        'width': NODE_WIDTH + 20,  # Slightly wider for solar
+        'height': NODE_HEIGHT + 20,
+        'data': {
+            'icon': '☀️',
+            'panel_capacity_kw': capacity_kw,
+            'inverter_kw': inverter_kw,
+            'phase_type': phase_type,
+            'system_type': 'On-Grid (Net Metering)',
+            # DC side
+            'dc_wire_mm2': dc_circuit.get('wire_size_mm2', 4.0),
+            'dc_breaker_a': dc_circuit.get('dc_breaker_a', 20),
+            # AC side (grid connection)
+            'ac_wire_mm2': ac_wire,
+            'ac_breaker_a': ac_breaker,
+            'ac_breaker_type': ac_circuit.get('breaker_type', 'RCBO 30mA'),
+            # Flow direction indicator
+            'flow': 'bidirectional',  # Grid-tie can export/import
+            'description': f'Grid-Tie Inverter {inverter_kw:.0f}kW ({phase_type})',
         }
     }
 

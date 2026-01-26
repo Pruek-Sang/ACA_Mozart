@@ -46,3 +46,16 @@
 
 ## EV Charger
 - `EVCHARGER-7KW` - EV Charger 7kW (Level 2)
+
+## Solar PV Systems (On-Grid)
+> Updated: 2026-01-26 - Solar integration for 1-Phase and 3-Phase systems
+> Note: ≤5kW for 1-Phase, >5kW requires 3-Phase connection
+
+- `SOLAR-ONGRID-3KW` - Solar On-Grid 3kW (1-Phase, residential)
+- `SOLAR-ONGRID-5KW` - Solar On-Grid 5kW (1-Phase max, residential)
+- `SOLAR-ONGRID-7KW` - Solar On-Grid 7kW (3-Phase required)
+- `SOLAR-ONGRID-10KW` - Solar On-Grid 10kW (3-Phase, MEA net metering limit)
+- `SOLAR-ONGRID-15KW` - Solar On-Grid 15kW (3-Phase, commercial)
+- `SOLAR-ONGRID-20KW` - Solar On-Grid 20kW (3-Phase, commercial)
+- `SOLAR-ONGRID-25KW` - Solar On-Grid 25kW (3-Phase, large commercial)
+- `SOLAR-ONGRID-30KW` - Solar On-Grid 30kW (3-Phase, CT Meter required)

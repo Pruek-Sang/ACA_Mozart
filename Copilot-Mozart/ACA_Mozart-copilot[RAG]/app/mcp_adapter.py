@@ -39,6 +39,7 @@ class LoadType(str, Enum):
     HVAC = "hvac"
     MOTOR = "motor"
     APPLIANCE = "appliance"
+    SOLAR = "solar"  # [CP-SOLAR] Solar PV system (Generation)
     OTHER = "other"
 
 
@@ -221,6 +222,19 @@ DEVICE_MAPPING: Dict[str, Tuple[float, LoadType, bool]] = {
     # Exhaust Fans
     "FAN-EXHAUST-25W": (25, LoadType.OTHER, False),       # พัดลมดูดอากาศ
     "FAN-EXHAUST-50W": (50, LoadType.OTHER, False),
+    
+    # =========================================================================
+    # [CP-SOLAR] Solar PV Systems (On-Grid)
+    # Power in watts (positive), LoadType.SOLAR, continuous=True
+    # =========================================================================
+    "SOLAR-ONGRID-3KW": (3000, LoadType.SOLAR, True),     # 3kW On-Grid (1-Phase)
+    "SOLAR-ONGRID-5KW": (5000, LoadType.SOLAR, True),     # 5kW On-Grid (1-Phase max)
+    "SOLAR-ONGRID-7KW": (7000, LoadType.SOLAR, True),     # 7kW On-Grid (3-Phase)
+    "SOLAR-ONGRID-10KW": (10000, LoadType.SOLAR, True),   # 10kW On-Grid (3-Phase)
+    "SOLAR-ONGRID-15KW": (15000, LoadType.SOLAR, True),   # 15kW On-Grid (3-Phase)
+    "SOLAR-ONGRID-20KW": (20000, LoadType.SOLAR, True),   # 20kW On-Grid (3-Phase)
+    "SOLAR-ONGRID-25KW": (25000, LoadType.SOLAR, True),   # 25kW On-Grid (3-Phase)
+    "SOLAR-ONGRID-30KW": (30000, LoadType.SOLAR, True),   # 30kW On-Grid (3-Phase, CT Meter)
 }
 
 

@@ -17,10 +17,12 @@ from models.catalog_models import BreakerPoles, ConductorMaterial, BreakerType
 from config import get_settings, get_branch_distance_feet, METERS_TO_FEET
 from exceptions import InvalidSpecError, UnsupportedProjectError, ThreePhaseRequiredError
 # [NEXIA EXTENSION] Import Context Injectors
-from context import DeratingInjector, KaRatingInjector, NgLinkInjector
+from context import DeratingInjector, KaRatingInjector, NgLinkInjector, SolarCellInjector
 from context.input_sanitizer_injector import InputSanitizerInjector
 # [3-PHASE EXTENSION] Import Phase Balance Injector
 from context.phase_balance_injector import get_phase_balance_injector
+# [SOLAR EXTENSION] Import Solar Cell Injector
+from context.solar_cell_injector import get_solar_cell_injector
 import logging
 
 logger = logging.getLogger(__name__)
@@ -54,6 +56,9 @@ class DesignPipeline:
         
         # [3-PHASE EXTENSION] Initialize Phase Balance Injector
         self.phase_balance_injector = get_phase_balance_injector(max_imbalance=15.0)
+        
+        # [SOLAR EXTENSION] Initialize Solar Cell Injector
+        self.solar_cell_injector = get_solar_cell_injector()
         
         # [3-PHASE] Configuration
         self.three_phase_threshold_kw = 25.0  # วสท. 2564
@@ -271,6 +276,22 @@ class DesignPipeline:
                 'grouped_circuits': grouped_circuits  # Add grouped circuits to results
             }
             autolisp_code = self._generate_autolisp(request, design_results)
+            
+            # Step 7.5: [SOLAR EXTENSION] Solar PV Calculations (On-Grid)
+            # Must be after Step 7 to have complete design_results
+            # Injects: solar_data (inverter size, DC/AC circuits, net metering status)
+            logger.info("[CP-SOLAR-START] Step 7.5: Checking for Solar PV...")
+            solar_data = None
+            if self.solar_cell_injector.should_inject(request):
+                logger.info("[CP-SOLAR-DETECT] Solar loads detected - calculating PV system")
+                solar_data = self.solar_cell_injector.inject(request, calculations)
+                if solar_data:
+                    # Add solar to design results for downstream use
+                    design_results['solar_data'] = solar_data
+                    calculations['solar'] = solar_data
+                    logger.info(f"[CP-SOLAR-DONE] Solar calculation complete: capacity={solar_data.get('panel_capacity_kw', 0):.1f}kW")
+            else:
+                logger.debug("[CP-SOLAR-SKIP] No solar components detected")
             
             # Step 8: Build result
             logger.info("Step 8: Building final result")

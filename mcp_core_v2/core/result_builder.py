@@ -27,27 +27,29 @@ class ResultBuilder:
         conduit_sizing: Dict[str, Any],
         compliance_report: Dict[str, Any],
         autolisp_code: str = None,
-        grouped_circuits: List[Dict[str, Any]] = None  # Reserved for future circuit grouping
+        grouped_circuits: List[Dict[str, Any]] = None,  # Reserved for future circuit grouping
+        errors: List[str] = None,  # Optional pre-computed errors (e.g., from sanitizer)
+        warnings: List[str] = None  # Optional pre-computed warnings
     ) -> DesignResult:
         # Note: grouped_circuits is reserved for future use (SonarQube: intentionally unused)
         """Build complete design result."""
-        errors = []
-        warnings = []
+        result_errors = errors or []
+        result_warnings = warnings or []
         
         # Collect errors from each section
-        errors.extend(self._extract_errors(calculations))
-        errors.extend(self._extract_errors(wire_sizing))
-        errors.extend(self._extract_errors(breaker_selections))
-        errors.extend(self._extract_errors(conduit_sizing))
+        result_errors.extend(self._extract_errors(calculations))
+        result_errors.extend(self._extract_errors(wire_sizing))
+        result_errors.extend(self._extract_errors(breaker_selections))
+        result_errors.extend(self._extract_errors(conduit_sizing))
         
         # Collect compliance issues
         if not compliance_report.get('compliant', True):
-            errors.extend([
+            result_errors.extend([
                 issue['message'] 
                 for issue in compliance_report.get('issues', [])
             ])
         
-        warnings.extend([
+        result_warnings.extend([
             warning['message'] 
             for warning in compliance_report.get('warnings', [])
         ])
@@ -63,8 +65,8 @@ class ResultBuilder:
             grouped_circuits=grouped_circuits or [],  # Include circuit grouping data
             autolisp_code=autolisp_code,
             completed_at=datetime.now(timezone.utc),
-            errors=errors,
-            warnings=warnings
+            errors=result_errors,
+            warnings=result_warnings
         )
         
         return result

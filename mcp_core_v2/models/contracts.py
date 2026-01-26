@@ -35,6 +35,7 @@ class LoadType(str, Enum):
     HVAC = "hvac"
     MOTOR = "motor"
     APPLIANCE = "appliance"
+    SOLAR = "solar"  # [CP-SOLAR] Solar PV system (Generation, not consumption)
     OTHER = "other"
 
 

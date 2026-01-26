@@ -34,6 +34,7 @@ class CircuitType(str, Enum):
     WATER_HEATER = "water_heater"  # RCBO required
     KITCHEN = "kitchen"         # Kitchen dedicated
     MOTOR = "motor"             # Motor starter required
+    SOLAR = "solar"             # [CP-SOLAR] Solar PV dedicated circuit
     GENERAL = "general"         # Other grouped loads
 
 
@@ -165,6 +166,7 @@ class CircuitGrouper:
         'DRYER', 'อบผ้า',                              # Dryer
         'WASHER', 'ซัก',                               # Washer
         'PUMP', 'ปั๊ม',                                # Pumps (motor)
+        'SOLAR', 'โซลาร์', 'PV', 'INVERTER',          # [CP-SOLAR] Solar PV systems
     }
     
     # Load types that need RCBO (wet location)
