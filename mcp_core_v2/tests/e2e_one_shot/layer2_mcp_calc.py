@@ -1,15 +1,36 @@
-"""Layer 2: MCP Calculation Validation Tests"""
+"""Layer 2: MCP Calculation Validation Tests
+
+IMPORTANT: Uses DEVICE_MAPPING and VOLTAGE_MAPPING from production mcp_adapter.py
+to ensure E2E tests match real system behavior.
+"""
 
 import json
 from pathlib import Path
 from typing import Tuple, Dict, Any
 import sys
 
-# Add parent to path for imports
+# Add parent paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Add RAG app path for mcp_adapter
+_rag_app_path = Path(__file__).parent.parent.parent.parent / "Copilot-Mozart" / "ACA_Mozart-copilot[RAG]"
+sys.path.insert(0, str(_rag_app_path))
 
 from pipeline import DesignPipeline
 from models.contracts import DesignRequest
+
+# 🔴 CRITICAL: Import from PRODUCTION adapter (not hardcoded!)
+try:
+    from app.mcp_adapter import DEVICE_MAPPING, VOLTAGE_MAPPING, DEFAULT_DEVICE, DEFAULT_VOLTAGE, LoadType
+    _USE_PRODUCTION_ADAPTER = True
+except ImportError:
+    # Fallback for isolated tests (but warn loudly)
+    import warnings
+    warnings.warn("⚠️ Cannot import production mcp_adapter! Using fallback mappings.")
+    _USE_PRODUCTION_ADAPTER = False
+    DEVICE_MAPPING = {}
+    VOLTAGE_MAPPING = {}
+    DEFAULT_DEVICE = (500, "other", False)
+    DEFAULT_VOLTAGE = "240V_1PH"
 
 
 class McpCalcTests:
@@ -105,27 +126,38 @@ class McpCalcTests:
         )
     
     def _get_device_mapping(self, device_code: str) -> Dict[str, Any]:
-        """Map device code to MCP format."""
-        mappings = {
-            "AC-12000BTU": {"load_type": "HVAC", "power_watts": 1500, "is_continuous": True},
-            "AC-18000BTU": {"load_type": "HVAC", "power_watts": 2200, "is_continuous": True},
-            "AC-9000BTU": {"load_type": "HVAC", "power_watts": 1200, "is_continuous": True},
-            "HEATER-3500W": {"load_type": "APPLIANCE", "power_watts": 3500, "is_continuous": True},
-            "INDUCTION-3000W": {"load_type": "APPLIANCE", "power_watts": 3000, "is_continuous": False},
-            "SOCKET-16A": {"load_type": "RECEPTACLE", "power_watts": 3680, "is_continuous": False},
-            "SOCKET-13A": {"load_type": "RECEPTACLE", "power_watts": 2990, "is_continuous": False},
-            "LIGHT-LED": {"load_type": "LIGHTING", "power_watts": 15, "is_continuous": False},
-            "REFRIG-200W": {"load_type": "APPLIANCE", "power_watts": 200, "is_continuous": True},
-        }
-        return mappings.get(device_code, {"load_type": "OTHER", "power_watts": 1000})
+        """
+        Map device code to MCP format.
+        
+        🔴 USES PRODUCTION mcp_adapter.DEVICE_MAPPING for consistency!
+        """
+        if _USE_PRODUCTION_ADAPTER and device_code in DEVICE_MAPPING:
+            power, load_type, is_continuous = DEVICE_MAPPING[device_code]
+            return {
+                "load_type": load_type.value if hasattr(load_type, 'value') else str(load_type),
+                "power_watts": power,
+                "is_continuous": is_continuous
+            }
+        
+        # Fallback for unknown devices
+        return {"load_type": "other", "power_watts": 500, "is_continuous": False}
     
     def _map_voltage(self, voltage_system: str) -> str:
-        """Map Thai voltage to NEC."""
+        """
+        Map Thai voltage to NEC.
+        
+        🔴 USES PRODUCTION mcp_adapter.VOLTAGE_MAPPING for consistency!
+        """
+        if _USE_PRODUCTION_ADAPTER and voltage_system in VOLTAGE_MAPPING:
+            v = VOLTAGE_MAPPING[voltage_system]
+            return v.value if hasattr(v, 'value') else str(v)
+        
+        # Fallback
         mapping = {
-            "TH_1PH_230V": "SINGLE_PHASE_240V",
-            "TH_3PH_400V": "THREE_PHASE_480V"
+            "TH_1PH_230V": "240V_1PH",
+            "TH_3PH_400V": "208V_3PH"
         }
-        return mapping.get(voltage_system, "SINGLE_PHASE_240V")
+        return mapping.get(voltage_system, "240V_1PH")
     
     def _find_room_name(self, room_id: str, rooms: list) -> str:
         """Find room name by ID."""
