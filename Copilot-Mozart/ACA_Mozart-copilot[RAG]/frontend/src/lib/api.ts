@@ -257,3 +257,40 @@ export async function startSessionWithName(projectName?: string): Promise<{ sess
 
     return response.json();
 }
+
+/**
+ * 🆕 Claim a guest session for the logged-in user
+ * 
+ * Call this after a guest logs in to keep their work.
+ * Extends session expiry from 24 hours to 30 days.
+ * 
+ * @param sessionId - The guest session ID to claim
+ * @returns Success status and new expiry info
+ */
+export async function claimGuestSession(sessionId: string): Promise<{
+    status: string;
+    session_id: string;
+    message: string;
+    new_expiry_days: number;
+}> {
+    const token = await getAccessToken();
+
+    if (!token) {
+        throw new Error('Authentication required. Please log in first.');
+    }
+
+    const response = await fetch(buildApiUrl(`/api/v1/session/${sessionId}/claim`), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to claim session');
+    }
+
+    return response.json();
+}

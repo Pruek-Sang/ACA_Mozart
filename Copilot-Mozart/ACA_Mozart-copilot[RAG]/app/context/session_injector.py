@@ -33,9 +33,11 @@ logger = logging.getLogger("Aura.SessionInjector")
 # CONFIGURATION
 # =============================================================================
 
-# TODO: Adjust session TTL based on production usage patterns
-# Current: 24 hours. May need to increase for longer projects.
-SESSION_TTL_HOURS = 24
+# 🆕 SMART EXPIRY: Different TTL for Guest vs Logged-in users
+# Guest: 24 hours (temporary trial)
+# Logged-in: NO EXPIRY (NULL) - permanent until user deletes or max limit reached
+GUEST_TTL_HOURS = 24          # Guest sessions expire in 24 hours
+LOGGED_IN_TTL_DAYS = None     # None = NO EXPIRY for logged-in users
 
 # Max projects per user. Oldest will be auto-deleted when exceeded.
 # TODO: In future, implement archiving to separate storage instead of deletion.
@@ -195,8 +197,17 @@ class SessionInjector:
                     logger.warning(f"Max projects ({MAX_PROJECTS_PER_USER}) reached, deleting oldest: {oldest.id}")
                     await self.delete(oldest.id)
             
-            # 🆕 Calculate expiry time
-            expires_at = (_utcnow() + timedelta(hours=SESSION_TTL_HOURS)).isoformat()
+            # 🆕 SMART EXPIRY: Different TTL for Guest vs Logged-in
+            # Guest (user_id=None): 24 hours - temporary trial
+            # Logged-in (user_id=UUID): NO EXPIRY (NULL) - permanent
+            if user_id is None:
+                # Guest mode: 24 hours
+                expires_at = (_utcnow() + timedelta(hours=GUEST_TTL_HOURS)).isoformat()
+                logger.info(f"[SESSION-CREATE] 🕐 Guest mode: expires in {GUEST_TTL_HOURS} hours")
+            else:
+                # Logged-in mode: NO EXPIRY (NULL in DB)
+                expires_at = None
+                logger.info("[SESSION-CREATE] 🔒 Logged-in mode: NO EXPIRY (permanent)")
             
             data = {
                 "user_id": actual_user_id,
@@ -208,7 +219,7 @@ class SessionInjector:
                 "messages": [],
                 "partial_requirements": {},
                 "status": "active",
-                "expires_at": expires_at,
+                "expires_at": expires_at,  # None for logged-in = no expiry
             }
             
             if initial_data:
@@ -474,6 +485,75 @@ class SessionInjector:
             return project.id
         
         return None
+    
+    # =========================================================================
+    # 🆕 CLAIM GUEST SESSION (Guest → Logged-in upgrade)
+    # =========================================================================
+    
+    async def claim_guest_session(self, session_id: str, user_id: str) -> bool:
+        """
+        Claim a guest session for a logged-in user.
+        
+        This allows guests to keep their work when they log in.
+        The session's user_id is updated and expiry is extended to 30 days.
+        
+        Args:
+            session_id: Guest session UUID
+            user_id: Authenticated user's UUID
+            
+        Returns:
+            True if claim succeeded, False otherwise
+            
+        Example:
+            # Guest creates session (user_id=None)
+            session = await session_injector.create(user_id=None)
+            
+            # Guest logs in, wants to keep their work
+            claimed = await session_injector.claim_guest_session(
+                session_id=session.id,
+                user_id="user-uuid-from-auth"
+            )
+        """
+        if not self.is_available():
+            logger.warning("[SESSION-CLAIM] ❌ Supabase not available")
+            return False
+        
+        try:
+            # Load session to verify it's a guest session
+            session = await self.load(session_id)
+            if not session:
+                logger.warning(f"[SESSION-CLAIM] ❌ Session not found: {session_id}")
+                return False
+            
+            if session.user_id is not None:
+                logger.warning(f"[SESSION-CLAIM] ❌ Session already claimed by user: {session.user_id}")
+                return False
+            
+            # Check max projects limit for the user
+            existing = await self.load_by_user(user_id, limit=MAX_PROJECTS_PER_USER + 1)
+            if len(existing) >= MAX_PROJECTS_PER_USER:
+                oldest = existing[-1]
+                logger.warning(f"[SESSION-CLAIM] Max projects ({MAX_PROJECTS_PER_USER}) reached, deleting oldest: {oldest.id}")
+                await self.delete(oldest.id)
+            
+            # Set expiry to NULL (no expiry for logged-in users)
+            new_expires_at = None  # NULL = no expiry
+            
+            # Update session
+            success = await self.update(session_id, {
+                "user_id": user_id,
+                "expires_at": new_expires_at,
+            })
+            
+            if success:
+                logger.info(f"[SESSION-CLAIM] ✅ Session {session_id[:8]}... claimed by user {user_id[:8]}...")
+                logger.info("[SESSION-CLAIM] 🔒 No expiry (permanent)")
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"[SESSION-CLAIM] ❌ Failed: {e}")
+            return False
 
 
 # Singleton instance

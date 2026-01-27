@@ -39,11 +39,13 @@ from pydantic import BaseModel
 # 🆕 Stateful Intelligence imports
 try:
     from app.context import session_injector
+    from app.context.project_injector import project_injector  # 🆕 Add project support
     from app.context.supabase_client import get_supabase_client, SupabaseHealthCheck
     SUPABASE_AVAILABLE = True
 except ImportError as e:
     SUPABASE_AVAILABLE = False
     session_injector = None
+    project_injector = None  # 🆕
     get_supabase_client = lambda: None
 
 try:
@@ -640,6 +642,262 @@ async def list_projects(request: Request):
     except Exception as e:
         logger.error(f"Failed to list projects: {e}")
         return {"projects": [], "error": str(e)}
+
+
+# =============================================================================
+# 🆕 CLAIM GUEST SESSION - Allow guests to keep their work after login
+# [2026-01-27] Guest workflow: Create session → Work → Login → Claim session
+# =============================================================================
+
+@app.post("/api/v1/session/{session_id}/claim")
+async def claim_guest_session(
+    session_id: str,
+    request: Request
+):
+    """
+    Claim a guest session for the logged-in user.
+    
+    This allows guests to keep their work when they log in.
+    The session's user_id is updated and expiry is extended from 24h to 30 days.
+    
+    Flow:
+    1. Guest creates session (user_id=None, expires in 24h)
+    2. Guest works on design
+    3. Guest decides to log in
+    4. Frontend calls /session/{id}/claim with auth token
+    5. Session now belongs to the user (expires in 30 days)
+    
+    Returns:
+        status: "claimed" or error
+        message: Success/error message
+        new_expiry_days: 30
+    """
+    user_id = getattr(request.state, "user_id", None)
+    
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please log in first."
+        )
+    
+    # Validate user_id is UUID
+    import re
+    if not re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(user_id), re.I):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid user_id format. Must be UUID."
+        )
+    
+    if not SUPABASE_AVAILABLE or not session_injector:
+        raise HTTPException(
+            status_code=503, 
+            detail="Session storage not available."
+        )
+    
+    try:
+        success = await session_injector.claim_guest_session(session_id, user_id)
+        
+        if success:
+            logger.info(f"✅ [SESSION-CLAIM] User {user_id[:8]}... claimed session {session_id[:8]}...")
+            return {
+                "status": "claimed",
+                "session_id": session_id,
+                "message": "เชื่อมต่อ session กับบัญชีของคุณสำเร็จ ข้อมูลจะเก็บไว้ 30 วัน",
+                "new_expiry_days": 30
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to claim session. It may already belong to another user."
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [SESSION-CLAIM] Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# 🆕 PROJECT CRUD ENDPOINTS - Save sessions as permanent projects
+# [2026-01-27] Added to support permanent project storage (vs 24h sessions)
+# =============================================================================
+
+@app.post("/api/v1/project/save")
+async def save_project(
+    session_id: str = Query(..., description="Session ID to save as project"),
+    name: str = Query(..., description="Project name"),
+    description: Optional[str] = Query(None, description="Project description"),
+    request: Request = None
+):
+    """
+    Save a session as a permanent project.
+    
+    This copies data from mozart.sessions to mozart.projects for permanent storage.
+    Sessions expire in 24h, but projects are permanent.
+    
+    Returns:
+    - project_id: UUID of the saved project
+    - status: "saved"
+    """
+    user_id = getattr(request.state, "user_id", None) if request else None
+    
+    if not SUPABASE_AVAILABLE or not project_injector:
+        raise HTTPException(
+            status_code=503, 
+            detail="Project storage not available. Please try again later."
+        )
+    
+    try:
+        # 1. Load session data
+        session = await session_injector.load(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session not found: {session_id[:8]}...")
+        
+        # 2. Create project from session
+        project = await project_injector.create_from_session(
+            session=session,
+            name=name,
+            description=description
+        )
+        
+        if not project:
+            raise HTTPException(status_code=500, detail="Failed to create project")
+        
+        logger.info(f"✅ [PROJECT-SAVE] Saved session {session_id[:8]}... as project {project.id[:8]}... '{name}'")
+        
+        return {
+            "status": "saved",
+            "project_id": project.id,
+            "project_name": name,
+            "message": f"บันทึกโปรเจค '{name}' สำเร็จ"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PROJECT-SAVE] Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/project/list")
+async def list_saved_projects(request: Request):
+    """
+    List all saved projects for the current user.
+    
+    Unlike /session/list (which shows temporary 24h sessions),
+    this returns permanent saved projects from mozart.projects table.
+    """
+    user_id = getattr(request.state, "user_id", None)
+    
+    if not SUPABASE_AVAILABLE or not project_injector:
+        return {"projects": [], "storage": "unavailable"}
+    
+    try:
+        # Validate UUID
+        import re
+        is_valid_uuid = user_id and re.match(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', 
+            str(user_id), re.I
+        )
+        if not is_valid_uuid:
+            logger.warning(f"⚠️ Invalid user_id '{user_id}', returning empty project list")
+            return {"projects": [], "storage": "supabase", "note": "no_valid_user_id"}
+        
+        projects = await project_injector.load_by_user(user_id, limit=50)
+        
+        return {
+            "projects": [
+                {
+                    "project_id": p.id,
+                    "name": p.name,
+                    "description": p.description,
+                    "version": p.version,
+                    "status": p.status,
+                    "updated_at": p.updated_at,
+                    "loads_count": len(p.loads) if p.loads else 0,
+                    "has_mcp_response": bool(p.mcp_response)
+                }
+                for p in projects
+            ],
+            "storage": "supabase",
+            "count": len(projects)
+        }
+    except Exception as e:
+        logger.error(f"[PROJECT-LIST] Failed: {e}")
+        return {"projects": [], "error": str(e)}
+
+
+@app.get("/api/v1/project/{project_id}")
+async def load_project(project_id: str, request: Request):
+    """
+    Load a saved project by ID.
+    
+    Returns full project data including mcp_response, rooms, loads, etc.
+    """
+    if not SUPABASE_AVAILABLE or not project_injector:
+        raise HTTPException(status_code=503, detail="Project storage not available")
+    
+    try:
+        project = await project_injector.load(project_id)
+        
+        if not project:
+            raise HTTPException(status_code=404, detail=f"Project not found: {project_id[:8]}...")
+        
+        return {
+            "project_id": project.id,
+            "name": project.name,
+            "description": project.description,
+            "rooms": project.rooms,
+            "loads": project.loads,
+            "site_context": project.site_context,
+            "mcp_response": project.mcp_response,
+            "sld_data": project.sld_data,
+            "version": project.version,
+            "status": project.status,
+            "created_at": project.created_at,
+            "updated_at": project.updated_at
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PROJECT-LOAD] Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/v1/project/{project_id}")
+async def delete_project(project_id: str, confirm: str = Query(None), request: Request = None):
+    """
+    Delete a saved project (requires confirm=CONFIRM).
+    """
+    if confirm != "CONFIRM":
+        raise HTTPException(
+            status_code=400,
+            detail="Delete requires confirm=CONFIRM query parameter"
+        )
+    
+    if not SUPABASE_AVAILABLE or not project_injector:
+        raise HTTPException(status_code=503, detail="Project storage not available")
+    
+    try:
+        success = await project_injector.delete(project_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        logger.info(f"🗑️ [PROJECT-DELETE] Deleted project {project_id[:8]}...")
+        
+        return {
+            "status": "deleted",
+            "project_id": project_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PROJECT-DELETE] Failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================
