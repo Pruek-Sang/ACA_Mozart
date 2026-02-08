@@ -160,10 +160,10 @@ class TestSessionIntegration(unittest.TestCase):
         with open(routes_path, 'r') as f:
             content = f.read()
         
-        # Check project_name is parsed from body (not query param anymore)
-        # New code uses: body.get("project_name") and stores in actual_project_name
-        self.assertIn('body.get("project_name")', content)
-        self.assertIn('project_name=actual_project_name', content)
+        # Check project_name is parsed from Query param
+        # New code uses: project_name: Optional[str] = Query(...)
+        self.assertIn('project_name: Optional[str] = Query', content)
+        self.assertIn('actual_project_name = project_name or "บ้านนายสมหญิง"', content)
 
     def test_10_session_update_real_integration(self):
         """REAL Integration Test: Session UPDATE persists to Supabase.
