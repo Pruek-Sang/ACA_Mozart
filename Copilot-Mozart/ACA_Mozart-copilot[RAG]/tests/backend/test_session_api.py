@@ -29,7 +29,7 @@ class TestSessionCreate:
         
         response = test_client.post(
             "/api/v1/session/start",
-            json={"project_name": project_name}
+            params={"project_name": project_name}
         )
         
         assert response.status_code == 200
