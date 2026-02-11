@@ -39,6 +39,7 @@
 - [Engineering Decisions](#-engineering-decisions)
 - [Project Structure](#-project-structure)
 - [Quick Start](#-quick-start)
+- [How to Use](#-how-to-use)
 - [CI/CD Pipeline](#-cicd-pipeline)
 - [API Endpoints](#-api-endpoints)
 - [Testing](#-testing)
@@ -349,7 +350,97 @@ npm install && npm run dev
 
 ---
 
-## 🔄 CI/CD Pipeline
+## � How to Use
+
+The system accepts Thai natural language input — from a one-line description to a fully detailed specification. The RAG engine auto-fills missing information using Thai electrical standards (EIT/TIS).
+
+### Level 1: Simple (ระบุคร่าวๆ — ระบบเติมให้อัตโนมัติ)
+
+Just type what you need. The system infers room sizes, default devices, and lighting from building type:
+
+```
+ออกแบบระบบไฟฟ้า บ้าน 2 ชั้น 2 ห้องนอน 2 ห้องน้ำ
+```
+
+The system will auto-fill: default room areas, standard outlets per room, LED lighting by area, water heaters for bathrooms, and generate a complete load schedule.
+
+### Level 2: Moderate (ระบุห้อง + พื้นที่)
+
+Add floor layout and room sizes — the system fills in default devices:
+
+```
+ออกแบบระบบไฟฟ้า บ้าน 2 ชั้น
+
+ชั้น 1
+- ห้องนั่งเล่น 30 ตร.ม.
+- ห้องครัว กว้าง 3 x 5 เมตร
+- ห้องน้ำ 1 ห้อง
+- ห้องเก็บของ 20 ตร.ม.
+- โรงรถ 20 ตร.ม.
+
+ชั้น 2
+- 2 ห้องนอน
+- 1 ห้องน้ำ
+- ห้องเก็บของ 10 ตร.ม.
+```
+
+### Level 3: Full Specification (ระบุทุกรายละเอียด — ระดับวิศวกร)
+
+Provide exact devices, wattages, outlet counts, wire run distances, and compliance constraints:
+
+```
+ออกแบบระบบไฟฟ้าบ้านพักอาศัย 2 ชั้น (ไทย)
+
+เงื่อนไขมาตรฐาน:
+- มาตรฐาน: วสท. 2001-56 / IEC 60364
+- ระบบไฟ: 1 เฟส 230V, สายดินแบบ TT
+- แรงดันตก: วงจรย่อยไม่เกิน 3%
+- ห้องน้ำ + น้ำอุ่น ต้องใช้ RCBO 30mA
+- แอร์ทุกตัวต้องแยกวงจรเฉพาะ
+
+ตำแหน่งตู้ไฟ:
+- ตู้ MDB/DB อยู่ "โรงรถ ชั้น 1"
+- ระยะสายเมนจากมิเตอร์ถึงตู้ MDB = 12 เมตร
+- ระยะเฉลี่ยจากตู้ MDB ไปห้องชั้น 1 = 15 เมตร/วงจร
+- ระยะเฉลี่ยจากตู้ MDB ไปห้องชั้น 2 = 25 เมตร/วงจร
+
+ชั้น 1
+1) ห้องนั่งเล่น 30 ตร.ม.
+   - เต้ารับคู่ 6 จุด, ไฟ LED 20W x4, พัดลมเพดาน 60W
+2) ห้องครัว 15 ตร.ม.
+   - เตาแม่เหล็กไฟฟ้า 3000W (วงจรเฉพาะ)
+   - ไมโครเวฟ 1500W, หม้อหุงข้าว 800W, ตู้เย็น 300W
+   - กาต้มน้ำ 2200W, เต้ารับเหนือเคาน์เตอร์ 6 จุด
+3) ห้องน้ำ — น้ำอุ่น 4500W (RCBO 30mA วงจรเฉพาะ)
+...
+
+ชั้น 2
+1) ห้องนอน 1 — แอร์ 12000 BTU, เต้ารับคู่ 4 จุด
+2) ห้องนอน 2 — แอร์ 20000 BTU, เต้ารับคู่ 3 จุด
+3) ห้องน้ำ 2 — น้ำอุ่น 3500W (RCBO)
+...
+```
+
+### What You Get Back
+
+Regardless of input level, the system returns:
+
+| Output | Description |
+|--------|-------------|
+| **Load Schedule** | Per-circuit breakdown: device, watts, current, wire size, breaker |
+| **Wire & Breaker Selection** | NEC-compliant sizing with voltage drop check |
+| **Circuit Grouping** | Automatic load balancing across breakers |
+| **Compliance Report** | Pass/fail against EIT/NEC standards with warnings |
+| **BOQ (Bill of Quantities)** | Material list with market pricing |
+| **SLD (Single-Line Diagram)** | Visual circuit diagram |
+| **QC Certificate** | Standards compliance summary |
+| **AutoLISP Code** | Ready for AutoCAD execution |
+
+> **Note**: The system currently accepts input in **Thai only**. English language support is planned.
+
+---
+
+## �🔄 CI/CD Pipeline
 
 Fully automated via **GitHub Actions** — code pushed to `main` triggers the entire pipeline:
 
