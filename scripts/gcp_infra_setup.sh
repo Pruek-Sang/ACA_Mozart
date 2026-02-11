@@ -7,8 +7,8 @@
 
 set -e
 
-PROJECT_ID="gen-lang-client-0658701327"
-REGION="asia-southeast1"
+PROJECT_ID="${GCP_PROJECT_ID:?ERROR: Set GCP_PROJECT_ID environment variable}"
+REGION="${GCP_REGION:-asia-southeast1}"
 
 echo "═══════════════════════════════════════════════════════════"
 echo "🛡️ Mozart Infrastructure Setup"

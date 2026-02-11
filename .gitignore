@@ -3,9 +3,15 @@
 .env.local
 .env_ACA
 Docker/.env_ACA
+**/.env.production
+**/.env.staging
 *.key
 *credentials*.json
 service-account*.json
+
+# Trust/Verification logs (may contain sensitive LLM outputs)
+*.jsonl
+verification_log*.txt
 
 # Python
 __pycache__/

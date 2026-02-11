@@ -15,8 +15,8 @@ on:
   workflow_dispatch:
 
 env:
-  FRONTEND_URL: https://frontend-203658178245.asia-southeast1.run.app
-  RAG_URL: https://mozart-rag-203658178245.asia-southeast1.run.app
+  FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+  RAG_URL: ${{ secrets.RAG_URL }}
 
 jobs:
   owasp-zap:

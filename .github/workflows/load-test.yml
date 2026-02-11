@@ -24,7 +24,7 @@ on:
         default: '2m'
 
 env:
-  RAG_URL: https://mozart-rag-203658178245.asia-southeast1.run.app
+  RAG_URL: ${{ secrets.RAG_URL }}
 
 jobs:
   load-test:
