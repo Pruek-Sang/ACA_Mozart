@@ -171,66 +171,129 @@
 
 ```
 ACA_Mozart/
-├── .github/workflows/           # CI/CD (5 workflows)
-│   ├── docker-build.yml         # Build & push images on merge to main
-│   ├── security.yml             # OWASP ZAP + dependency audit (weekly)
-│   ├── e2e-browser.yml          # Playwright browser tests
-│   ├── load-test.yml            # k6 load testing
-│   └── price-scraper.yml        # Scheduled BOQ price updates
+├── .github/workflows/                 # CI/CD (5 workflows)
+│   ├── docker-build.yml               # Build → Deploy → Smoke → Rollback
+│   ├── security.yml                   # OWASP ZAP + dependency audit (weekly)
+│   ├── e2e-browser.yml                # Playwright browser tests (nightly)
+│   ├── load-test.yml                  # k6 stress testing (weekly)
+│   └── price-scraper.yml              # BOQ price auto-update (monthly)
 │
 ├── Copilot-Mozart/ACA_Mozart-copilot[RAG]/
-│   ├── app/                     # RAG Service (FastAPI)
-│   │   ├── routes.py            # API endpoints
-│   │   ├── service.py           # Core 5-phase spec engine
-│   │   ├── mcp_adapter.py       # RAG → MCP data mapping
-│   │   ├── mcp_client.py        # HTTP client to MCP Core
-│   │   ├── models.py            # Pydantic contracts
-│   │   ├── knowledge_service.py # Folder-based RAG retrieval
-│   │   ├── middleware/          # Rate limiter, admin auth
-│   │   ├── context/             # Supabase session injection
-│   │   ├── formatters/          # Markdown output formatters
-│   │   └── parsers/             # LLM output parsers
-│   ├── core/                    # Vector DB layer
-│   │   ├── faiss_db.py          # FAISS integration
-│   │   ├── vector_adapter.py    # DB backend switcher
-│   │   └── ingest.py            # Knowledge ingestion
-│   ├── frontend/                # React SPA
-│   │   ├── src/components/      # 24 React components
-│   │   ├── src/lib/             # API client, Supabase, utilities
-│   │   ├── src/hooks/           # Custom React hooks
-│   │   └── e2e/                 # Playwright E2E tests
-│   ├── rag_knowledge/           # Curated knowledge base
-│   │   ├── db/                  # Device catalogs & codes
-│   │   ├── example/             # Few-shot LLM examples
-│   │   ├── mcp/                 # MCP API contracts
-│   │   └── standard/            # Thai electrical standards
-│   ├── gate_way_new.py          # Gateway service
-│   └── Docker/                  # Dockerfiles & compose configs
+│   ├── app/                           # RAG Service (FastAPI)
+│   │   ├── routes.py                  # API endpoints
+│   │   ├── service.py                 # Core 5-phase spec engine
+│   │   ├── models.py                  # Pydantic contracts
+│   │   ├── mcp_adapter.py             # RAG→MCP data mapping (device_code → watts)
+│   │   ├── mcp_client.py              # HTTP client to MCP Core
+│   │   ├── knowledge_service.py       # Folder-based RAG retrieval
+│   │   ├── intent/                    # Intent detection
+│   │   │   └── edit_detector.py       # Detect edit vs new design intent
+│   │   ├── parsers/                   # LLM output parsers
+│   │   │   ├── hybrid_parser.py       # LLM + regex fallback parser
+│   │   │   ├── llm_parser.py          # Gemini structured output
+│   │   │   ├── regex_parser.py        # Deterministic fallback
+│   │   │   ├── device_catalog.py      # Device code resolver
+│   │   │   └── normalizer.py          # Input normalization (Thai→English)
+│   │   ├── formatters/                # Output formatters
+│   │   │   ├── markdown_formatter.py  # Human-readable results
+│   │   │   ├── pdf_formatter.py       # PDF export
+│   │   │   ├── audit_formatter.py     # Audit trail formatting
+│   │   │   └── full_report_builder.py # Complete report assembly
+│   │   ├── display/                   # Result rendering
+│   │   │   ├── boq_renderer.py        # Bill of quantities
+│   │   │   ├── sld_renderer.py        # Single-line diagram SVG
+│   │   │   ├── qc_certificate.py      # QC compliance certificate
+│   │   │   ├── revision_diff.py       # Design revision comparison
+│   │   │   └── explainable_qc.py      # Human-readable QC explanations
+│   │   ├── context/                   # Request context injection
+│   │   │   ├── session_injector.py    # Supabase session management
+│   │   │   ├── project_injector.py    # Project context loading
+│   │   │   ├── merge_engine.py        # Multi-turn design merging
+│   │   │   ├── supabase_client.py     # Supabase client wrapper
+│   │   │   └── validator.py           # Cross-service validation
+│   │   ├── catalog/                   # Device catalog
+│   │   │   └── device_loader.py       # Load device specs from knowledge base
+│   │   ├── middleware/                # Rate limiter, admin auth
+│   │   ├── logic/                     # Business logic
+│   │   │   └── validation.py          # Input/output validation rules
+│   │   └── utils/                     # Shared utilities
+│   │
+│   ├── core/                          # Vector DB layer
+│   │   ├── faiss_db.py                # FAISS integration
+│   │   ├── vector_adapter.py          # DB backend switcher (FAISS/Chroma)
+│   │   └── ingest.py                  # Knowledge ingestion pipeline
+│   │
+│   ├── frontend/                      # React SPA (24 components)
+│   │   ├── src/components/            # UI components
+│   │   ├── src/lib/                   # API client, Supabase, utilities
+│   │   ├── src/hooks/                 # Custom React hooks
+│   │   ├── src/types/                 # TypeScript type definitions
+│   │   ├── tests/                     # Vitest unit tests
+│   │   └── e2e/                       # Playwright E2E tests
+│   │
+│   ├── rag_knowledge/                 # Curated knowledge base
+│   │   ├── db/                        # Device catalogs & codes
+│   │   ├── example/                   # Few-shot LLM examples
+│   │   ├── mcp/                       # MCP API contracts & limits
+│   │   └── standard/                  # Thai electrical standards (TIS, EIT)
+│   │
+│   ├── gate_way_new.py                # Gateway service (intent router)
+│   ├── tests/                         # RAG backend tests
+│   │   ├── backend/                   # API endpoint tests
+│   │   ├── fixtures/                  # Test data & mock responses
+│   │   └── one_shot_qa/               # End-to-end QA tests
+│   └── Docker/                        # Dockerfiles & NGINX configs
 │
-├── mcp_core_v2/                 # MCP Calculation Engine
-│   ├── api.py                   # REST interface
-│   ├── pipeline.py              # Design pipeline orchestrator
-│   ├── core/                    # Calculation modules
-│   │   ├── load_calculator.py   # NEC load calculations
-│   │   ├── wire_sizer.py        # Wire sizing + voltage drop
-│   │   ├── breaker_selector.py  # Breaker/RCBO selection
-│   │   ├── circuit_grouper.py   # Load balancing across phases
-│   │   ├── conduit_sizer.py     # Conduit fill calculations
-│   │   ├── compliance_checker.py# Standards compliance validation
-│   │   ├── autolisp_generator.py# AutoCAD code generation
-│   │   ├── lighting_calculator.py
-│   │   └── sld_generator.py     # Single-line diagram data
-│   ├── context/                 # Safety injectors (derating, kA, NG-link)
-│   ├── models/                  # Pydantic contracts
-│   └── Docker/                  # Multi-stage Dockerfile
+├── mcp_core_v2/                       # MCP Calculation Engine
+│   ├── api.py                         # REST interface
+│   ├── pipeline.py                    # Design pipeline orchestrator
+│   ├── config.py                      # NEC/EIT configuration
+│   ├── core/                          # Calculation modules (16 files)
+│   │   ├── load_calculator.py         # NEC Article 220 load calculations
+│   │   ├── wire_sizer.py              # Wire sizing + voltage drop analysis
+│   │   ├── breaker_selector.py        # Breaker/RCBO selection
+│   │   ├── circuit_grouper.py         # Phase load balancing
+│   │   ├── conduit_sizer.py           # NEC Chapter 9 conduit fill
+│   │   ├── compliance_checker.py      # Standards compliance validation
+│   │   ├── autolisp_generator.py      # AutoCAD code generation
+│   │   ├── lighting_calculator.py     # Illumination calculations
+│   │   ├── sld_generator.py           # Single-line diagram data
+│   │   ├── boq_service.py             # Bill of quantities with pricing
+│   │   ├── price_scraper.py           # Live market price scraping
+│   │   ├── pandapower_adapter.py      # Power flow simulation
+│   │   ├── result_builder.py          # Structured result assembly
+│   │   ├── room_defaults.py           # Default loads by room type
+│   │   └── template_resolver.py       # Design template matching
+│   ├── context/                       # Safety injectors (10 files)
+│   │   ├── derating_injector.py       # Temperature/conduit derating (NEC 310)
+│   │   ├── ka_rating_injector.py      # Short-circuit kA rating
+│   │   ├── ng_link_injector.py        # Neutral-Ground link rules
+│   │   ├── phase_balance_injector.py  # 3-phase balance validation
+│   │   ├── input_sanitizer_injector.py# Input validation & XSS prevention
+│   │   ├── service_vd_injector.py     # Service voltage drop check
+│   │   ├── solar_cell_injector.py     # Solar PV integration rules
+│   │   ├── three_phase_injector.py    # 3-phase system handling
+│   │   └── vehicle_mode_injector.py   # EV charger support
+│   ├── dal/                           # Data access layer
+│   │   ├── catalog_dal.py             # Catalog data interface
+│   │   └── file_catalog_dal.py        # File-based catalog implementation
+│   ├── catalog/                       # Equipment catalog data (CSV)
+│   ├── models/                        # Pydantic contracts
+│   ├── tests/                         # MCP unit & E2E tests
+│   └── Docker/                        # Multi-stage Dockerfile
 │
-├── tests/                       # Integration & E2E tests
-├── scripts/                     # Deployment & infra scripts
-├── docker-compose.fullstack.yml # Full stack orchestration
-└── docker-compose.prod.yml      # Production (pre-built images)
+├── tests/                             # Cross-service integration tests
+│   ├── test_e2e_data_flow.py          # RAG ↔ MCP contract tests
+│   ├── load/                          # k6 stress test scripts
+│   └── chaos/                         # Chaos engineering tests
+│
+├── scripts/                           # Deployment & infra scripts
+├── Doc/                               # Project documentation
+├── docker-compose.fullstack.yml       # Full stack orchestration (dev)
+└── docker-compose.prod.yml            # Production (pre-built images)
 ```
 
-**Scale**: ~260 source files · 56 backend tests · 5 CI/CD workflows · 24 React components
+**Scale**: 706 files · 56 backend test files · 5 CI/CD workflows · 24 React components · 10 safety injectors
 
 ---
 
