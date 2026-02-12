@@ -2,14 +2,33 @@
 Pytest Configuration for ACA Mozart RAG Tests
 =============================================
 Central conftest.py with shared fixtures and configuration
+
+Key conventions:
+- test_client: TestClient with mocked RagService (no FAISS/LLM needed)
+- supabase_client: Real Supabase client (skips if no creds)
+- TESTING=1 env var prevents health check from hitting production Supabase
 """
 
 import pytest
 import os
 import sys
+import time
 
 # Add app to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Global TESTING mode — prevents Supabase pings in health checks, etc.
+# ═══════════════════════════════════════════════════════════════════════════
+os.environ.setdefault("TESTING", "1")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Register custom markers so pytest doesn't warn about unknown markers
+# ═══════════════════════════════════════════════════════════════════════════
+def pytest_configure(config):
+    config.addinivalue_line("markers", "live: marks tests that hit real external services (Supabase, LLM, MCP Core)")
 
 
 def pytest_addoption(parser):
@@ -59,19 +78,35 @@ def project_id(request):
 @pytest.fixture(scope="module")
 def test_client():
     """
-    FastAPI TestClient for real API testing.
-    Uses the actual app from routes.py.
+    FastAPI TestClient with mocked RagService.
+    
+    Uses the lazy-init proxy in routes.py — injects a mock RagService
+    so the app starts without FAISS, Google AI, or vector DB.
+    Works identically in CI and locally.
     """
-    from fastapi.testclient import TestClient
+    from unittest.mock import MagicMock, AsyncMock
+    from starlette.testclient import TestClient
+    from app.models import StandardResponse, AnswerMetadata
     
-    # 🩹 CI HOTFIX: Inject dummy keys to pass startup checks in service.py
-    if not os.getenv("GOOGLE_API_KEY"):
-        os.environ["GOOGLE_API_KEY"] = "dummy-ci-key"
-        
-    from app.routes import app
+    # Inject mock RagService into the lazy proxy (avoids FAISS/LLM init)
+    import app.routes as routes_mod
+    mock_rag = MagicMock()
+    # process_ask is awaited in route handlers — must be AsyncMock
+    # Return a valid StandardResponse so endpoint serialization doesn't fail
+    mock_rag.process_ask = AsyncMock(return_value=StandardResponse(
+        answer="mock response for testing",
+        sources=[],
+        confidence="Low",
+        grounding_status="mocked",
+        metadata=AnswerMetadata(llm_model="mock", retrieved_docs=[]),
+    ))
+    routes_mod._rag_service_instance = mock_rag
     
-    with TestClient(app) as client:
+    with TestClient(routes_mod.app) as client:
         yield client
+    
+    # Cleanup: reset the lazy proxy
+    routes_mod._rag_service_instance = None
 
 
 @pytest.fixture(scope="module")

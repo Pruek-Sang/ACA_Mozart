@@ -2285,11 +2285,8 @@ Query: "{query}"
                 elif extracted_data:
                     logger.warning(f"[CP-VD] extracted_data present but no floor_distances found. Data keys: {list(extracted_data.keys())}")
                 
-                # 🆕 [VD-FIX] Inject floor_distances from extracted_data (RAG) into mcp_result (Core)
-                # This bridges the gap between RAG extraction and Compute layer
-                if extracted_data and extracted_data.get('floor_distances'):
-                    result['floor_distances'] = extracted_data['floor_distances']
-                    logger.info(f"[CP-VD-BRIDGE] Injected floor_distances into mcp_result: {result['floor_distances']}")
+                # 🔧 REMOVED: Duplicate floor_distances injection (identical to block above)
+                # The block above already handles this injection correctly.
 
                 # 🆕 [VD-FIX] Inject VD from wire_sizing[load.id] into grouped_circuits
                 # This fixes the key mismatch where compute.py looks for circuit_id but wire_sizing uses load.id

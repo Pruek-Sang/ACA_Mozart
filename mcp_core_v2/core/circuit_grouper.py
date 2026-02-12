@@ -85,6 +85,7 @@ class GroupedCircuit:
             'power_watts': load.power_watts,
             'quantity': load.quantity,
             'location': load.location.room if hasattr(load.location, 'room') else str(load.location),
+            'device_code': getattr(load, 'device_code', None) or load.name,
         }
     
     def add_load(self, load: ElectricalLoad):

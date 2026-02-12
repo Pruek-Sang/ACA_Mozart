@@ -76,8 +76,39 @@ app = FastAPI(
     description="Mozart RAG Spec Engine - Aura's Divine Creation"
 )
 
-# Initialize service
-rag_service = RagService()
+# ═══════════════════════════════════════════════════════════════════
+# Lazy-Init RagService — NOT created at import time.
+# This allows TestClient to import `app.routes.app` without triggering
+# FAISS load, Google AI config, or vector DB access.
+# In production, RagService() is created on first request.
+# In tests, conftest.py injects a mock before any request.
+# ═══════════════════════════════════════════════════════════════════
+_rag_service_instance = None
+
+
+class _LazyRagProxy:
+    """Proxy that defers RagService() creation until first attribute access."""
+    def __getattr__(self, name):
+        global _rag_service_instance
+        if _rag_service_instance is None:
+            _rag_service_instance = RagService()
+        return getattr(_rag_service_instance, name)
+
+
+rag_service = _LazyRagProxy()
+
+
+# 🔑 JWT Auth Middleware — Registered first (innermost = closest to endpoint)
+# Decodes Supabase JWT from Authorization header → sets request.state.user_id
+# Permissive: never returns 401, guest mode continues to work
+# Note: In Starlette, first-registered = innermost. This is fine because
+# no outer middleware (request_id, log_requests) reads user_id.
+try:
+    from app.middleware.jwt_auth import jwt_auth_middleware
+    app.middleware("http")(jwt_auth_middleware)
+    logger.info("🔑 JWT auth middleware registered")
+except ImportError:
+    logger.warning("⚠️ JWT auth middleware not available")
 
 
 # Middleware for request ID
@@ -173,7 +204,8 @@ async def root():
     supabase_status = "not_configured"
     
     # 🔌 Keepalive ping - ทุก health check จะ ping Supabase
-    if SUPABASE_AVAILABLE:
+    # Skip in TESTING mode to avoid hitting production DB
+    if SUPABASE_AVAILABLE and not os.getenv("TESTING"):
         client = get_supabase_client()
         if client:
             try:
@@ -274,13 +306,17 @@ async def ask_standard(req: QueryRequest, request: Request, session_id: str = No
                     logger.info(f"✅ [AUTO-SAVE] Saved design to session {session_id[:8]}...")
                     
                     # 🆕 FIX: Write-through - Save loads for EDIT mode
+                    # 🔧 BUG FIX: Use device_code (not circuit_name) so merge_engine can match
                     display_data = metadata.get("display_data", {})
                     if circuits := display_data.get("circuits"):
                         loads_to_save = [
                             {
-                                "device": c.get("circuit_name", ""),
+                                "device": c.get("device_code") or c.get("circuit_name", ""),
+                                "device_name": c.get("circuit_name", ""),
                                 "room_name": c.get("room", "") or c.get("floor", ""),
                                 "floor": int(c.get("floor", 1)) if str(c.get("floor", "")).isdigit() else 1,
+                                "quantity": c.get("num_loads", 1),
+                                "power_watts": c.get("total_watts", 0),
                             }
                             for c in circuits
                         ]
@@ -540,6 +576,12 @@ async def start_session(
             # Generate a proper UUID for non-UUID user identifiers (e.g., "guest_xxx")
             logger.warning(f"⚠️ [SESSION-START] user_id '{raw_user_id}' is not UUID format, generating new UUID")
             user_id = str(uuid.uuid4())
+    else:
+        # 🔧 BUG FIX: Guest users get user_id=None → stored as NULL in UUID column
+        # Schema allows nullable user_id (ALTER TABLE ... DROP NOT NULL was applied)
+        # Each guest session is isolated by unique session_id, not user_id
+        user_id = None
+        logger.info("👤 [SESSION-START] No auth → guest mode (user_id=NULL)")
     
     logger.info(f"🆕 [SESSION-START] Creating session for user={user_id}, project={project_name}")
     
@@ -569,6 +611,7 @@ async def start_session(
     
     return {
         "session_id": session_id,
+        "user_id": user_id,
         "project_name": actual_project_name,
         "message": "Session created. Please answer site context questions.",
         "site_context": questionnaire.model_dump()
@@ -605,7 +648,12 @@ async def list_projects(request: Request):
         # FIX: Validate user_id is UUID before querying Supabase
         # IP addresses like "169.254.169.126" are not valid UUIDs
         import re
-        is_valid_uuid = user_id and re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(user_id), re.I)
+        # Guest users have user_id=None → can't query by user, return empty
+        if user_id is None:
+            logger.info("👤 [LIST] Guest user (no auth) → returning empty project list")
+            return {"projects": [], "storage": "supabase", "note": "guest_no_projects"}
+        # Validate user_id is UUID before querying Supabase
+        is_valid_uuid = re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', str(user_id), re.I)
         if not is_valid_uuid:
             logger.warning(f"⚠️ Invalid user_id '{user_id}' (not UUID), returning empty project list")
             return {"projects": [], "storage": "supabase", "note": "no_valid_user_id"}
@@ -761,13 +809,18 @@ async def delete_session(session_id: str, request: Request, confirm: str = None)
     
     if not SUPABASE_AVAILABLE or not session_injector:
         # Fallback to in-memory
-        session_store.remove_session(session_id)
+        session_store.delete_session(session_id)
         logger.info(f"🧹 [SOFT-DELETE] Removed in-memory session: {session_id[:8]}...")
         return {"status": "deleted", "storage": "memory", "session_id": session_id}
     
     try:
         # Soft-delete: set status to 'expired' (DB CHECK constraint: active/expired/migrated)
         client = get_supabase_client()
+        if client is None:
+            # Supabase module imported but no credentials — fall back to in-memory
+            session_store.delete_session(session_id)
+            logger.info(f"🧹 [SOFT-DELETE] Removed in-memory session (no DB creds): {session_id[:8]}...")
+            return {"status": "deleted", "storage": "memory", "session_id": session_id}
         
         # 🔧 FIX: Use 'mozart' schema (not 'public')
         result = client.schema("mozart").table("sessions").update({

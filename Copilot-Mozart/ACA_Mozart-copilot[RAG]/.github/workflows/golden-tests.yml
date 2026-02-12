@@ -1,0 +1,90 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# 🌟 Golden Tests — Post-Deployment Verification
+#
+# Runs live golden tests against a deployed environment.
+# These tests hit real LLM + MCP Core services.
+# Triggered manually or after a successful deploy.
+# ═══════════════════════════════════════════════════════════════════════════
+name: 🌟 Golden Tests (Post-Deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_url:
+        description: 'Backend URL to test against'
+        required: false
+        default: ''
+        type: string
+
+  # Auto-trigger after docker-build deploy job succeeds
+  workflow_run:
+    workflows: ["🐳 Docker Build & Deploy"]
+    types: [completed]
+    branches: [main]
+
+env:
+  ENABLE_LIVE_TESTS: 'true'
+
+jobs:
+  golden-tests:
+    name: 🌟 Live Golden Tests
+    runs-on: ubuntu-latest
+    # Only run if manually triggered OR if the deploy workflow succeeded
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    continue-on-error: true  # Don't block deploys — golden tests are advisory
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          cd "Copilot-Mozart/ACA_Mozart-copilot[RAG]"
+          pip install --quiet --no-cache-dir -r requirements-test.txt
+
+      - name: 🌟 Run Golden Stress Test
+        env:
+          ENABLE_LIVE_TESTS: 'true'
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          STAGING_BACKEND_URL: ${{ inputs.backend_url || secrets.STAGING_BACKEND_URL }}
+          PYTHONPATH: ${{ github.workspace }}/Copilot-Mozart/ACA_Mozart-copilot[RAG]
+        working-directory: Copilot-Mozart/ACA_Mozart-copilot[RAG]
+        run: |
+          echo "🌟 Running golden stress test..."
+          python -m pytest tests/test_golden_stress.py -v -m live --tb=long
+
+      - name: 🔄 Run Golden Multi-Turn Test
+        env:
+          ENABLE_LIVE_TESTS: 'true'
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          STAGING_BACKEND_URL: ${{ inputs.backend_url || secrets.STAGING_BACKEND_URL }}
+          PYTHONPATH: ${{ github.workspace }}/Copilot-Mozart/ACA_Mozart-copilot[RAG]
+        working-directory: Copilot-Mozart/ACA_Mozart-copilot[RAG]
+        run: |
+          echo "🔄 Running golden multi-turn test..."
+          python -m pytest tests/test_golden_multiturn.py -v -m live --tb=long
+
+      - name: 📊 Golden Test Summary
+        if: always()
+        run: |
+          echo "╔════════════════════════════════════════════════════════════╗"
+          echo "║            🌟 GOLDEN TEST RESULTS (Advisory)               ║"
+          echo "╠════════════════════════════════════════════════════════════╣"
+          echo "║ These tests hit real LLM + MCP services.                   ║"
+          echo "║ Failures may indicate LLM drift, not code bugs.            ║"
+          echo "║ Review logs before rolling back.                           ║"
+          echo "╚════════════════════════════════════════════════════════════╝"

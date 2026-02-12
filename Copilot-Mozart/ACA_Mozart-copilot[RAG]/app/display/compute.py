@@ -36,6 +36,7 @@ class CircuitData(TypedDict):
     # === EXISTING FIELDS (DO NOT REMOVE!) ===
     circuit_name: str
     circuit_id: str
+    device_code: str             # 🆕 Original device code for EDIT mode matching
     floor: str
     room: str
     total_watts: float
@@ -472,10 +473,16 @@ def _process_circuits(
             notes = circuit.get('notes', [])
             remark = '; '.join(notes) if notes else ''
             
+            # 🆕 Extract device_code from constituent loads (threaded from MCP Core)
+            _loads_in_ckt = circuit.get('loads', [])
+            _device_codes = [l.get('device_code', l.get('name', '')) for l in _loads_in_ckt] if isinstance(_loads_in_ckt, list) else []
+            primary_device_code = _device_codes[0] if _device_codes else ckt_name
+            
             circuit_data: CircuitData = {
                 # === EXISTING FIELDS (unchanged) ===
                 'circuit_name': ckt_name,
                 'circuit_id': circuit_id,
+                'device_code': primary_device_code,
                 'floor': floor_str,
                 'room': room,
                 'total_watts': round_up(total_watts),

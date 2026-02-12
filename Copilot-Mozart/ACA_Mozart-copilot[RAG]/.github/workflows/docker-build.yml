@@ -114,8 +114,9 @@ jobs:
           export GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}"
           export SUPABASE_URL="${{ secrets.SUPABASE_URL }}"
           export SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          export SUPABASE_JWT_SECRET="${{ secrets.SUPABASE_JWT_SECRET }}"
           export PROJECT_ID="${{ secrets.GCP_PROJECT_ID }}"
-          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py tests/test_e2e_integration.py tests/test_real_supabase_integration.py tests/backend/test_session_api.py tests/backend/test_design_api.py -v --tb=short
+          python -m pytest tests/test_parser_logic.py tests/test_merge_logic.py tests/test_comprehensive_parser.py tests/test_session_integration.py tests/test_e2e_integration.py tests/test_real_supabase_integration.py tests/backend/test_session_api.py tests/backend/test_design_api.py tests/test_gateway_auth.py tests/test_golden_multiturn.py -v --tb=short -m "not live"
           echo "✅ RAG Backend tests PASSED"
 
       - name: 📊 Backend Test Summary

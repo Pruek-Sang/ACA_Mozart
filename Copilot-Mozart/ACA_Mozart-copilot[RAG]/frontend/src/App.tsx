@@ -22,6 +22,48 @@ import { logger } from './lib/logger';
 import { LogOut, User as UserIcon, MessageSquareHeart, FolderOpen, Trash2, Undo2 } from 'lucide-react';
 
 /**
+ * 🔧 Unified circuit→LoadResult mapper
+ * 
+ * Maps backend CircuitData fields to frontend LoadResult interface.
+ * Used in 3 places: session restore, fresh design, session switch.
+ * SINGLE SOURCE OF TRUTH — edit here, all 3 sites get the fix.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCircuitToLoadResult(ckt: Record<string, any>) {
+  return {
+    room_name: (ckt.room || ckt.floor || '') as string,
+    device_name: (ckt.circuit_name || '') as string,
+    device_code: (ckt.device_code || '') as string,
+    power_kw: (ckt.total_kw || 0) as number,
+    current_a: (ckt.total_current || 0) as number,
+    breaker_size: (ckt.breaker_rating || 15) as number,
+    wire_size: `${ckt.wire_size || '2.5'} mm²`,
+    conduit_size: (ckt.conduit_size || '1/2"') as string,
+    voltage_drop_percent: (ckt.vd_percent || 0) as number,
+    // Connection Load (VA) - 3-phase ready
+    load_va_l1: (ckt.load_va_l1 || ckt.total_va || Math.round((ckt.total_kw || 0) * 1000) || 0) as number,
+    load_va_l2: (ckt.load_va_l2 || 0) as number,
+    load_va_l3: (ckt.load_va_l3 || 0) as number,
+    total_va: (ckt.total_va || Math.round((ckt.total_kw || 0) * 1000) || 0) as number,
+    // Circuit Breaker Details
+    breaker_type: (ckt.breaker_type || 'MCB') as string,
+    breaker_poles: (ckt.breaker_poles || 1) as number,
+    breaker_ic_ka: (ckt.breaker_ic_ka || 6) as number,
+    breaker_af: (ckt.breaker_af || ckt.breaker_rating || 15) as number,
+    breaker_at: (ckt.breaker_at || ckt.breaker_rating || 15) as number,
+    // Wire/Cable Details
+    wire_size_l: (ckt.wire_size_l || ckt.wire_size || '2.5') as string,
+    wire_size_n: (ckt.wire_size_n || ckt.wire_size || '2.5') as string,
+    wire_size_grd: (ckt.wire_size_grd || ckt.ground_size || '2.5') as string,
+    wire_type: (ckt.wire_type || 'IEC01') as string,
+    ground_size: (ckt.ground_size || '2.5') as string,
+    conduit_type: (ckt.conduit_type || 'PVC') as string,
+    requires_rcbo: (ckt.requires_rcbo || false) as boolean,
+    remark: (ckt.remark || '') as string,
+  };
+}
+
+/**
  * App - Main Application Controller
  * 
  * Layout: Split Screen (Left: Chat+Context, Right: Results)
@@ -205,28 +247,7 @@ function App() {
             success: true,
             message: 'Design restored',
             data: {
-              loads: (displayData.circuits || []).map((ckt: Record<string, unknown>) => ({
-                room_name: ckt.room || ckt.floor || '',
-                device_name: ckt.circuit_name,
-                power_kw: ckt.total_kw,
-                current_a: ckt.total_current,
-                breaker_size: ckt.breaker_rating,
-                wire_size: `${ckt.wire_size} mm²`,
-                conduit_size: ckt.conduit_size,
-                voltage_drop_percent: ckt.vd_percent,
-                // Full mapping for PDF support
-                load_va_l1: ckt.load_va_l1 || ckt.total_va || 0,
-                load_va_l2: ckt.load_va_l2 || 0,
-                load_va_l3: ckt.load_va_l3 || 0,
-                total_va: ckt.total_va || 0,
-                breaker_type: ckt.breaker_type || 'MCB',
-                breaker_poles: ckt.breaker_poles || 1,
-                breaker_ic_ka: ckt.breaker_ic_ka || 6,
-                wire_type: ckt.wire_type || 'IEC01',
-                conduit_type: ckt.conduit_type || 'PVC',
-                requires_rcbo: ckt.requires_rcbo || false,
-                remark: ckt.remark || '',
-              })),
+              loads: (displayData.circuits || []).map(mapCircuitToLoadResult),
               warnings: displayData.warnings || [],
               explainable_warnings: displayData.explainable_warnings,
               assumptions: displayData.assumptions,
@@ -532,62 +553,7 @@ function App() {
           success: true,
           message: 'Design calculated',
           data: {
-            loads: (displayData.circuits || []).map((ckt: {
-              room?: string;
-              floor?: string;
-              circuit_name: string;
-              total_kw: number;
-              total_current: number;
-              total_watts?: number;
-              total_va?: number;
-              load_va_l1?: number;
-              load_va_l2?: number;
-              load_va_l3?: number;
-              breaker_rating: number;
-              breaker_type?: string;
-              breaker_poles?: number;
-              breaker_ic_ka?: number;
-              breaker_af?: number;
-              breaker_at?: number;
-              wire_size: string;
-              wire_size_l?: string;
-              wire_size_n?: string;
-              wire_size_grd?: string;
-              wire_type?: string;
-              ground_size?: string;
-              conduit_size?: string;
-              conduit_type?: string;
-              vd_percent?: number;
-              requires_rcbo?: boolean;
-              remark?: string;
-            }) => ({
-              room_name: ckt.room || ckt.floor || '',
-              device_name: ckt.circuit_name,
-              power_kw: ckt.total_kw,
-              current_a: ckt.total_current,
-              breaker_size: ckt.breaker_rating,
-              wire_size: `${ckt.wire_size} mm²`,
-              conduit_size: ckt.conduit_size,
-              voltage_drop_percent: ckt.vd_percent,
-              // 🔧 FIX: Add fields needed by PDF
-              load_va_l1: ckt.load_va_l1 || ckt.total_va || Math.round(ckt.total_kw * 1000) || 0,
-              load_va_l2: ckt.load_va_l2 || 0,
-              load_va_l3: ckt.load_va_l3 || 0,
-              total_va: ckt.total_va || Math.round(ckt.total_kw * 1000) || 0,
-              breaker_type: ckt.breaker_type || 'MCB',
-              breaker_poles: ckt.breaker_poles || 1,
-              breaker_ic_ka: ckt.breaker_ic_ka || 6,
-              breaker_af: ckt.breaker_af || ckt.breaker_rating,
-              breaker_at: ckt.breaker_at || ckt.breaker_rating,
-              wire_size_l: ckt.wire_size_l || ckt.wire_size,
-              wire_size_n: ckt.wire_size_n || ckt.wire_size,
-              wire_size_grd: ckt.wire_size_grd || ckt.ground_size || '2.5',
-              wire_type: ckt.wire_type || 'IEC01',
-              ground_size: ckt.ground_size || '2.5',
-              conduit_type: ckt.conduit_type || 'PVC',
-              requires_rcbo: ckt.requires_rcbo || false,
-              remark: ckt.remark || '',
-            })),
+            loads: (displayData.circuits || []).map(mapCircuitToLoadResult),
             warnings: displayData.warnings || [],
             explainable_warnings: displayData.explainable_warnings,
             assumptions: displayData.assumptions,
@@ -738,17 +704,7 @@ function App() {
                           success: true,
                           message: 'Design restored',
                           data: {
-                            loads: (displayData.circuits || []).map((ckt: Record<string, unknown>) => ({
-                              room_name: ckt.room || ckt.floor || '',
-                              device_name: ckt.circuit_name,
-                              power_kw: ckt.total_kw,
-                              current_a: ckt.total_current,
-                              breaker_size: ckt.breaker_rating,
-                              wire_size: `${ckt.wire_size} mm²`,
-                              conduit_size: ckt.conduit_size,
-                              voltage_drop_percent: ckt.vd_percent,
-                              total_va: ckt.total_va || 0,
-                            })),
+                            loads: (displayData.circuits || []).map(mapCircuitToLoadResult),
                             warnings: displayData.warnings || [],
                             total_power_kw: displayData.total_kw,
                             main_breaker: Number.parseInt(displayData.main_breaker) || 0,

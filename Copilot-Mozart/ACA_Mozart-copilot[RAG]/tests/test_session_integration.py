@@ -11,6 +11,7 @@ import sys
 import os
 import asyncio
 import unittest
+import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 
 # Add app to path
@@ -67,6 +68,7 @@ class TestSessionIntegration(unittest.TestCase):
         self.assertEqual(MAX_PROJECTS_PER_USER, 10)
         self.assertEqual(DEFAULT_PROJECT_NAME, "บ้านนายสมหญิง")
     
+    @pytest.mark.live
     def test_05_guest_mode_uses_null_user_id(self):
         """REAL Integration Test: Guest session creates with NULL user_id in Supabase.
         
@@ -120,51 +122,10 @@ class TestSessionIntegration(unittest.TestCase):
         self.assertIn('project_name', params)
         self.assertIn('initial_data', params)
     
-    def test_07_delete_requires_confirm(self):
-        """Test that delete endpoint requires CONFIRM."""
-        # This would be an integration test with FastAPI TestClient
-        # For now, verify the logic is in place
-        import re
-        
-        routes_path = os.path.join(
-            os.path.dirname(__file__), '..', 'app', 'routes.py'
-        )
-        with open(routes_path, 'r') as f:
-            content = f.read()
-        
-        # Check CONFIRM requirement exists
-        self.assertIn('confirm != "CONFIRM"', content)
-        self.assertIn('?confirm=CONFIRM', content)
-    
-    def test_08_list_projects_endpoint_exists(self):
-        """Test that list projects endpoint exists."""
-        import re
-        
-        routes_path = os.path.join(
-            os.path.dirname(__file__), '..', 'app', 'routes.py'
-        )
-        with open(routes_path, 'r') as f:
-            content = f.read()
-        
-        # Check list endpoint exists
-        self.assertIn('/api/v1/session/list', content)
-        self.assertIn('def list_projects', content)
-    
-    def test_09_start_session_accepts_project_name(self):
-        """Test that start_session accepts project_name from request body."""
-        import re
-        
-        routes_path = os.path.join(
-            os.path.dirname(__file__), '..', 'app', 'routes.py'
-        )
-        with open(routes_path, 'r') as f:
-            content = f.read()
-        
-        # Check project_name is parsed from Query param
-        # New code uses: project_name: Optional[str] = Query(...)
-        self.assertIn('project_name: Optional[str] = Query', content)
-        self.assertIn('actual_project_name = project_name or "บ้านนายสมหญิง"', content)
+    # NOTE: Tests 07-09 removed — they read routes.py as a text file (fragile).
+    # Endpoint existence is now tested by TestClient tests in test_gateway_auth.py.
 
+    @pytest.mark.live
     def test_10_session_update_real_integration(self):
         """REAL Integration Test: Session UPDATE persists to Supabase.
         
@@ -212,6 +173,7 @@ class TestSessionIntegration(unittest.TestCase):
         result = asyncio.get_event_loop().run_until_complete(run_test())
         self.assertTrue(result)
 
+    @pytest.mark.live
     def test_11_edit_merge_real_integration(self):
         """REAL Integration Test: Edit/Merge changes persist to Supabase.
         
@@ -285,6 +247,7 @@ class TestSessionIntegration(unittest.TestCase):
         result = asyncio.get_event_loop().run_until_complete(run_test())
         self.assertTrue(result)
 
+    @pytest.mark.live
     def test_12_actual_account_full_integration(self):
         """REAL Integration Test: Actual Account FULL flow (NO MOCKS AT ALL).
         
@@ -387,6 +350,7 @@ class TestSessionPersistenceReal(unittest.TestCase):
     3. Multiple projects don't overwrite each other (UUID unique)
     """
 
+    @pytest.mark.live
     def test_13_session_refresh_persistence(self):
         """REAL Test: Session data persists after 'refresh' (simulated by load).
         
@@ -444,6 +408,7 @@ class TestSessionPersistenceReal(unittest.TestCase):
         result = asyncio.get_event_loop().run_until_complete(run_test())
         self.assertTrue(result)
 
+    @pytest.mark.live
     def test_14_crud_full_cycle_real(self):
         """REAL Test: Full CRUD cycle with actual Supabase.
         
@@ -501,6 +466,7 @@ class TestSessionPersistenceReal(unittest.TestCase):
         result = asyncio.get_event_loop().run_until_complete(run_test())
         self.assertTrue(result)
 
+    @pytest.mark.live
     def test_15_multiple_projects_unique_uuid(self):
         """REAL Test: Multiple projects don't overwrite each other.
         
@@ -584,6 +550,7 @@ class TestAdvancedIntegration(unittest.TestCase):
     NO MOCKS - All tests hit real Supabase!
     """
 
+    @pytest.mark.live
     def test_16_concurrent_session_writes(self):
         """REAL Test: Multiple concurrent writes don't corrupt data.
         
@@ -632,6 +599,7 @@ class TestAdvancedIntegration(unittest.TestCase):
         result = asyncio.get_event_loop().run_until_complete(run_test())
         self.assertTrue(result)
 
+    @pytest.mark.live
     def test_17_null_user_id_handling(self):
         """REAL Test: Guest sessions (NULL user_id) work correctly.
         
@@ -673,6 +641,7 @@ class TestAdvancedIntegration(unittest.TestCase):
         result = asyncio.get_event_loop().run_until_complete(run_test())
         self.assertTrue(result)
 
+    @pytest.mark.live
     def test_18_session_data_integrity(self):
         """REAL Test: Complex data structures persist correctly.
         

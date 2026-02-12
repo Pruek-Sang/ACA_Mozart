@@ -98,6 +98,7 @@ THE_STRESS_TEST_PROMPT = """
 # ═══════════════════════════════════════════════════════════════════════════
 # TEST FUNCTION
 # ═══════════════════════════════════════════════════════════════════════════
+@pytest.mark.live
 @pytest.mark.skipif(not LIVE_TESTS_ENABLED, reason="Live tests disabled. Set ENABLE_LIVE_TESTS=true")
 @pytest.mark.asyncio
 async def test_stress_scenario_hardcore():

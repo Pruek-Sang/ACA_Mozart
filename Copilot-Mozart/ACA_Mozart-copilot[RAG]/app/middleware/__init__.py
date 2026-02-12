@@ -11,9 +11,11 @@ Philosophy:
 """
 
 from .rate_limiter import RateLimiter, rate_limiter, RateLimitExceeded
+from .jwt_auth import jwt_auth_middleware
 
 __all__ = [
     "RateLimiter",
     "rate_limiter",
     "RateLimitExceeded",
+    "jwt_auth_middleware",
 ]

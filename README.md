@@ -50,43 +50,43 @@
 ## 🏗 Architecture
 
 ```
-          ┌─────────────────────────────────────────────────────────────┐
-          │                      Client Browser                         │
-          │       React 19 + TypeScript + Tailwind + Supabase Auth      │
-          └────────────────────────┬────────────────────────────────────┘
-                                   │
-          ┌────────────────────────▼────────────────────────────────────┐
-          │  Frontend Container (NGINX serves React + proxies /api)     │
-          │  Production: Cloud Run  ·  Local: npm run dev (Vite :3000)  │
-          └────────────────────────┬────────────────────────────────────┘
-                                   │ /api/*
-                                   ▼
-          ┌─────────────────────────────────────────────────────────┐
-          │               Gateway Service (:8000)                   │
-          │     LLM-based Intent Router + Rate Limiting + CORS      │
-          │     Routes:  MOZART (engineering)  |  AMADEUS (chat)    │
-          └───────────────────┬─────────────────────────────────────┘
-                              │
-                              ▼
-          ┌─────────────────────────────────────────────────────────┐
-          │               Mozart RAG Service (:8080)                │
-          │  Google Gemini LLM  ·  FAISS Vector DB  ·  FastAPI     │
-          │                                                         │
-          │  ┌─────────┐  ┌──────────────┐  ┌───────────────────┐  │
-          │  │Knowledge │→│ 5-Phase Spec │→│  MCP Adapter      │  │
-          │  │Retrieval │  │ Generation   │  │  (Validate+Map)   │  │
-          │  └─────────┘  └──────────────┘  └────────┬──────────┘  │
-          └──────────────────────────────────────────┼──────────────┘
-                                                     │ HTTP
-                                                     ▼
-          ┌─────────────────────────────────────────────────────────┐
-          │               MCP Core v2 Service (:5001)               │
-          │    NEC/EIT-Compliant Electrical Calculation Engine       │
-          │                                                         │
-          │  Load Calc → Wire Sizer → Breaker Selector → Conduit   │
-          │  Circuit Grouper → Compliance Check → AutoLISP Gen     │
-          │  pandapower  ·  Derating/kA/NG-Link Injectors          │
-          └─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Client Browser                           │
+│         React 19 + TypeScript + Tailwind + Supabase Auth        │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+┌───────────────────────────────▼─────────────────────────────────┐
+│    Frontend Container (NGINX serves React + proxies /api)       │
+│    Production: Cloud Run  ·  Local: npm run dev (Vite :3000)    │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │ /api/*
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Gateway Service (:8000)                       │
+│        LLM-based Intent Router + Rate Limiting + CORS           │
+│        Routes:  MOZART (engineering)  |  AMADEUS (chat)         │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  Mozart RAG Service (:8080)                      │
+│     Google Gemini LLM  ·  FAISS Vector DB  ·  FastAPI           │
+│                                                                 │
+│  ┌───────────┐  ┌────────────────┐  ┌───────────────────────┐  │
+│  │ Knowledge  │→│  5-Phase Spec  │→│     MCP Adapter       │  │
+│  │ Retrieval  │  │  Generation    │  │   (Validate+Map)      │  │
+│  └───────────┘  └────────────────┘  └───────────┬───────────┘  │
+└─────────────────────────────────────────────────┼───────────────┘
+                                                  │ HTTP
+                                                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 MCP Core v2 Service (:5001)                      │
+│       NEC/EIT-Compliant Electrical Calculation Engine            │
+│                                                                 │
+│  Load Calc → Wire Sizer → Breaker Selector → Conduit           │
+│  Circuit Grouper → Compliance Check → AutoLISP Gen              │
+│  pandapower  ·  Derating/kA/NG-Link Injectors                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 **Four independent services** communicate over a Docker bridge network. NGINX is embedded inside the Frontend container (not a standalone proxy). Each service has its own health check and can be scaled independently.
@@ -107,7 +107,8 @@
 - Breaker/RCBO selection with proper trip curves
 - Conduit fill calculation (NEC Chapter 9)
 - Circuit grouping with automatic load balancing across phases
-- **Safety injectors**: Temperature derating, kA rating (transformer proximity), N-G link rules
+- **Safety injectors**: Temperature derating, kA rating (transformer proximity), N-G link rules, solar PV, EV charger support
+- **Automated safety warnings**: RCBO requirements, AFCI recommendations, motor starter/overload protection, dedicated circuit enforcement
 
 ### Intelligent Gateway Router
 - LLM-based intent classification (engineering queries → Mozart, general chat → Amadeus)
@@ -117,13 +118,24 @@
 
 ### Production Frontend
 - **Authentication**: Supabase Auth (email/password + guest mode)
-- **Chat UI**: Real-time conversational interface for design input (Thai + English)
-- **Result Viewer**: Tabular load schedules, circuit details, compliance warnings
-- **SLD Viewer**: Single-line diagram rendering with SVG symbols
-- **BOQ Export**: Bill of quantities with live-scraped market pricing → PDF/Excel
-- **QC Certificate**: Generated compliance certificate panel
-- **Session Persistence**: Multi-project support with Supabase-backed session store
+- **Multi-turn Chat**: Conversational design — start with "ออกแบบบ้าน 2 ชั้น" then refine with "เพิ่มแอร์ห้องนอน 1"
+- **5-Tab Result Viewer**:
+  - **Load Table** — Per-circuit breakdown: device, VA, breaker, wire size, voltage drop %, pass/fail status
+  - **Audit** — Comparison of user-specified values vs system recommendations (e.g., "Default 15m → ควรวัดจริง")
+  - **SLD** — Single-line diagram with SVG symbols
+  - **BOQ** — Bill of quantities with live-scraped pricing from HomePro/GlobalHouse
+  - **Assumptions** — Transparent display of all system assumptions and defaults used
+- **Summary Bar**: Main CB, main feeder size, raceway type, demand factor — at a glance
+- **Download**: Export full report as PDF or Excel
+- **Site Context**: Transformer distance detection → automatic kA rating warnings
+- **Session Persistence**: Multi-project support with Supabase-backed session store (rename, switch, delete projects)
 - **Health Dashboard**: Live service status monitoring
+
+### BOQ with Live Market Pricing
+- **Web scraper** pulls real prices from HomePro and GlobalHouse
+- **Auto-updated monthly** via GitHub Actions (`price-scraper.yml`)
+- Fallback to previous prices if scraping fails
+- Prices committed to `catalog/prices.csv` automatically
 
 ### AutoCAD Integration
 - AutoLISP code generation from calculation results

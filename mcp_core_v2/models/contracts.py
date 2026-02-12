@@ -58,6 +58,10 @@ class ElectricalLoad(BaseModel):
     location: Location
     is_continuous: bool = False
     notes: Optional[str] = None
+    device_code: Optional[str] = Field(
+        None,
+        description="Original device code from RAG (e.g. AC-12000BTU). Preserved for EDIT mode matching."
+    )
     # ============================================================
     # Voltage Drop Distance Fields (วสท. 2564 Compliant)
     # ============================================================

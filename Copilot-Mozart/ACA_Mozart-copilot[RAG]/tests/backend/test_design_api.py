@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 class TestDesignAsk:
     """Test POST /api/v1/ask"""
     
+    @pytest.mark.live
     def test_ask_returns_answer(self, test_client):
         """POST /ask with question → returns answer"""
         response = test_client.post(
@@ -32,6 +33,7 @@ class TestDesignAsk:
         assert "answer" in data
         assert len(data["answer"]) > 0
     
+    @pytest.mark.live
     def test_ask_with_session_id(self, test_client):
         """POST /ask with session_id → results associated with session"""
         # Create session first
@@ -49,6 +51,7 @@ class TestDesignAsk:
         # Should succeed (may take time for LLM)
         assert response.status_code in [200, 504]  # 504 = LLM timeout
     
+    @pytest.mark.live
     def test_ask_design_intent_returns_calculation(self, test_client):
         """POST /ask with design query → returns calculation data"""
         response = test_client.post(

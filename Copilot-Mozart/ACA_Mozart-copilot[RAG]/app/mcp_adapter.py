@@ -63,6 +63,7 @@ class McpElectricalLoad:
     notes: Optional[str] = None
     branch_distance_m: Optional[float] = None  # 🆕 VD Calculation
     power_factor: Optional[float] = None  # 🆕 PF by load type (1.0=resistive, 0.85=motor)
+    device_code: Optional[str] = None  # 🆕 Preserve for EDIT mode matching
     
     def to_dict(self) -> Dict:
         """Convert to dict for JSON serialization"""
@@ -80,7 +81,8 @@ class McpElectricalLoad:
             "is_continuous": self.is_continuous,
             "notes": self.notes,
             "branch_distance_m": self.branch_distance_m,
-            "power_factor": self.power_factor  # 🆕 Include PF in API request
+            "power_factor": self.power_factor,  # 🆕 Include PF in API request
+            "device_code": self.device_code,  # 🆕 Preserve for EDIT mode matching
         }
 
 
@@ -405,7 +407,8 @@ class McpAdapter:
                 is_continuous=is_continuous,
                 notes=load.notes,
                 branch_distance_m=dist,
-                power_factor=power_factor  # 🆕 Correct PF by load type
+                power_factor=power_factor,  # 🆕 Correct PF by load type
+                device_code=load.device_code,  # 🆕 Preserve for EDIT mode matching
             )
             mcp_loads.append(mcp_load)
         

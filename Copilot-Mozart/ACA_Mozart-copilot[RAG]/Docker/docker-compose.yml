@@ -70,6 +70,8 @@ services:
       - PYTHONUNBUFFERED=1
       # MCP Core connection
       - MCP_CORE_URL=http://mcp-core:5001
+      # JWT Auth (reads from .env_ACA if set there)
+      # - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
     
     restart: unless-stopped
     

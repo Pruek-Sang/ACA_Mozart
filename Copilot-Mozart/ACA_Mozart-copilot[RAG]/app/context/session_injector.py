@@ -50,9 +50,7 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _generate_guest_id() -> str:
-    """Generate a guest user ID for anonymous users."""
-    return f"guest_{uuid.uuid4().hex[:12]}"
+# _generate_guest_id() removed — guests use user_id=None (DB stores NULL in UUID column)
 
 
 @dataclass
@@ -267,6 +265,23 @@ class SessionInjector:
             
             if result.data:
                 session = SessionData.from_dict(result.data)
+                
+                # 🆕 Guest session TTL enforcement (24h)
+                # Real users (UUID) don't expire. Guests (user_id=None) expire after 24h.
+                if session.user_id is None and session.expires_at:
+                    try:
+                        from datetime import datetime, timezone
+                        if isinstance(session.expires_at, str):
+                            # Parse ISO format from Supabase (e.g., "2026-02-12T10:30:00+00:00")
+                            exp = datetime.fromisoformat(session.expires_at.replace("Z", "+00:00"))
+                        else:
+                            exp = session.expires_at
+                        if exp < datetime.now(timezone.utc):
+                            logger.warning(f"[SESSION-LOAD] ⏰ Guest session expired: {session_id[:8]}")
+                            return None
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"[SESSION-LOAD] ⚠️ Could not parse expires_at: {e}")
+                
                 logger.info(f"[SESSION-LOAD] ✅ Found: {session.project_name}")
                 logger.info(f"[SESSION-LOAD] Has MCP: {bool(session.mcp_response)}")
                 logger.info(f"[SESSION-LOAD] Messages: {len(session.messages) if session.messages else 0}")

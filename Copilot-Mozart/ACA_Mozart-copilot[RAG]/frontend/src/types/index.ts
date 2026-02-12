@@ -174,6 +174,7 @@ export interface CircuitData {
     requires_rcbo: boolean;
     num_loads: number;
     notes: string[];
+    device_code?: string;          // 🆕 Device code for EDIT mode matching
 
     // === NEW FIELDS (Optional - Professional Load Table) ===
     circuit_no?: number;           // CCT No. (1, 2, 3...)
@@ -383,6 +384,7 @@ export interface LoadResult {
     id?: string;
     room_name: string;
     device_name: string;
+    device_code?: string;        // 🆕 Original device code for EDIT mode (e.g. AC-12000BTU)
     power_kw: number;
     current_a: number;
     breaker_size: number;
@@ -391,6 +393,7 @@ export interface LoadResult {
     voltage_drop_percent?: number;
     phase?: number;
     warnings?: string[];
+    requires_rcbo?: boolean;     // 🆕 RCBO requirement flag
 
     // Legacy / Alternative fields found in usage
     total_watts?: number;

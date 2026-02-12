@@ -401,7 +401,7 @@ class ServiceProxy:
         # Site context answer = has site keywords but NO new design request
         return has_site and not has_design
     
-    async def call_mozart(self, request: GatewayRequest, trace_id: str) -> Dict[str, Any]:
+    async def call_mozart(self, request: GatewayRequest, trace_id: str, auth_header: Optional[str] = None) -> Dict[str, Any]:
         """
         Call MOZART (RAG Service)
         
@@ -411,6 +411,10 @@ class ServiceProxy:
         - /api/v1/ask for general questions
         """
         try:
+            # 🔧 FIX: Build headers with auth forwarding to prevent user_id=NULL
+            _headers = {"X-Trace-ID": trace_id}
+            if auth_header:
+                _headers["Authorization"] = auth_header
             # [CP1] Checkpoint: Gateway Entry
             query_len = len(request.input)
             has_session = hasattr(request, 'session_id') and request.session_id
@@ -480,7 +484,7 @@ class ServiceProxy:
                                 {"field_name": k, "value": v} 
                                 for k, v in site_context.items()
                             ]},
-                            headers={"X-Trace-ID": trace_id}
+                            headers=_headers
                         )
                     
                     # Get session's remembered requirements and design
@@ -513,7 +517,7 @@ class ServiceProxy:
                     # Start new session
                     session_resp = await self.client.post(
                         f"{MOZART_ENDPOINT}/api/v1/session/start",
-                        headers={"X-Trace-ID": trace_id}
+                        headers=_headers
                     )
                     
                     if session_resp.status_code == 200:
@@ -553,7 +557,7 @@ class ServiceProxy:
             response = await self.client.post(
                 endpoint,
                 json=payload,
-                headers={"X-Trace-ID": trace_id}
+                headers=_headers
             )
             response.raise_for_status()
             
@@ -580,13 +584,16 @@ class ServiceProxy:
             logger.error(f"[{trace_id}] MOZART call failed: {e}")
             return {"error": str(e)}
     
-    async def call_amadeus(self, request: GatewayRequest, trace_id: str) -> Dict[str, Any]:
+    async def call_amadeus(self, request: GatewayRequest, trace_id: str, auth_header: Optional[str] = None) -> Dict[str, Any]:
         """
         Call AMADEUS (AGI Service)
         
         For general conversation and non-technical queries
         """
         try:
+            _headers = {"X-Trace-ID": trace_id}
+            if auth_header:
+                _headers["Authorization"] = auth_header
             response = await self.client.post(
                 f"{AMADEUS_ENDPOINT}/chat",
                 json={
@@ -594,7 +601,7 @@ class ServiceProxy:
                     "user_id": request.user_id,
                     "session_id": request.session_id
                 },
-                headers={"X-Trace-ID": trace_id}
+                headers=_headers
             )
             response.raise_for_status()
             return response.json()
@@ -723,7 +730,8 @@ async def proxy_ask(request: Request):
                 json=body,
                 headers={
                     "Content-Type": "application/json",
-                    "X-Forwarded-For": request.client.host if request.client else "unknown"
+                    "X-Forwarded-For": request.client.host if request.client else "unknown",
+                    **_forward_auth(request),  # 🔧 FIX: Forward auth to prevent user_id=NULL
                 }
             )
             
@@ -759,7 +767,8 @@ async def proxy_logs(request: Request):
                 json=body,
                 headers={
                     "Content-Type": "application/json",
-                    "X-Forwarded-For": request.client.host if request.client else "unknown"
+                    "X-Forwarded-For": request.client.host if request.client else "unknown",
+                    **_forward_auth(request),  # 🔧 FIX: Forward auth for log attribution
                 }
             )
             
@@ -777,8 +786,63 @@ async def proxy_logs(request: Request):
 
 
 # =============================================================================
+# 🆕 Undo Proxy Route (Frontend Undo Button)
+# =============================================================================
+
+@app.post("/api/v1/undo")
+async def proxy_undo(request: Request):
+    """
+    Proxy /api/v1/undo to RAG Service (MOZART)
+    
+    Frontend Undo Button calls this endpoint.
+    Backend expects session_id as a query parameter.
+    """
+    try:
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "session_id query parameter required"}
+            )
+
+        url = f"{MOZART_ENDPOINT}/api/v1/undo?session_id={session_id}"
+        logger.info(f"[PROXY] Undo request for session: {session_id[:8]}...")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    **_forward_auth(request),
+                }
+            )
+            return JSONResponse(
+                status_code=response.status_code,
+                content=response.json()
+            )
+    except Exception as e:
+        logger.error(f"Proxy /api/v1/undo failed: {e}")
+        return JSONResponse(
+            status_code=502,
+            content={"error": f"Gateway proxy error: {str(e)}"}
+        )
+
+
+# =============================================================================
 # 🆕 Session Proxy Routes (Frontend needs these!)
 # =============================================================================
+
+def _forward_auth(request: Request) -> dict:
+    """Forward Authorization header from client request to backend.
+    
+    🔧 BUG FIX: Previously only proxy_session_list forwarded auth.
+    Without auth, RAG backend creates sessions with user_id=NULL,
+    causing all anonymous sessions to overwrite each other.
+    """
+    headers = {}
+    if auth := request.headers.get("Authorization"):
+        headers["Authorization"] = auth
+    return headers
 
 @app.post("/api/v1/session/start")
 async def proxy_session_start(request: Request):
@@ -791,7 +855,7 @@ async def proxy_session_start(request: Request):
             url += f"?project_name={project_name}"
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url)
+            response = await client.post(url, headers=_forward_auth(request))
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
         logger.error(f"Proxy /api/v1/session/start failed: {e}")
@@ -803,14 +867,9 @@ async def proxy_session_list(request: Request):
     """Proxy /api/v1/session/list to RAG Service"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            # Forward Authorization header if present
-            headers = {}
-            if auth := request.headers.get("Authorization"):
-                headers["Authorization"] = auth
-            
             response = await client.get(
                 f"{MOZART_ENDPOINT}/api/v1/session/list",
-                headers=headers
+                headers=_forward_auth(request)
             )
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
@@ -823,7 +882,7 @@ async def proxy_session_get(session_id: str, request: Request):
     """Proxy /api/v1/session/{id} to RAG Service"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}")
+            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}", headers=_forward_auth(request))
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
         logger.error(f"Proxy /api/v1/session/{session_id} failed: {e}")
@@ -835,7 +894,7 @@ async def proxy_session_data(session_id: str, request: Request):
     """Proxy /api/v1/session/{id}/data to RAG Service"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/data")
+            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/data", headers=_forward_auth(request))
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
         logger.error(f"Proxy /api/v1/session/{session_id}/data failed: {e}")
@@ -852,7 +911,7 @@ async def proxy_session_delete(session_id: str, request: Request):
             url += f"?confirm={confirm}"
         
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.delete(url)
+            response = await client.delete(url, headers=_forward_auth(request))
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
         logger.error(f"Proxy DELETE /api/v1/session/{session_id} failed: {e}")
@@ -868,7 +927,7 @@ async def proxy_session_site_get(session_id: str, request: Request):
     """Proxy GET /api/v1/session/{id}/site to RAG Service"""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/site")
+            response = await client.get(f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/site", headers=_forward_auth(request))
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
         logger.error(f"Proxy GET /api/v1/session/{session_id}/site failed: {e}")
@@ -883,7 +942,8 @@ async def proxy_session_site_post(session_id: str, request: Request):
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/site",
-                json=body
+                json=body,
+                headers=_forward_auth(request)
             )
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
@@ -909,7 +969,8 @@ async def proxy_session_design(session_id: str, request: Request):
         async with httpx.AsyncClient(timeout=120.0) as client:  # Longer timeout for design
             response = await client.post(
                 f"{MOZART_ENDPOINT}/api/v1/session/{session_id}/design",
-                json=body
+                json=body,
+                headers=_forward_auth(request)
             )
             return JSONResponse(status_code=response.status_code, content=response.json())
     except Exception as e:
@@ -919,6 +980,7 @@ async def proxy_session_design(session_id: str, request: Request):
 @app.post("/orchestrate", response_model=GatewayResponse)
 async def orchestrate(
     request: GatewayRequest,
+    raw_request: Request,
     x_trace_id: Optional[str] = Header(None)
 ) -> GatewayResponse:
     """
@@ -935,6 +997,8 @@ async def orchestrate(
     """
     start_time = time.time()
     trace_id = x_trace_id or f"gateway-{uuid.uuid4().hex[:12]}"
+    # 🔧 FIX: Extract auth header from raw request to forward to backend
+    _auth = raw_request.headers.get("Authorization")
     
     logger.info(f"[{trace_id}] Orchestrating: {request.input[:50]}...")
     
@@ -944,7 +1008,7 @@ async def orchestrate(
         
         if dialogue_response.get("ready_for_mcp"):
             # Dialogue complete → Execute via MOZART
-            data = await proxy.call_mozart(request, trace_id)
+            data = await proxy.call_mozart(request, trace_id, auth_header=_auth)
             return GatewayResponse(
                 mode=IntentMode.MOZART,
                 data={"dialogue": dialogue_response, "result": data},
@@ -978,9 +1042,9 @@ async def orchestrate(
     
     # Call appropriate service
     if decision.mode == IntentMode.MOZART:
-        data = await proxy.call_mozart(request, trace_id)
+        data = await proxy.call_mozart(request, trace_id, auth_header=_auth)
     else:
-        data = await proxy.call_amadeus(request, trace_id)
+        data = await proxy.call_amadeus(request, trace_id, auth_header=_auth)
     
     return GatewayResponse(
         mode=decision.mode,
