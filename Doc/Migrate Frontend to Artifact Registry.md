@@ -293,7 +293,7 @@ gcloud run deploy mozart-rag \
   --region $REGION \
   --allow-unauthenticated \
   --memory 1Gi \
-  --set-env-vars "MCP_CORE_URL=$MCP_URL,GOOGLE_API_KEY=REDACTED_GOOGLE_KEY"
+  --set-env-vars "MCP_CORE_URL=$MCP_URL,GOOGLE_API_KEY=REDACTED_API_KEY"
 
 # Get RAG URL
 RAG_URL=$(gcloud run services describe mozart-rag --region $REGION --format 'value(statusecho "========================================"ntend --region $REGION --format 'value(sta
@@ -668,7 +668,7 @@ gcloud run deploy mozart-rag \
   --region $REGION \
   --allow-unauthenticated \
   --memory 1Gi \
-  --set-env-vars "MCP_CORE_URL=$MCP_URL,GOOGLE_API_KEY=REDACTED_GOOGLE_KEY"
+  --set-env-vars "MCP_CORE_URL=$MCP_URL,GOOGLE_API_KEY=REDACTED_API_KEY"
 
 # Get RAG URL
 RAG_URL=$(gcloud run services describe mozart-rag --region $REGION --format 'value(statusecho "========================================"ntend --region $REGION --format 'value(sta
@@ -1683,7 +1683,7 @@ GATEWAY_URL: import.meta.env.DEV
 
 ```bash
 gcloud run deploy gateway \
-  --set-env-vars "GOOGLE_API_KEY=REDACTED_GOOGLE_KEY"  # อยู่ที่นี่!
+  --set-env-vars "GOOGLE_API_KEY=REDACTED_API_KEY"  # อยู่ที่นี่!
 ```
 
 **Gateway เก็บ API Key ไว้แล้ว** - Frontend แค่เรียกหา Gateway ก็พอ!
@@ -2868,14 +2868,14 @@ gcloud run deploy frontend --image docker.io/acatest01/mozart-frontend:3c31423 -
 {
   "type": "service_account",
   "project_id": "gen-lang-client-0658701327",
-  "private_key_id": "3005369840eb8f4f029e1a24580cd6636a6d36ea",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQC82dQQilvvSe0q\nKBwf8rZkbZ9oWZlsqC9R1Y1BkKwhIGSeCaMaGyjlyUzBJtDGJxaIrxFHHUS6IanX\nFqSw2gjrX3zJamYx4OR4AASBdFIsadsrZMyN0oEa3hzFTZn5/8CQHoD8NV9gBRg7\nr8yTbbvmHVl464bRcE+wM/xLP/7fk5uq13eLIP+LHEnIeVtpI1GEe7N223uPomR7\nl6K4V+SG4eA0gJ+Q8u7s/KR/jyAmS52mM+UWHkorUWtJ16kUXMKPeeM6MIkD0NOI\nb+PQyDf5R8j8yTGrf9iEyZgp4A7cSjQms+rRgCJDrSYylvDgIPpBL2Jnd1zk6dH3\nL3Qlu44XAgMBAAECggEARdqnC/U5u2HTdZf/izu6hpxb7fvSefQeCL2eseVjHh++\nyAxVhdcNAi47E2kZqWoU9jsXf4AOh3DjQ1mvUnFcAkBARrpyEboXmGGdSQsvSBlh\nxgPTfBQkyDznVH33WhdlcYmu+Vt+q2RHCfDlkZTx/1TU3xrzs+3AtDMOfAEwdB8g\nXc10g0rLyMoscbSPRrHD7Uj6dqC8/xnfXWGGVrKnOxVZt6UAV71JbUDazCIiuh+o\nCv7v9Db+0SMTcrtY/Ck4WshDs80Yd9L1oULvN1LVxAVPb/DMtaXDV8W9NDcLi4tB\n6Zw4QrD6TeNP2ntv5k4YybIr3UagWrYu3P2BiCvGFQKBgQDzlWGAG2trjcZ66p5l\nfaBAGHxi9CyURfxPHxhvjlZShgoBSVpfiv1i5zbFc+Mbh39Ou//k8lCUgKSpqQxd\nypktElPq9a0FZcKjc0IxglpBWwQxseu9NwinQDk9kkpjAw7qEFgSQQ490r1AJmiN\ndJlVHN2zccC7xbkntpBc0e3O3QKBgQDGejgwrSmL3MnZPPu+3wYcXgAhW27wE11J\nIYoQbxDjkcCSRBOFd0gPFP4nA84eeuDLLssL6Gbd59zpMHyEOBww2n2O1PYHPjyC\n8qfm13X2QAhicLSsoFQZr6KLXwExzmt6G1zuBMU+4xwTVS/+qnxZiW9z2+zMLv+l\n7RWzNn7PgwKBgBE0aueWiDbXk75Y1glLH0eHszl2D7QFYXXhN2OhxR0dFJXUrYp0\nEcOrmyXFMrReFLLl+oQcTW6/y2GkbBgv2DPjyIOfCLKJ5n6PBIzkrSVSnXA5JfJ+\ncaEGm0RrEc/+hk4oC2B2sd/SA8YFMHtVUgM9/7bOARQCOjrA3V+BAHANAn8MZ5cb\nc7clBqeW7DjPtSCspTNc4loMpyktaOs4G7jygCmI+rg9nzbhum4oAhTf0s455LLM\nC7piJBuqd11Q5jDc3Mr8IlM+IKWniYL06oJ04Yukm2avY1XeRRvjmgx5EG2nNA6a\n0bGCPK+Ehc56HC2pau2MUDJ8kHNp62dvy/ghAoGBAOClsLFX2nGiyBDET7ezPDgb\nN0wG4ZkeLFiLIZVGwNo2vFMMlOyezqabuenRraB6vGhoXEb5bVSVIKqOpmL80LHu\nDVdChaRKpsva8Qotjdfh43QCOCrGKVwAqBAGlGKonopEy2EYGqMzN9/8lppzEyRB\nnW1aj10RwmgBO+g0mrvr\n-----END PRIVATE KEY-----\n",
+  "private_key_id": "REDACTED_KEY_ID",
+  "private_key": "REDACTED_PRIVATE_KEY",
   "client_email": "github-actions@gen-lang-client-0658701327.iam.gserviceaccount.com",
-  "client_id": "113923700000313552066",
+  "client_id": "REDACTED_CLIENT_ID",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/github-actions%40gen-lang-client-0658701327.iam.gserviceaccount.com",
+  "client_x509_cert_url": "REDACTED_CERT_URL",
   "universe_domain": "googleapis.com"
 }]
 

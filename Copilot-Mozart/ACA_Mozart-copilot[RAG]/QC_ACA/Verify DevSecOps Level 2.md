@@ -3897,9 +3897,9 @@ echo -n "ใส่_GEMINI_API_KEY_ตรงนี้" | gcloud secrets create ge
 
 ### User Input
 
-อ่ะเอาไป  REDACTED_GOOGLE_KEY   และทำ phase 4 เลย
+อ่ะเอาไป  REDACTED_API_KEY   และทำ phase 4 เลย
 
-*User accepted the command `echo -n "REDACTED_GOOGLE_KEY" | gcloud secrets create gemini-key --data-file=- --project=gen-lang-client-0658701327 2>&1 || echo "Secret may already exist, trying to update..."`*
+*User accepted the command `echo -n "REDACTED_API_KEY" | gcloud secrets create gemini-key --data-file=- --project=gen-lang-client-0658701327 2>&1 || echo "Secret may already exist, trying to update..."`*
 
 *Checked command status*
 
@@ -4967,9 +4967,9 @@ https://github.com/Pruek-Sang/ACA_Mozart/actions
 
 ### User Input
 
-อันนี้ผ่านมั้ย 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
+อันนี้ผ่านมั้ย ghp_REDACTED
 
-*User accepted the command `curl -s -H "Authorization: token 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" "https://api.github.com/repos/Pruek-Sang/ACA_Mozart/actions/runs?per_page=10" | jq '.workflow_runs[] | {id, name, conclusion, head_sha: .head_sha[0:7], created_at}' 2>&1`*
+*User accepted the command `curl -s -H "Authorization: token ghp_REDACTED" "https://api.github.com/repos/Pruek-Sang/ACA_Mozart/actions/runs?per_page=10" | jq '.workflow_runs[] | {id, name, conclusion, head_sha: .head_sha[0:7], created_at}' 2>&1`*
 
 ### Planner Response
 
@@ -4987,7 +4987,7 @@ https://github.com/Pruek-Sang/ACA_Mozart/actions
 
 ### 🔍 ต้องดู Jobs ว่า MCP Core build จริงไหม:
 
-*User accepted the command `curl -s -H "Authorization: token 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" "https://api.github.com/repos/Pruek-Sang/ACA_Mozart/actions/runs/20526342217/jobs" | jq '.jobs[] | {name, conclusion}' 2>&1`*
+*User accepted the command `curl -s -H "Authorization: token ghp_REDACTED" "https://api.github.com/repos/Pruek-Sang/ACA_Mozart/actions/runs/20526342217/jobs" | jq '.jobs[] | {name, conclusion}' 2>&1`*
 
 ### Planner Response
 

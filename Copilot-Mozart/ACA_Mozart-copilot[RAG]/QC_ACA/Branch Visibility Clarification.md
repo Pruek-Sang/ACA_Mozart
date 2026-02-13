@@ -3620,7 +3620,7 @@ spec:
         - name: MCP_CORE_URL
           value: https://mcp-core-rc5mtgajza-as.a.run.app
         - name: GOOGLE_API_KEY
-          value: REDACTED_GOOGLE_KEY
+          value: REDACTED_API_KEY
 pruek050201@cloudshell:~ (gen-lang-client-0658701327)$   ก็ไม่มีปัญหานะ?
 
 ### Planner Response

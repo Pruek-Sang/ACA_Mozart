@@ -1290,7 +1290,7 @@ services:
 นี่คือ [.env](cci:7://file:///home/builder/Desktop/ACA_Mozart/Copilot-Mozart/ACA_Mozart-copilot%5BRAG%5D/.env:0:0-0:0) ปัจจุบันเจ้าค่ะ:
 
 ```
-GOOGLE_API_KEY=REDACTED_GOOGLE_KEY
+GOOGLE_API_KEY=REDACTED_API_KEY
 ```
 
 **ต้องการให้แก้อะไรเจ้าคะ?** 🔧
@@ -1321,7 +1321,7 @@ GOOGLE_API_KEY=M-`M-9M-^CM-`M-8M-*M-`M-9M-^H_API_KEY_M-`M-8M-^BM-`M-8M--M-`M-8M-
 **สร้าง [.env](cci:7://file:///home/builder/Desktop/ACA_Mozart/.env:0:0-0:0) ใหม่เรียบร้อยแล้วเจ้าค่ะ!** ✅
 
 ```
-GOOGLE_API_KEY=REDACTED_GOOGLE_KEY$
+GOOGLE_API_KEY=REDACTED_API_KEY$
 ```
 
 ไม่มีตัวอักษรแปลกๆแล้ว (มีแค่ `$` ตอนท้ายแสดง end of line ซึ่งปกติ)
@@ -1428,7 +1428,7 @@ DEBUG=false
 
 ### ไฟล์ [.env](cci:7://file:///home/builder/Desktop/ACA_Mozart/.env:0:0-0:0) ใหม่:
 ```bash
-GOOGLE_API_KEY=REDACTED_GOOGLE_KEY
+GOOGLE_API_KEY=REDACTED_API_KEY
 MISTRAL_API_KEY=REDACTED_MISTRAL_KEY
 MODEL_NAME_ANSWER=gemini-2.5-flash-lite
 MODEL_NAME_JUDGE=gemini-2.5-pro

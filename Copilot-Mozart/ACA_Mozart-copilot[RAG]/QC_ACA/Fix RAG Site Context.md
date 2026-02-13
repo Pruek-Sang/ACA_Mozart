@@ -4855,7 +4855,7 @@ MCP Core รองรับครบ:
 *User accepted the command `/tmp/test_env/bin/pip install google-generativeai --quiet 2>/dev/null && /tmp/test_env/bin/python3 -c "
 import google.generativeai as genai
 
-API_KEY = 'REDACTED_GOOGLE_KEY'
+API_KEY = 'REDACTED_API_KEY'
 genai.configure(api_key=API_KEY)
 
 try:
@@ -4878,7 +4878,7 @@ import google.generativeai as genai
 import warnings
 warnings.filterwarnings('ignore')
 
-API_KEY = 'REDACTED_GOOGLE_KEY'
+API_KEY = 'REDACTED_API_KEY'
 genai.configure(api_key=API_KEY)
 
 print('📋 Available Models:')
@@ -4906,7 +4906,7 @@ import google.generativeai as genai
 import warnings
 warnings.filterwarnings('ignore')
 
-API_KEY = 'REDACTED_GOOGLE_KEY'
+API_KEY = 'REDACTED_API_KEY'
 genai.configure(api_key=API_KEY)
 
 model = genai.GenerativeModel('gemini-2.5-flash-lite')
